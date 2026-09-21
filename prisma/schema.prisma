@@ -1,0 +1,528 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+enum AnalysisStatus {
+  UPLOADED
+  PARSING
+  AI_EXTRACTION
+  NORMALIZING
+  CALCULATING
+  VALIDATING
+  AI_AUDIT
+  WAITING_REVIEW
+  COMPLETED
+  FAILED
+  AI_ERROR
+}
+
+enum SubjectStatus {
+  EXEMPTED
+  PENDING
+  REVIEW
+}
+
+enum Readability {
+  CLEAR
+  UNCLEAR
+  UNREADABLE
+}
+
+enum SubjectOrigin {
+  AI
+  USER
+}
+
+enum EntryPeriodSource {
+  DOCUMENT
+  STRUCTURED
+  RULE
+  USER
+}
+
+enum ReliabilityLevel {
+  HIGH
+  REVIEW_RECOMMENDED
+  REVIEW_REQUIRED
+}
+
+enum ProjectionSubjectKind {
+  REGULAR
+  BACKLOG
+}
+
+enum WarningSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum WarningSource {
+  PIPELINE
+  VALIDATOR
+  AUDITOR
+  MATRIX
+  EXTRACTION
+}
+
+enum AIOperation {
+  DOCUMENT_EXTRACTION
+  CURRICULUM_EXTRACTION
+  AUDIT
+  FINAL_EXPLANATION
+  CONNECTION_TEST
+}
+
+enum AIReviewStatus {
+  OK
+  REVIEW
+}
+
+enum IntegrationStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+}
+
+enum RuleStatus {
+  CONFIRMED
+  CONFIGURABLE
+  NOT_CONFIGURED
+}
+
+enum RetentionPolicy {
+  DAYS_30
+  DAYS_90
+  DAYS_180
+  INDEFINITE
+  DELETE_AFTER_PROCESSING
+}
+
+enum AIPrivacyMode {
+  PDF_FILE
+  REDACTED_TEXT
+}
+
+// ------------------------------------------------------------------
+// Identidade e acesso
+// ------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         Role      @default(ANALYST)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime? @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+
+  analyses           CurricularAnalysis[] @relation("AnalysisCreatedBy")
+  manualCorrections  ManualCorrection[]
+  auditLogs          AuditLog[]
+  resolvedWarnings   AnalysisWarning[]    @relation("WarningResolvedBy")
+  ruleSetsCreated    RuleSetVersion[]
+  integrationsUpdated OpenAIIntegration[] @relation("IntegrationUpdatedBy")
+  integrationsCreated OpenAIIntegration[] @relation("IntegrationCreatedBy")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// ------------------------------------------------------------------
+// Análise curricular
+// ------------------------------------------------------------------
+
+model CurricularAnalysis {
+  id                     String             @id @default(uuid()) @db.Uuid
+  status                 AnalysisStatus     @default(UPLOADED)
+  createdById            String             @db.Uuid
+  courseName             String?
+  matrixLabel            String?
+  campus                 String?
+  modality               String?
+  candidateLabel         String?
+  entryPeriod            Int?
+  entryPeriodSource      EntryPeriodSource?
+  entryTerm              String?
+  startTerm              String
+  reliability            ReliabilityLevel?
+  reviewItemsCount       Int                @default(0)
+  processingSteps        Json               @default("[]")
+  errorCode              String?
+  errorMessage           String?
+  ruleSetVersionId       String             @db.Uuid
+  engineVersion          String
+  extractorPromptVersion String?
+  auditorPromptVersion   String?
+  extractionModel        String?
+  auditModel             String?
+  curriculumMatrixId     String?            @db.Uuid
+  projectionIncomplete   Boolean            @default(false)
+  completedAt            DateTime?          @db.Timestamptz(6)
+  lastCalculatedAt       DateTime?          @db.Timestamptz(6)
+  createdAt              DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime           @updatedAt @db.Timestamptz(6)
+
+  createdBy        User               @relation("AnalysisCreatedBy", fields: [createdById], references: [id])
+  ruleSetVersion   RuleSetVersion     @relation(fields: [ruleSetVersionId], references: [id])
+  curriculumMatrix CurriculumMatrix?  @relation(fields: [curriculumMatrixId], references: [id], onDelete: SetNull)
+  document         UploadedDocument?
+  subjects         AnalyzedSubject[]
+  projections      SemesterProjection[]
+  claims           DocumentClaim[]
+  warnings         AnalysisWarning[]
+  corrections      ManualCorrection[]
+  extractions      AIExtraction[]
+  reviews          AIReview[]
+  usages           AIUsage[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([createdById])
+}
+
+model UploadedDocument {
+  id              String    @id @default(uuid()) @db.Uuid
+  analysisId      String    @unique @db.Uuid
+  originalName    String
+  storageKey      String
+  sizeBytes       Int
+  sha256          String
+  pageCount       Int?
+  mimeType        String
+  localExtraction Json?
+  deleteAfter     DateTime? @db.Timestamptz(6)
+  deletedAt       DateTime? @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+
+  analysis CurricularAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([deleteAfter])
+}
+
+model AnalyzedSubject {
+  id          String        @id @default(uuid()) @db.Uuid
+  analysisId  String        @db.Uuid
+  rowHash     String
+  code        String?
+  name        String
+  workload    Int
+  period      Int
+  usedSubject String?
+  status      SubjectStatus
+  readability Readability   @default(CLEAR)
+  sourcePage  Int
+  sourceRow   Int
+  bbox        Json?
+  origin      SubjectOrigin @default(AI)
+  note        String?
+  sortIndex   Int
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(6)
+
+  analysis     CurricularAnalysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  projections  ProjectionSubject[]
+  corrections  ManualCorrection[]
+  warnings     AnalysisWarning[]
+
+  @@unique([analysisId, rowHash])
+  @@index([analysisId, period, sortIndex])
+}
+
+model SemesterProjection {
+  id                    String   @id @default(uuid()) @db.Uuid
+  analysisId            String   @db.Uuid
+  index                 Int
+  term                  String
+  periodNumber          Int?
+  isAdditional          Boolean  @default(false)
+  subjectsInPeriod      Int
+  exemptedInPeriod      Int
+  regularSubjectsToTake Int
+  maximumCapacity       Int
+  backlogCapacity       Int
+  subjectsFromBacklog   Int
+  semesterLoad          Int
+  remainingBacklog      Int
+  createdAt             DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis CurricularAnalysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  subjects ProjectionSubject[]
+
+  @@unique([analysisId, index])
+}
+
+model ProjectionSubject {
+  id           String                @id @default(uuid()) @db.Uuid
+  projectionId String                @db.Uuid
+  subjectId    String                @db.Uuid
+  kind         ProjectionSubjectKind
+  order        Int
+
+  projection SemesterProjection @relation(fields: [projectionId], references: [id], onDelete: Cascade)
+  subject    AnalyzedSubject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectionId, subjectId])
+}
+
+model DocumentClaim {
+  id              String   @id @default(uuid()) @db.Uuid
+  analysisId      String   @db.Uuid
+  type            String
+  value           Float?
+  sourcePage      Int
+  rawText         String?
+  calculatedValue Float?
+  matches         Boolean?
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis CurricularAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model AnalysisWarning {
+  id           String          @id @default(uuid()) @db.Uuid
+  analysisId   String          @db.Uuid
+  code         String
+  severity     WarningSeverity
+  source       WarningSource
+  message      String
+  subjectId    String?         @db.Uuid
+  sourcePage   Int?
+  resolvedAt   DateTime?       @db.Timestamptz(6)
+  resolvedById String?         @db.Uuid
+  createdAt    DateTime        @default(now()) @db.Timestamptz(6)
+
+  analysis   CurricularAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  subject    AnalyzedSubject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  resolvedBy User?              @relation("WarningResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([analysisId, resolvedAt])
+}
+
+model ManualCorrection {
+  id            String   @id @default(uuid()) @db.Uuid
+  analysisId    String   @db.Uuid
+  subjectId     String?  @db.Uuid
+  userId        String   @db.Uuid
+  field         String
+  previousValue String?
+  newValue      String?
+  reason        String?
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  analysis CurricularAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  subject  AnalyzedSubject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  user     User               @relation(fields: [userId], references: [id])
+
+  @@index([analysisId, createdAt(sort: Desc)])
+}
+
+// ------------------------------------------------------------------
+// IA
+// ------------------------------------------------------------------
+
+model AIExtraction {
+  id            String        @id @default(uuid()) @db.Uuid
+  analysisId    String        @db.Uuid
+  model         String
+  promptVersion String
+  privacyMode   AIPrivacyMode
+  rawOutput     Json?
+  durationMs    Int
+  status        String
+  errorCode     String?
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+
+  analysis CurricularAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model AIReview {
+  id            String         @id @default(uuid()) @db.Uuid
+  analysisId    String         @db.Uuid
+  model         String
+  promptVersion String
+  status        AIReviewStatus
+  issues        Json
+  durationMs    Int
+  createdAt     DateTime       @default(now()) @db.Timestamptz(6)
+
+  analysis CurricularAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model AIUsage {
+  id            String      @id @default(uuid()) @db.Uuid
+  analysisId    String?     @db.Uuid
+  operation     AIOperation
+  model         String
+  inputTokens   Int
+  outputTokens  Int
+  totalTokens   Int
+  estimatedCost Decimal     @db.Decimal(12, 6)
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+
+  analysis CurricularAnalysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([analysisId])
+}
+
+model OpenAIIntegration {
+  id                     String            @id @default("default")
+  status                 IntegrationStatus @default(DISCONNECTED)
+  encryptedApiKey        String?
+  encryptionIv           String?
+  encryptionAuthTag      String?
+  keyVersion             Int?
+  apiKeyLastFour         String?
+  extractionModel        String            @default("gpt-5.6-sol")
+  auditModel             String            @default("gpt-5.6-sol")
+  futureExplanationModel String?
+  projectLabel           String?
+  serviceAccountLabel    String?
+  lastTestedAt           DateTime?         @db.Timestamptz(6)
+  lastConnectionStatus   String?
+  lastErrorCode          String?
+  createdById            String?           @db.Uuid
+  updatedById            String?           @db.Uuid
+  createdAt              DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime          @updatedAt @db.Timestamptz(6)
+
+  createdBy User? @relation("IntegrationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User? @relation("IntegrationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+// ------------------------------------------------------------------
+// Regras e configurações
+// ------------------------------------------------------------------
+
+model RuleSetVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  version       String    @unique
+  isActive      Boolean   @default(false)
+  effectiveFrom DateTime  @default(now()) @db.Timestamptz(6)
+  notes         String?
+  createdById   String?   @db.Uuid
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+
+  createdBy User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  rules     SystemRule[]
+  analyses  CurricularAnalysis[]
+}
+
+model SystemRule {
+  id               String     @id @default(uuid()) @db.Uuid
+  ruleSetVersionId String     @db.Uuid
+  key              String
+  valueType        String
+  value            Json
+  status           RuleStatus
+  description      String
+
+  ruleSetVersion RuleSetVersion @relation(fields: [ruleSetVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleSetVersionId, key])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
+// ------------------------------------------------------------------
+// Matrizes curriculares
+// ------------------------------------------------------------------
+
+model Course {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  code      String?
+  modality  String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  matrices CurriculumMatrix[]
+
+  @@unique([name, modality])
+}
+
+model CurriculumMatrix {
+  id        String    @id @default(uuid()) @db.Uuid
+  courseId  String    @db.Uuid
+  label     String
+  year      Int
+  version   String
+  validFrom DateTime? @db.Date
+  validTo   DateTime? @db.Date
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+
+  course   Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  periods  CurriculumPeriod[]
+  analyses CurricularAnalysis[]
+
+  @@unique([courseId, year, version])
+}
+
+model CurriculumPeriod {
+  id       String  @id @default(uuid()) @db.Uuid
+  matrixId String  @db.Uuid
+  number   Int
+  label    String?
+
+  matrix   CurriculumMatrix   @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  subjects CurriculumSubject[]
+
+  @@unique([matrixId, number])
+}
+
+model CurriculumSubject {
+  id            String @id @default(uuid()) @db.Uuid
+  periodId      String @db.Uuid
+  name          String
+  workload      Int
+  prerequisites Json   @default("[]")
+  order         Int    @default(0)
+
+  period CurriculumPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId, order])
+}

@@ -1,0 +1,34 @@
+/*
+ * Design Tokens — Universidade Cruzeiro do Sul Virtual
+ * Único lugar do projeto onde valores hexadecimais de marca são definidos.
+ */
+:root {
+  /* Marca */
+  --brand-navy: #003b71;
+  --brand-blue: #0693e3;
+  --brand-cyan: #0693e3;
+  --brand-gold: #fef84c;
+  --brand-bg: #f4f8fc;
+  --brand-white: #ffffff;
+  --brand-text: #17212b;
+
+  /* Derivados (tons) */
+  --brand-navy-900: #00284d;
+  --brand-navy-50: #e8f2fa;
+  --brand-cyan-50: #e9f6fe;
+  --brand-cyan-700: #0578bb;
+  --brand-gold-50: #fffde1;
+  --brand-gold-700: #8b8100;
+
+  /* Semânticos de status */
+  --status-success: #1d8a5a;
+  --status-success-bg: #e6f5ee;
+  --status-warning: #b7791f;
+  --status-warning-bg: #fdf3e0;
+  --status-danger: #c0392b;
+  --status-danger-bg: #fbe9e7;
+  --status-info: var(--brand-cyan-700);
+  --status-info-bg: var(--brand-cyan-50);
+  --status-neutral: #5b6b7b;
+  --status-neutral-bg: #eef1f5;
+}

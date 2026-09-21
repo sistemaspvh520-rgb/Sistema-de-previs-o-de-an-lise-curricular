@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: analise-curricular-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: analise
+      POSTGRES_PASSWORD: analise_dev_password
+      POSTGRES_DB: analise_curricular
+    ports:
+      - "5432:5432"
+    volumes:
+      - analise_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analise -d analise_curricular"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  analise_pgdata:
