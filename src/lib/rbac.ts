@@ -64,6 +64,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permission: Permission }
   { prefix: "/settings/usage", permission: "usage:read" },
   { prefix: "/settings/privacy", permission: "privacy:manage" },
   { prefix: "/settings/security", permission: "privacy:manage" },
+  { prefix: "/settings/maintenance", permission: "privacy:manage" },
   { prefix: "/matrices", permission: "matrix:manage" },
   { prefix: "/analyses/new", permission: "analysis:create" },
 ];

@@ -99,3 +99,29 @@ describe("impersonação", () => {
     expect(await consumeImpersonationToken(bad)).toBeNull(); // emissor não é ADMIN
   });
 });
+
+describe("exclusão definitiva de conta", () => {
+  it("transfere análises/correções ao admin e remove o usuário", async (ctx) => {
+    if (!dbOk) return ctx.skip();
+    const { prisma } = prismaMod;
+    const admin = await makeUser("ADMIN");
+    const victim = await makeUser("ANALYST");
+    const rs = await prisma.ruleSetVersion.findFirstOrThrow({ where: { isActive: true } });
+    const a = await prisma.curricularAnalysis.create({ data: { createdById: victim.id, startTerm: "2026.1", ruleSetVersionId: rs.id, engineVersion: "1.0.0" } });
+    await prisma.manualCorrection.create({ data: { analysisId: a.id, userId: victim.id, field: "status", previousValue: "A", newValue: "B" } });
+    // mesma transação usada pela action
+    const result = await prisma.$transaction(async (tx) => {
+      const analyses = await tx.curricularAnalysis.updateMany({ where: { createdById: victim.id }, data: { createdById: admin.id } });
+      await tx.manualCorrection.updateMany({ where: { userId: victim.id }, data: { userId: admin.id } });
+      await tx.user.delete({ where: { id: victim.id } });
+      return analyses.count;
+    });
+    expect(result).toBe(1);
+    expect(await prisma.user.findUnique({ where: { id: victim.id } })).toBeNull();
+    const kept = await prisma.curricularAnalysis.findUniqueOrThrow({ where: { id: a.id }, include: { corrections: true } });
+    expect(kept.createdById).toBe(admin.id);
+    expect(kept.corrections[0].userId).toBe(admin.id);
+    await prisma.curricularAnalysis.delete({ where: { id: a.id } });
+    created.splice(created.indexOf(victim.id), 1);
+  });
+});

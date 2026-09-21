@@ -12,6 +12,10 @@
 - "Acessar como": token de uso único (60 s) emitido por ADMIN ativo; a sessão resultante carrega `impersonatorId`; evento `admin.impersonate` na auditoria. O usuário não é notificado (decisão da instituição); o registro de auditoria é a salvaguarda.
 - E-mails saem por SMTP autenticado (senha de app), sem senha em texto no corpo dos convites; a auditoria registra `email.sent`/`email.failed` sem conteúdo.
 
+## Exclusão de contas e limpeza de dados
+- Exclusão definitiva de conta (ADMIN): análises e correções da pessoa são transferidas ao admin que exclui; tokens/senha temporária caem em cascata; não é possível excluir a própria conta nem o último ADMIN ativo. Confirmação digitada ("EXCLUIR") e registro em auditoria.
+- Manutenção de dados (ADMIN): limpeza de auditoria, uso de IA e análises (tudo ou mais antigos que N dias), com confirmação digitada ("LIMPAR"); arquivos no storage são removidos junto com as análises.
+
 ## Autorização (RBAC)
 - Perfis ADMIN / ANALYST / VIEWER. Matriz de permissões em `src/lib/rbac.ts`.
 - Verificação em `middleware.ts` (rotas), em cada server action/route handler (`requireRole`) e na UI.

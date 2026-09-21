@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Eye, KeyRound, Loader2, LogIn, MailPlus, Pencil, Send } from "lucide-react";
+import { Eye, KeyRound, Loader2, LogIn, MailPlus, Pencil, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ROLE_LABELS } from "@/lib/rbac";
-import { impersonateUserAction, resendInviteAction, resetPasswordAction, revealInitialPasswordAction, sendResetLinkAction, updateUserAction } from "@/features/users/actions";
+import { deleteUserAction, impersonateUserAction, resendInviteAction, resetPasswordAction, revealInitialPasswordAction, sendResetLinkAction, updateUserAction } from "@/features/users/actions";
 import { TemporaryPasswordDialog } from "@/features/users/temporary-password-dialog";
 import type { Role } from "@/generated/prisma/enums";
 
@@ -29,6 +29,8 @@ interface UserRow {
 export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; isSelf: boolean; emailEnabled: boolean }) {
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const [shown, setShown] = useState<{ password: string | null } | null>(null);
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
@@ -70,6 +72,14 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
     start(async () => {
       const res = await impersonateUserAction({ id: user.id });
       if (res && !res.ok) toast.error(res.error);
+    });
+  }
+  function remove() {
+    start(async () => {
+      const res = await deleteUserAction({ id: user.id });
+      setDeleteOpen(false);
+      if (res.ok) toast.success(res.message);
+      else toast.error(res.error);
     });
   }
   function reset() {
@@ -139,6 +149,16 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
           <TooltipContent>Acessar como este usuário (modo de suporte)</TooltipContent>
         </Tooltip>
       )}
+      {!isSelf && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Excluir conta" onClick={() => { setDeleteConfirm(""); setDeleteOpen(true); }} disabled={pending}>
+              <Trash2 className="size-4 text-status-danger" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Excluir conta definitivamente</TooltipContent>
+        </Tooltip>
+      )}
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
@@ -153,8 +173,8 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
             </div>
             <div className="space-y-2">
               <Label htmlFor={`email-${user.id}`}>E-mail (login)</Label>
-              <Input id={`email-${user.id}`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isSelf} />
-              {!isSelf && <p className="text-xs text-muted-foreground">Ao corrigir o e-mail, reenvie o convite para a pessoa definir a senha.</p>}
+              <Input id={`email-${user.id}`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <p className="text-xs text-muted-foreground">{isSelf ? "O novo e-mail passa a ser o seu login." : "Ao corrigir o e-mail, reenvie o convite para a pessoa definir a senha."}</p>
             </div>
             <div className="space-y-2">
               <Label>Perfil</Label>
@@ -193,6 +213,25 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => { e.preventDefault(); reset(); }} disabled={pending}>{pending && <Loader2 className="size-4 animate-spin" />} Gerar senha temporária</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir a conta de {user.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é definitiva e não pode ser desfeita. O acesso é removido na hora. As análises e correções feitas por esta pessoa passam a constar como suas, para não perder dados institucionais.
+              Para confirmar, digite <strong>EXCLUIR</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="EXCLUIR" autoComplete="off" />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); remove(); }} disabled={pending || deleteConfirm !== "EXCLUIR"} className="bg-destructive text-white hover:bg-destructive/90">
+              {pending && <Loader2 className="size-4 animate-spin" />} Excluir definitivamente
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

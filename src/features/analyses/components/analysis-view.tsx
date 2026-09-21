@@ -22,6 +22,7 @@ import { CandidateSummaryDialog } from "@/features/analyses/components/candidate
 import { EntryPeriodBanner, AdditionalRuleBanner } from "@/features/analyses/components/entry-period-banner";
 import { SourceBadge } from "@/features/analyses/components/source-badge";
 import { MatrixLinkSelect, type MatrixOption } from "@/features/analyses/components/matrix-link-select";
+import { DeleteAnalysisButton } from "@/features/analyses/components/delete-analysis-button";
 import { completeAnalysisAction, reopenAnalysisAction, updateStartTermAction } from "@/features/analyses/actions";
 import type { AnalysisVM, SubjectVM } from "@/features/analyses/view-model";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ const PdfViewer = dynamic(() => import("@/features/analyses/components/pdf-viewe
   loading: () => <div className="flex h-full items-center justify-center rounded-xl border"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>,
 });
 
-export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = null }: { vm: AnalysisVM; perms: { review: boolean; complete: boolean; rules: boolean; diagnostics: boolean }; matrices?: MatrixOption[]; suggestedMatrixId?: string | null }) {
+export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = null }: { vm: AnalysisVM; perms: { review: boolean; complete: boolean; rules: boolean; diagnostics: boolean; delete?: boolean }; matrices?: MatrixOption[]; suggestedMatrixId?: string | null }) {
   const [tab, setTab] = useState("summary");
   const [showPdf, setShowPdf] = useState(false);
   const [page, setPage] = useState(1);
@@ -82,7 +83,8 @@ export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = nul
         {editable && <StartTermDialog vm={vm} />}
         {perms.complete && vm.status === "WAITING_REVIEW" && vm.entryPeriod !== null && <CompleteDialog onConfirm={complete} pending={pending} count={vm.reviewItemsCount} />}
         {perms.review && vm.status === "COMPLETED" && <Button variant="outline" onClick={reopen} disabled={pending}><RotateCcw className="size-4" /> Registrar nova revisão</Button>}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {perms.delete && <DeleteAnalysisButton analysisId={vm.id} />}
           {pdfAvailable && perms.diagnostics && (
             <Button variant={showPdf ? "secondary" : "outline"} onClick={() => setShowPdf((s) => !s)}>
               {showPdf ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />} {showPdf ? "Ocultar PDF" : "PDF lado a lado"}

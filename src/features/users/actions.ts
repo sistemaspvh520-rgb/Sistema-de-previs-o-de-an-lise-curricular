@@ -13,7 +13,7 @@ import { assignTemporaryPassword, readTemporaryPassword } from "@/features/users
 import { sendInvite, sendReset } from "@/features/users/password-tokens";
 import { isEmailConfigured } from "@/services/email/mailer";
 import { issueImpersonationToken } from "@/features/users/impersonation";
-import { signIn } from "@/lib/auth";
+import { signIn, unstable_update } from "@/lib/auth";
 
 const roleSchema = z.enum(["ADMIN", "ANALYST", "VIEWER"]);
 
@@ -94,6 +94,7 @@ export async function updateUserAction(input: unknown): Promise<ActionResult> {
       entityId: parsed.data.id,
       metadata: { before: { name: before.name, email: before.email, role: before.role, isActive: before.isActive }, after: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, isActive: parsed.data.isActive } },
     });
+    if (parsed.data.id === admin.id) await unstable_update({}); // atualiza nome/e-mail na própria sessão
     revalidatePath("/settings/users");
     return ok(undefined, "Usuário atualizado.");
   } catch (err) {
@@ -183,4 +184,35 @@ export async function impersonateUserAction(input: unknown): Promise<ActionResul
   // signIn redireciona (lança NEXT_REDIRECT); não capturar.
   await signIn("credentials", { impersonationToken: token, redirectTo: "/dashboard" });
   return ok(undefined);
+}
+
+/**
+ * Exclusão definitiva da conta. Análises e correções feitas pela pessoa são transferidas ao admin que exclui
+ * (dados institucionais não se perdem); tokens, sessões e senha temporária são removidos em cascata.
+ */
+export async function deleteUserAction(input: unknown): Promise<ActionResult<{ reassignedAnalyses: number }>> {
+  try {
+    const admin = await requirePermission("users:manage");
+    const parsed = resetSchema.safeParse(input);
+    if (!parsed.success) return fail("Dados inválidos.");
+    if (parsed.data.id === admin.id) return fail("Você não pode excluir a própria conta.");
+    const target = await prisma.user.findUnique({ where: { id: parsed.data.id } });
+    if (!target) return fail("Usuário não encontrado.");
+    if (target.role === "ADMIN") {
+      const admins = await prisma.user.count({ where: { role: "ADMIN", isActive: true, id: { not: target.id } } });
+      if (admins === 0) return fail("Não é possível excluir o único administrador ativo.");
+    }
+    const result = await prisma.$transaction(async (tx) => {
+      const analyses = await tx.curricularAnalysis.updateMany({ where: { createdById: target.id }, data: { createdById: admin.id } });
+      await tx.manualCorrection.updateMany({ where: { userId: target.id }, data: { userId: admin.id } });
+      await tx.user.delete({ where: { id: target.id } });
+      return { reassignedAnalyses: analyses.count };
+    });
+    await recordAudit({ userId: admin.id, action: "user.delete", entityType: "User", entityId: target.id, metadata: { email: target.email, name: target.name, role: target.role, reassignedAnalyses: result.reassignedAnalyses } });
+    revalidatePath("/settings/users");
+    return ok(result, result.reassignedAnalyses ? `Conta excluída. ${result.reassignedAnalyses} análise(s) transferida(s) para você.` : "Conta excluída definitivamente.");
+  } catch (err) {
+    logger.error("deleteUserAction", { err: String(err) });
+    return toActionError(err);
+  }
 }

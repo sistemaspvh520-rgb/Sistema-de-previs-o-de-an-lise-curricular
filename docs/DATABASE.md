@@ -6,7 +6,7 @@
 - Enums nativos do PostgreSQL via Prisma.
 - Campos JSONB para estruturas versionadas (saída bruta da IA, posições do parser, passos de processamento).
 - Nunca armazenar: API Key em texto puro, CPF/RG extraídos, chain-of-thought.
-- Tabelas de histórico (`ManualCorrection`, `AuditLog`, `AIUsage`) são **append-only**: sem `update`/`delete` no código.
+- Tabelas de histórico (`ManualCorrection`, `AuditLog`, `AIUsage`) são **append-only** no fluxo normal. A única exceção é a área **Configurações → Manutenção de dados** (ADMIN, confirmação por texto), que permite limpar auditoria, uso de IA e análises — a limpeza em si gera um registro de auditoria com o resumo.
 
 ## 2. Enums
 

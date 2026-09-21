@@ -38,10 +38,11 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       const checkedAt = typeof token.checkedAt === "number" ? token.checkedAt : 0;
       const userId = typeof token.id === "string" ? token.id : null;
       if (userId && (trigger === "update" || Date.now() - checkedAt > SESSION_RECHECK_MS)) {
-        const current = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, name: true, mustChangePassword: true } });
+        const current = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, name: true, email: true, mustChangePassword: true } });
         if (!current || !current.isActive) return null;
         token.role = current.role;
         token.name = current.name;
+        token.email = current.email;
         token.mustChangePassword = token.impersonatorId ? false : current.mustChangePassword;
         token.checkedAt = Date.now();
       }
