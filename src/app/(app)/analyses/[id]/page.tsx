@@ -13,6 +13,8 @@ import { formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Análise" };
 export const dynamic = "force-dynamic";
+// server actions desta rota (reprocessar, reauditar) podem esperar a OpenAI
+export const maxDuration = 300;
 
 export default async function AnalysisPage({ params }: PageProps<"/analyses/[id]">) {
   const user = await requireUser();

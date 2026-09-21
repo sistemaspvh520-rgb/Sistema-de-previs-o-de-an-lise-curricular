@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
@@ -16,14 +16,16 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "retention:run": "tsx scripts/run-retention.ts",
-    "postinstall": "node scripts/copy-pdf-worker.mjs",
-    "prebuild": "node scripts/copy-pdf-worker.mjs"
+    "postinstall": "node scripts/copy-pdf-worker.mjs && prisma generate",
+    "prebuild": "node scripts/copy-pdf-worker.mjs",
+    "vercel-build": "prisma migrate deploy && tsx prisma/seed.ts && prisma generate && next build"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@radix-ui/react-slot": "^1.2.3",
+    "@supabase/supabase-js": "2.116.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.3.2",

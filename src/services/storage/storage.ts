@@ -3,18 +3,15 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { getEnv } from "@/lib/env";
+import { supabaseStorage } from "@/services/storage/supabase-storage";
 
 /**
  * StorageService — abstração de armazenamento de documentos.
  * Implementação atual: sistema de arquivos local (STORAGE_DIR, fora de public/).
  * Preparado para uma implementação S3-compatível com a mesma interface.
  */
-export interface StorageService {
-  save(bytes: Buffer, opts: { extension: string; prefix?: string }): Promise<{ key: string; sizeBytes: number }>;
-  read(key: string): Promise<Buffer>;
-  delete(key: string): Promise<void>;
-  exists(key: string): Promise<boolean>;
-}
+import type { StorageService } from "@/services/storage/types";
+export type { StorageService };
 
 function baseDir(): string {
   return path.resolve(/*turbopackIgnore: true*/ process.cwd(), getEnv().STORAGE_DIR);
@@ -55,5 +52,5 @@ export const localFsStorage: StorageService = {
 };
 
 export function getStorage(): StorageService {
-  return localFsStorage;
+  return getEnv().STORAGE_DRIVER === "supabase" ? supabaseStorage : localFsStorage;
 }

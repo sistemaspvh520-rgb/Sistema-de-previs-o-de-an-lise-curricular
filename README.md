@@ -9,6 +9,10 @@ Documentação: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/DATABAS
 [`docs/ACADEMIC_RULES.md`](docs/ACADEMIC_RULES.md) · [`docs/OPENAI_INTEGRATION.md`](docs/OPENAI_INTEGRATION.md) ·
 [`docs/SECURITY.md`](docs/SECURITY.md) · [`docs/UI_UX.md`](docs/UI_UX.md) · [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md)
 
+## Produção
+
+Vercel + Supabase — passo a passo em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## Requisitos
 
 - Node.js ≥ 20.19 (testado com 26) e npm

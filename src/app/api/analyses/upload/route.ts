@@ -10,7 +10,7 @@ import { logger } from "@/lib/logger";
 import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const user = await getSessionUser();

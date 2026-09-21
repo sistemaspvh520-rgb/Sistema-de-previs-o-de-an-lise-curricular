@@ -4,7 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { hash } from "@node-rs/argon2";
 import { RULE_DEFINITIONS } from "../src/domain/curricular-analysis/rules/types";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL ?? "" });
+const adapter = new PrismaPg({ connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "" });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
