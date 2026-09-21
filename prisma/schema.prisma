@@ -123,6 +123,12 @@ enum PasswordTokenPurpose {
   RESET
 }
 
+enum DeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ------------------------------------------------------------------
 // Identidade e acesso
 // ------------------------------------------------------------------
@@ -159,6 +165,8 @@ model User {
   passwordTokensIssued PasswordToken[]     @relation("PasswordTokenCreatedBy")
   impersonationsAsAdmin ImpersonationToken[] @relation("ImpersonationAdmin")
   impersonationsAsTarget ImpersonationToken[] @relation("ImpersonationTarget")
+  deletionRequests        AnalysisDeletionRequest[] @relation("DeletionRequestedBy")
+  deletionRequestsReviewed AnalysisDeletionRequest[] @relation("DeletionReviewedBy")
 }
 
 /// Token de uso único para definir (convite) ou redefinir a senha por link de e-mail. Só o hash é armazenado.
@@ -257,9 +265,31 @@ model CurricularAnalysis {
   extractions      AIExtraction[]
   reviews          AIReview[]
   usages           AIUsage[]
+  deletionRequests AnalysisDeletionRequest[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([createdById])
+}
+
+/** Solicitação de exclusão feita pelo responsável pela análise e decidida por um administrador. */
+model AnalysisDeletionRequest {
+  id          String                @id @default(uuid()) @db.Uuid
+  analysisId  String                @db.Uuid
+  requestedById String              @db.Uuid
+  status      DeletionRequestStatus @default(PENDING)
+  reason      String?
+  reviewedById String?              @db.Uuid
+  reviewedAt  DateTime?             @db.Timestamptz(6)
+  decisionNote String?
+  createdAt   DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime              @updatedAt @db.Timestamptz(6)
+
+  analysis    CurricularAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  requestedBy User               @relation("DeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?              @relation("DeletionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([analysisId, requestedById, status])
 }
 
 model UploadedDocument {

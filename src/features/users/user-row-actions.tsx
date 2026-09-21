@@ -94,7 +94,7 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
   }
 
   return (
-    <div className="flex justify-end gap-1">
+    <div className="flex flex-wrap justify-end gap-1">
       {user.mustChangePassword && (
         <Tooltip>
           <TooltipTrigger asChild>

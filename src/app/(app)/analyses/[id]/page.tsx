@@ -63,7 +63,7 @@ export default async function AnalysisPage({ params }: PageProps<"/analyses/[id]
       {!vm.isProcessing && (!failed || hasData) && (
         <AnalysisView
           vm={vm}
-          perms={{ review: can(user.role, "analysis:review"), complete: !failed && can(user.role, "analysis:complete"), rules: can(user.role, "rules:manage"), diagnostics: can(user.role, "analysis:review"), delete: can(user.role, "analysis:delete") }}
+          perms={{ review: can(user.role, "analysis:review"), complete: !failed && can(user.role, "analysis:complete"), rules: can(user.role, "rules:manage"), diagnostics: can(user.role, "analysis:review"), delete: can(user.role, "analysis:delete"), requestDelete: user.role !== "ADMIN" }}
           matrices={matrices}
           suggestedMatrixId={suggestedMatrixId}
         />

@@ -23,6 +23,7 @@ import { EntryPeriodBanner, AdditionalRuleBanner } from "@/features/analyses/com
 import { SourceBadge } from "@/features/analyses/components/source-badge";
 import { MatrixLinkSelect, type MatrixOption } from "@/features/analyses/components/matrix-link-select";
 import { DeleteAnalysisButton } from "@/features/analyses/components/delete-analysis-button";
+import { RequestAnalysisDeletionButton } from "@/features/analyses/components/request-analysis-deletion-button";
 import { completeAnalysisAction, reopenAnalysisAction, updateStartTermAction } from "@/features/analyses/actions";
 import type { AnalysisVM, SubjectVM } from "@/features/analyses/view-model";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,7 @@ const PdfViewer = dynamic(() => import("@/features/analyses/components/pdf-viewe
   loading: () => <div className="flex h-full items-center justify-center rounded-xl border"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>,
 });
 
-export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = null }: { vm: AnalysisVM; perms: { review: boolean; complete: boolean; rules: boolean; diagnostics: boolean; delete?: boolean }; matrices?: MatrixOption[]; suggestedMatrixId?: string | null }) {
+export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = null }: { vm: AnalysisVM; perms: { review: boolean; complete: boolean; rules: boolean; diagnostics: boolean; delete?: boolean; requestDelete?: boolean }; matrices?: MatrixOption[]; suggestedMatrixId?: string | null }) {
   const [tab, setTab] = useState("summary");
   const [showPdf, setShowPdf] = useState(false);
   const [page, setPage] = useState(1);
@@ -83,8 +84,9 @@ export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = nul
         {editable && <StartTermDialog vm={vm} />}
         {perms.complete && vm.status === "WAITING_REVIEW" && vm.entryPeriod !== null && <CompleteDialog onConfirm={complete} pending={pending} count={vm.reviewItemsCount} />}
         {perms.review && vm.status === "COMPLETED" && <Button variant="outline" onClick={reopen} disabled={pending}><RotateCcw className="size-4" /> Registrar nova revisão</Button>}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           {perms.delete && <DeleteAnalysisButton analysisId={vm.id} />}
+          {perms.requestDelete && <RequestAnalysisDeletionButton analysisId={vm.id} />}
           {pdfAvailable && perms.diagnostics && (
             <Button variant={showPdf ? "secondary" : "outline"} onClick={() => setShowPdf((s) => !s)}>
               {showPdf ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />} {showPdf ? "Ocultar PDF" : "PDF lado a lado"}
@@ -95,7 +97,7 @@ export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = nul
 
       <div className={cn("grid gap-6", showPdf && "xl:grid-cols-2")}>
         <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-          <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 p-1">
             <TabsTrigger value="summary">Resumo</TabsTrigger>
             <TabsTrigger value="grade">Grade curricular</TabsTrigger>
             <TabsTrigger value="pending">Pendências</TabsTrigger>

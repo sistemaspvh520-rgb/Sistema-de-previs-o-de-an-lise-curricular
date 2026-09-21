@@ -52,7 +52,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
         }
       />
       <div className="mb-4 grid gap-3 2xl:grid-cols-[minmax(0,1fr)_16rem] 2xl:items-center">
-        <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+        <div className="flex min-w-0 flex-wrap gap-1.5">
           {STATUS_FILTERS.map((f) => (
             <Link
               key={f.id}
@@ -73,7 +73,6 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
         </form>
       </div>
       <Card className="overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -113,7 +112,6 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
             ))}
           </TableBody>
         </Table>
-        </div>
         {pages > 1 && (
           <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
             <span>Página {page} de {pages}</span>

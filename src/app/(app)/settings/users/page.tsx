@@ -37,6 +37,7 @@ export default async function UsersPage() {
         </Alert>
       )}
       <Card className="overflow-hidden shadow-sm">
+        <div className="hidden xl:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -80,6 +81,29 @@ export default async function UsersPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
+        <div className="divide-y xl:hidden">
+          {users.map((u) => (
+            <article key={u.id} className="space-y-3 p-4">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate font-medium">{u.name}</h2>
+                  <p className="break-all text-sm text-muted-foreground">{u.email}</p>
+                </div>
+                <Badge variant="secondary" className="shrink-0">{ROLE_LABELS[u.role]}</Badge>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {u.isActive ? <Badge variant="outline" className="border-transparent bg-status-success-bg text-status-success">Ativo</Badge> : <Badge variant="outline" className="border-transparent bg-status-neutral-bg text-status-neutral">Inativo</Badge>}
+                {u.mustChangePassword ? <Badge variant="outline" className="border-transparent bg-status-warning-bg text-status-warning">Senha temporária</Badge> : <Badge variant="outline" className="border-transparent bg-status-success-bg text-status-success">Senha definida</Badge>}
+              </div>
+              <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                <span>{u.mustChangePassword ? (u.inviteSentAt ? `Convite enviado em ${formatDateTime(u.inviteSentAt)}` : "Convite ainda não enviado") : "Senha definida pelo usuário"}</span>
+                <span>Último acesso: {formatDateTime(u.lastLoginAt)}</span>
+              </div>
+              <div className="border-t pt-2"><UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} /></div>
+            </article>
+          ))}
+        </div>
       </Card>
     </>
   );

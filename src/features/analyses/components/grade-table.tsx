@@ -67,7 +67,7 @@ export function GradeTable({
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -77,14 +77,14 @@ export function GradeTable({
               ))}
             </SelectContent>
           </Select>
-          <div className="relative w-56">
+          <div className="relative w-full sm:w-56">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar disciplina" className="pl-9" />
           </div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="hidden overflow-hidden rounded-xl border bg-card md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -159,6 +159,29 @@ export function GradeTable({
             ))}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="space-y-3 md:hidden">
+        {rows.length === 0 ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Nenhuma disciplina para este filtro.</div>
+        ) : rows.map((s) => (
+          <article key={s.id} onClick={() => onLocate?.(s)} className={cn("cursor-pointer rounded-xl border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50", selectedId === s.id && "bg-brand-cyan-50 ring-1 ring-brand-cyan") }>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5"><StatusIcon status={s.status} /></div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0"><h3 className="break-words text-sm font-medium">{s.name}</h3>{s.code && <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">#{s.code}</p>}</div>
+                  <SubjectStatusBadge status={s.status} />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{s.period}º período · {s.workload}h · {s.origin === "USER" ? "Alterada manualmente" : `PDF · página ${s.sourcePage}`}</p>
+                {s.usedSubject && <p className="mt-1 break-words text-xs text-muted-foreground">Utilizada: <span className="text-foreground">{s.usedSubject}</span></p>}
+                {s.note && <p className="mt-1 text-xs text-status-warning">{s.note}</p>}
+                {(s.scheduledTerm || s.inRemainingBacklog) && <p className={cn("mt-1 text-xs", s.inRemainingBacklog ? "text-status-danger" : "text-muted-foreground")}>{s.inRemainingBacklog ? "Sem vaga na previsão atual" : `${s.scheduledKind === "BACKLOG" ? "Adaptação" : "Regular"} em ${s.scheduledTerm}`}</p>}
+              </div>
+              {canEdit && <Button variant="ghost" size="icon" aria-label={`Corrigir ${s.name}`} onClick={(event) => { event.stopPropagation(); onEdit(s); }}><Pencil className="size-4" /></Button>}
+            </div>
+          </article>
+        ))}
       </div>
     </div>
   );
