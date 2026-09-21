@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: analise
+          POSTGRES_PASSWORD: analise_ci
+          POSTGRES_DB: analise_curricular
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U analise -d analise_curricular"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://analise:analise_ci@localhost:5432/analise_curricular?schema=public
+      AUTH_SECRET: ci-secret-ci-secret-ci-secret-1234567890
+      APP_ENCRYPTION_KEY: ${{ secrets.CI_APP_ENCRYPTION_KEY || 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=' }}
+      APP_ENCRYPTION_KEY_VERSION: "1"
+      CRON_SECRET: ci-cron-secret-1234567890
+      ADMIN_EMAIL: admin@ci.local
+      ADMIN_NAME: CI
+      ADMIN_PASSWORD: ci-password-123
+      STORAGE_DIR: ./storage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run db:seed
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

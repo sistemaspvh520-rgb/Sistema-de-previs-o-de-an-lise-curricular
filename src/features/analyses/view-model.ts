@@ -124,7 +124,7 @@ export interface AnalysisVM {
   review: { status: "OK" | "REVIEW"; model: string; promptVersion: string; issues: number; createdAt: string } | null;
   extraction: { model: string; promptVersion: string; privacyMode: string; durationMs: number; createdAt: string } | null;
   usage: { totalTokens: number; estimatedCost: number; calls: number };
-  matrix: { label: string; course: string } | null;
+  matrix: { id: string; label: string; course: string } | null;
   narrative: ProjectionNarrative | null;
 }
 
@@ -281,7 +281,7 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
       ? { model: a.extractions[0].model, promptVersion: a.extractions[0].promptVersion, privacyMode: a.extractions[0].privacyMode, durationMs: a.extractions[0].durationMs, createdAt: a.extractions[0].createdAt.toISOString() }
       : null,
     usage: usageTotals,
-    matrix: a.curriculumMatrix ? { label: a.curriculumMatrix.label, course: a.curriculumMatrix.course.name } : null,
+    matrix: a.curriculumMatrix ? { id: a.curriculumMatrix.id, label: a.curriculumMatrix.label, course: a.curriculumMatrix.course.name } : null,
     narrative,
   };
 }

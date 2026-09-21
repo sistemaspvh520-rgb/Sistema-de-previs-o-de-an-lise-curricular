@@ -42,6 +42,9 @@ Falhas:  qualquer etapa OpenAI → AI_ERROR (retomável)   |   outras → FAILED
 
 - O upload responde imediatamente com o `analysisId`; o pipeline roda em `after()` (`next/server`) e persiste
   `status` + `processingSteps` a cada passo. A UI faz polling em `GET /api/analyses/[id]/status`.
+- **Período de ingresso**: o valor informado no envio (`USER`) é a fonte oficial. Se não informado, o pipeline usa o cabeçalho
+  do PDF ("Série: N", leitura local) ou a IA (`DOCUMENT`), depois a regra institucional (`RULE`). Divergências entre envio e
+  documento viram `DocumentClaim`/alerta; nunca são corrigidas em silêncio.
 - Se o período de ingresso não puder ser determinado, o pipeline grava as disciplinas e para em
   `WAITING_REVIEW` com o warning `ENTRY_PERIOD_REQUIRED`. Após confirmação manual, `recalculateAnalysis`
   executa NORMALIZING(parcial) → CALCULATING → VALIDATING sem novo upload e sem nova chamada à OpenAI.

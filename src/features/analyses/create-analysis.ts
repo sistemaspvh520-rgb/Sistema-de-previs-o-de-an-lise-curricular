@@ -20,6 +20,13 @@ export function retentionDeadline(policy: RetentionPolicy, from = new Date()): D
   return new Date(from.getTime() + d * 24 * 60 * 60 * 1000);
 }
 
+export class DuplicateDocumentError extends Error {
+  constructor(readonly existingAnalysisId: string) {
+    super("Este PDF já foi analisado. Abra a análise existente ou reenvie confirmando a duplicidade.");
+    this.name = "DuplicateDocumentError";
+  }
+}
+
 export interface CreateAnalysisInput {
   userId: string;
   bytes: Buffer;
@@ -27,6 +34,8 @@ export interface CreateAnalysisInput {
   entryPeriod?: number | null;
   entryTerm?: string | null;
   startTerm?: string | null;
+  /** Reenviar mesmo que já exista análise com o mesmo SHA-256. */
+  force?: boolean;
 }
 
 /** Valida, armazena e cria a análise em estado UPLOADED. Não executa o pipeline. */
@@ -46,6 +55,10 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
 
   const ruleSet = await getActiveRuleSet();
   const sha256 = createHash("sha256").update(input.bytes).digest("hex");
+  if (!input.force) {
+    const existing = await prisma.uploadedDocument.findFirst({ where: { sha256 }, orderBy: { createdAt: "desc" }, select: { analysisId: true } });
+    if (existing) throw new DuplicateDocumentError(existing.analysisId);
+  }
   const storage = getStorage();
   const stored = await storage.save(input.bytes, { extension: "pdf" });
   const startTerm = input.startTerm && isValidTerm(input.startTerm) ? input.startTerm : suggestStartTerm();

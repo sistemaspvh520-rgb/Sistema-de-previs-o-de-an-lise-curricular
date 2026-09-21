@@ -4,27 +4,31 @@ export interface Term {
   semester: 1 | 2;
 }
 
+export type TermUnit = "SEMESTER" | "YEAR";
+
 export function parseTerm(term: string): Term {
-  const m = /^(\d{4})\.([12])$/.exec(term.trim());
-  if (!m) throw new Error(`Termo letivo inválido: "${term}". Use o formato YYYY.1 ou YYYY.2.`);
-  return { year: Number(m[1]), semester: Number(m[2]) as 1 | 2 };
+  const m = /^(\d{4})(?:\.([12]))?$/.exec(term.trim());
+  if (!m) throw new Error(`Termo letivo inválido: "${term}". Use o formato YYYY.1, YYYY.2 ou YYYY.`);
+  return { year: Number(m[1]), semester: (m[2] ? Number(m[2]) : 1) as 1 | 2 };
 }
 
-export function formatTerm(t: Term): string {
-  return `${t.year}.${t.semester}`;
+export function formatTerm(t: Term, unit: TermUnit = "SEMESTER"): string {
+  return unit === "YEAR" ? `${t.year}` : `${t.year}.${t.semester}`;
 }
 
-export function nextTerm(t: Term): Term {
+/** Próximo período letivo: semestral (X.1 → X.2 → X+1.1) ou anual (X → X+1). */
+export function nextTerm(t: Term, unit: TermUnit = "SEMESTER"): Term {
+  if (unit === "YEAR") return { year: t.year + 1, semester: t.semester };
   return t.semester === 1 ? { year: t.year, semester: 2 } : { year: t.year + 1, semester: 1 };
 }
 
 /** Sequência de n termos a partir de start (inclusive). */
-export function termSequence(start: string, n: number): string[] {
+export function termSequence(start: string, n: number, unit: TermUnit = "SEMESTER"): string[] {
   const out: string[] = [];
   let t = parseTerm(start);
   for (let i = 0; i < n; i++) {
-    out.push(formatTerm(t));
-    t = nextTerm(t);
+    out.push(formatTerm(t, unit));
+    t = nextTerm(t, unit);
   }
   return out;
 }
@@ -38,5 +42,5 @@ export function suggestStartTerm(now = new Date()): string {
 }
 
 export function isValidTerm(term: string): boolean {
-  return /^\d{4}\.[12]$/.test(term.trim());
+  return /^\d{4}(\.[12])?$/.test(term.trim());
 }

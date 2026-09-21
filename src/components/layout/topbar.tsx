@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, Menu, UserRound } from "lucide-react";
+import { KeyRound, LogOut, Menu, UserRound } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -59,6 +60,9 @@ export function Topbar({ user }: { user: { name: string; email: string; role: Ro
             <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/settings/account"><KeyRound className="size-4" /> Minha conta</Link>
+          </DropdownMenuItem>
           <form action={logoutAction}>
             <DropdownMenuItem asChild>
               <button type="submit" className="w-full">

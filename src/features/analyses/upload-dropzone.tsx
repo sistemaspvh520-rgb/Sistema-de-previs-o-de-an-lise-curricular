@@ -37,12 +37,13 @@ export function UploadDropzone({ maxMb, defaultStartTerm }: { maxMb: number; def
     [maxMb],
   );
 
-  function submit() {
+  function submit(force = false) {
     if (!file) return;
     setUploading(true);
     setProgress(0);
     const fd = new FormData();
     fd.append("file", file);
+    if (force) fd.append("force", "1");
     fd.append("entryTerm", entryTerm);
     fd.append("entryPeriod", entryPeriod);
     const xhr = new XMLHttpRequest();
@@ -57,6 +58,12 @@ export function UploadDropzone({ maxMb, defaultStartTerm }: { maxMb: number; def
         if (xhr.status === 201 && body.id) {
           toast.success("Arquivo recebido. Processamento iniciado.");
           router.push(`/analyses/${body.id}`);
+        } else if (xhr.status === 409 && body.existingId) {
+          toast.warning(body.error, {
+            duration: 12000,
+            action: { label: "Abrir existente", onClick: () => router.push(`/analyses/${body.existingId}`) },
+            cancel: { label: "Enviar mesmo assim", onClick: () => submit(true) },
+          });
         } else {
           toast.error(body.error ?? "Falha no envio.");
         }
@@ -160,7 +167,7 @@ export function UploadDropzone({ maxMb, defaultStartTerm }: { maxMb: number; def
             <p className="text-xs text-muted-foreground">Também define o primeiro semestre da previsão.</p>
           </div>
           <div className="flex md:col-span-2 md:justify-end">
-            <Button size="lg" onClick={submit} disabled={!file || !entryReady || uploading}>
+            <Button size="lg" onClick={() => submit()} disabled={!file || !entryReady || uploading}>
               {uploading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
               {uploading ? `Enviando ${progress}%` : "Gerar análise"}
             </Button>

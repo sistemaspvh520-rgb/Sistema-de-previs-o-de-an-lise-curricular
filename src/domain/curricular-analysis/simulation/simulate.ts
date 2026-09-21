@@ -86,6 +86,7 @@ export function simulateCurriculum(input: SimulateCurriculumInput): SimulationRe
   const initialBacklog = calculatePreviousBacklog(subjects, entryPeriod, rules);
   let backlog = initialBacklog;
   const semesters: SemesterSimulation[] = [];
+  const unit = rules.periodUnit === "YEAR" ? "YEAR" : "SEMESTER";
   let term = parseTerm(input.startTerm);
   let index = 0;
   let lastRegularCapacity: number | null = null;
@@ -94,7 +95,7 @@ export function simulateCurriculum(input: SimulateCurriculumInput): SimulationRe
   for (let p = entryPeriod; p <= lastPeriod; p++) {
     const { semester, remainingBacklog } = simulateSemester({
       index,
-      term: formatTerm(term),
+      term: formatTerm(term, unit),
       periodNumber: p,
       isAdditional: false,
       periodSubjects: grouped.get(p) ?? [],
@@ -104,7 +105,7 @@ export function simulateCurriculum(input: SimulateCurriculumInput): SimulationRe
     semesters.push(semester);
     backlog = remainingBacklog;
     lastRegularCapacity = semester.maximumCapacity;
-    term = nextTerm(term);
+    term = nextTerm(term, unit);
     index++;
   }
 
@@ -140,7 +141,7 @@ export function simulateCurriculum(input: SimulateCurriculumInput): SimulationRe
     additionalCount++;
     const { semester, remainingBacklog } = simulateSemester({
       index,
-      term: formatTerm(term),
+      term: formatTerm(term, unit),
       periodNumber: null,
       isAdditional: true,
       periodSubjects: [],
@@ -150,7 +151,7 @@ export function simulateCurriculum(input: SimulateCurriculumInput): SimulationRe
     });
     semesters.push(semester);
     backlog = remainingBacklog;
-    term = nextTerm(term);
+    term = nextTerm(term, unit);
     index++;
   }
 

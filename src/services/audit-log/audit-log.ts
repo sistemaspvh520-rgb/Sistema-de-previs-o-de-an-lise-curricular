@@ -2,6 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { redact } from "@/lib/logger";
+import { getClientIp } from "@/lib/request-ip";
 import type { Prisma } from "@/generated/prisma/client";
 
 export interface AuditEntry {
@@ -18,7 +19,7 @@ export async function recordAudit(entry: AuditEntry): Promise<void> {
   let userAgent: string | null = null;
   try {
     const h = await headers();
-    ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? null;
+    ip = getClientIp(h);
     userAgent = h.get("user-agent")?.slice(0, 300) ?? null;
   } catch {
     // fora de contexto de request (ex.: pipeline em background)

@@ -85,8 +85,10 @@ describe("pipeline (integração)", () => {
     const { runAnalysisPipeline, recalculateAnalysis } = await import("@/services/pipeline/runner");
     const { prisma } = prismaMod;
 
-    const { id } = await createAnalysisFromUpload({ userId, bytes: fixture, originalName: "sample.pdf", startTerm: "2026.2" });
+    const { id } = await createAnalysisFromUpload({ userId, bytes: fixture, originalName: "sample.pdf", startTerm: "2026.2", force: true });
     created.push(id);
+    // mesmo SHA-256 sem force → detecção de duplicado apontando para uma análise existente
+    await expect(createAnalysisFromUpload({ userId, bytes: fixture, originalName: "sample.pdf", startTerm: "2026.2" })).rejects.toMatchObject({ name: "DuplicateDocumentError" });
     await runAnalysisPipeline(id);
 
     let a = await prisma.curricularAnalysis.findUniqueOrThrow({ where: { id }, include: { subjects: true, warnings: true, projections: true, claims: true, usages: true, reviews: true } });

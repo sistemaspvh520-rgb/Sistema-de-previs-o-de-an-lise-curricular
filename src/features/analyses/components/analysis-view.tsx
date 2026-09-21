@@ -21,6 +21,7 @@ import { PendingTab } from "@/features/analyses/components/pending-tab";
 import { CandidateSummaryDialog } from "@/features/analyses/components/candidate-summary-dialog";
 import { EntryPeriodBanner, AdditionalRuleBanner } from "@/features/analyses/components/entry-period-banner";
 import { SourceBadge } from "@/features/analyses/components/source-badge";
+import { MatrixLinkSelect, type MatrixOption } from "@/features/analyses/components/matrix-link-select";
 import { completeAnalysisAction, reopenAnalysisAction, updateStartTermAction } from "@/features/analyses/actions";
 import type { AnalysisVM, SubjectVM } from "@/features/analyses/view-model";
 import { cn } from "@/lib/utils";

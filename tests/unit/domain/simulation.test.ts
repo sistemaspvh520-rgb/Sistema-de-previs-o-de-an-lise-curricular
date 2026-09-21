@@ -246,3 +246,12 @@ describe("buildProjectionNarrative", () => {
     expect(n.conclusionLine).toContain("dezembro de 2028");
   });
 });
+
+describe("periodUnit = YEAR (cursos anuais)", () => {
+  it("avança um ano por período e formata o termo como AAAA", () => {
+    expect(termSequence("2026", 3, "YEAR")).toEqual(["2026", "2027", "2028"]);
+    const subjects = [...makePeriod(1, 8, 2), ...makePeriod(2, 8, 0)];
+    const sim = simulateCurriculum({ subjects, entryPeriod: 1, startTerm: "2026", rules: rules({ periodUnit: "YEAR" }) });
+    expect(sim.semesters.map((s) => s.term)).toEqual(["2026", "2027"]);
+  });
+});

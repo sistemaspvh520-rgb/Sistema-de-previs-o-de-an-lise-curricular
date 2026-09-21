@@ -10,6 +10,8 @@ import { AnalysisStatusBadge } from "@/components/shared/status-badge";
 import { ProcessingPanel } from "@/features/analyses/components/processing-panel";
 import { AnalysisView } from "@/features/analyses/components/analysis-view";
 import { formatDateTime } from "@/lib/utils";
+import { prisma } from "@/lib/prisma";
+import { suggestMatrix } from "@/features/analyses/suggest-matrix";
 
 export const metadata: Metadata = { title: "Análise" };
 export const dynamic = "force-dynamic";
@@ -24,6 +26,9 @@ export default async function AnalysisPage({ params }: PageProps<"/analyses/[id]
   if (!detail) notFound();
   if (user.role !== "ADMIN" && detail.createdById !== user.id) notFound();
   const vm = buildAnalysisViewModel(detail);
+  const matrixRows = await prisma.curriculumMatrix.findMany({ where: { isActive: true }, include: { course: true }, orderBy: [{ course: { name: "asc" } }, { year: "desc" }] });
+  const matrices = matrixRows.map((m) => ({ id: m.id, label: m.label, course: m.course.name, year: m.year, version: m.version }));
+  const suggestedMatrixId = suggestMatrix(matrices, { courseName: vm.courseName, matrixLabel: vm.matrixLabel });
   const failed = vm.status === "FAILED" || vm.status === "AI_ERROR";
   const hasData = vm.subjects.length > 0;
 

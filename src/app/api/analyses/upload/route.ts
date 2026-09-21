@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import { getSessionUser } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
-import { createAnalysisFromUpload } from "@/features/analyses/create-analysis";
+import { createAnalysisFromUpload, DuplicateDocumentError } from "@/features/analyses/create-analysis";
 import { PdfValidationError } from "@/services/pdf/validate";
 import { runAnalysisPipeline } from "@/services/pipeline/runner";
 import { getSystemSettings } from "@/repositories/settings-repository";
@@ -12,7 +12,19 @@ import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+function sameOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true; // clientes sem Origin (ex.: curl) já dependem do cookie de sessão
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
+  if (!sameOrigin(req)) return NextResponse.json({ error: "Origem não permitida." }, { status: 403 });
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   if (!can(user.role, "analysis:create")) return NextResponse.json({ error: "Sem permissão para criar análises." }, { status: 403 });
@@ -42,7 +54,8 @@ export async function POST(req: Request) {
 
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    const { id } = await createAnalysisFromUpload({ userId: user.id, bytes, originalName: file.name, entryPeriod, entryTerm, startTerm: entryTerm });
+    const force = form.get("force") === "1";
+    const { id } = await createAnalysisFromUpload({ userId: user.id, bytes, originalName: file.name, entryPeriod, entryTerm, startTerm: entryTerm, force });
     after(async () => {
       try {
         await runAnalysisPipeline(id);
@@ -53,6 +66,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
     if (err instanceof PdfValidationError) return NextResponse.json({ error: err.message, code: err.code }, { status: 422 });
+    if (err instanceof DuplicateDocumentError) return NextResponse.json({ error: err.message, code: "DUPLICATE_DOCUMENT", existingId: err.existingAnalysisId }, { status: 409 });
     logger.error("upload.failed", { err: String(err) });
     const reason = err instanceof Error && err.message.includes("Nenhuma versão de regras ativa")
       ? "Não há regras acadêmicas ativas. Peça a um administrador para ativar uma configuração em Regras Acadêmicas."
