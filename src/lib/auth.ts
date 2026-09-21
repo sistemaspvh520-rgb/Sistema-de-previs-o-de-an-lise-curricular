@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
 import { getClientIp } from "@/lib/request-ip";
+import { consumeImpersonationToken } from "@/features/users/impersonation";
 
 const credentialsSchema = z.object({
   email: z.string().email().transform((v) => v.toLowerCase().trim()),
@@ -18,7 +19,7 @@ const credentialsSchema = z.object({
 /** Intervalo em que o perfil/ativação do usuário é reconferido no banco para invalidar sessões revogadas. */
 const SESSION_RECHECK_MS = 5 * 60 * 1000;
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ...authConfig,
   callbacks: {
     ...authConfig.callbacks,
@@ -27,6 +28,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.role = (user as { role?: Role }).role;
         token.name = user.name;
+        token.mustChangePassword = (user as { mustChangePassword?: boolean }).mustChangePassword ?? false;
+        token.impersonatorId = (user as { impersonatorId?: string }).impersonatorId;
+        token.impersonatorName = (user as { impersonatorName?: string }).impersonatorName;
         token.checkedAt = Date.now();
         return token;
       }
@@ -34,10 +38,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const checkedAt = typeof token.checkedAt === "number" ? token.checkedAt : 0;
       const userId = typeof token.id === "string" ? token.id : null;
       if (userId && (trigger === "update" || Date.now() - checkedAt > SESSION_RECHECK_MS)) {
-        const current = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, name: true } });
+        const current = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, name: true, mustChangePassword: true } });
         if (!current || !current.isActive) return null;
         token.role = current.role;
         token.name = current.name;
+        token.mustChangePassword = token.impersonatorId ? false : current.mustChangePassword;
         token.checkedAt = Date.now();
       }
       return token;
@@ -46,8 +51,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       name: "Credenciais",
-      credentials: { email: {}, password: {} },
+      credentials: { email: {}, password: {}, impersonationToken: {} },
       async authorize(raw, request) {
+        // "Acessar como": token de uso único emitido por um ADMIN (ver features/users/impersonation.ts)
+        const impersonationToken = typeof raw?.impersonationToken === "string" ? raw.impersonationToken : null;
+        if (impersonationToken) {
+          const result = await consumeImpersonationToken(impersonationToken);
+          if (!result) return null;
+          await prisma.auditLog.create({
+            data: { userId: result.admin.id, action: "admin.impersonate", entityType: "User", entityId: result.target.id, metadata: { targetEmail: result.target.email } },
+          });
+          return { id: result.target.id, email: result.target.email, name: result.target.name, role: result.target.role, mustChangePassword: false, impersonatorId: result.admin.id, impersonatorName: result.admin.name };
+        }
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
 
@@ -69,7 +84,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           data: { userId: user.id, action: "auth.login", entityType: "User", entityId: user.id, ip },
         });
 
-        return { id: user.id, email: user.email, name: user.name, role: user.role };
+        return { id: user.id, email: user.email, name: user.name, role: user.role, mustChangePassword: user.mustChangePassword };
       },
     }),
   ],

@@ -118,6 +118,11 @@ enum AIPrivacyMode {
   REDACTED_TEXT
 }
 
+enum PasswordTokenPurpose {
+  INVITE
+  RESET
+}
+
 // ------------------------------------------------------------------
 // Identidade e acesso
 // ------------------------------------------------------------------
@@ -130,6 +135,16 @@ model User {
   role         Role      @default(ANALYST)
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @db.Timestamptz(6)
+  /** Obriga a definir uma senha própria no próximo acesso. */
+  mustChangePassword       Boolean   @default(false)
+  /** Senha temporária cifrada (AES-256-GCM); apagada quando o usuário define a própria senha. */
+  initialPasswordEncrypted String?
+  initialPasswordIv        String?
+  initialPasswordAuthTag   String?
+  initialPasswordKeyVersion Int?
+  initialPasswordSetAt     DateTime? @db.Timestamptz(6)
+  /** Último convite/redefinição enviado por e-mail. */
+  inviteSentAt             DateTime? @db.Timestamptz(6)
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
 
@@ -140,6 +155,41 @@ model User {
   ruleSetsCreated    RuleSetVersion[]
   integrationsUpdated OpenAIIntegration[] @relation("IntegrationUpdatedBy")
   integrationsCreated OpenAIIntegration[] @relation("IntegrationCreatedBy")
+  passwordTokens      PasswordToken[]      @relation("PasswordTokenUser")
+  passwordTokensIssued PasswordToken[]     @relation("PasswordTokenCreatedBy")
+  impersonationsAsAdmin ImpersonationToken[] @relation("ImpersonationAdmin")
+  impersonationsAsTarget ImpersonationToken[] @relation("ImpersonationTarget")
+}
+
+/// Token de uso único para definir (convite) ou redefinir a senha por link de e-mail. Só o hash é armazenado.
+model PasswordToken {
+  id          String               @id @default(uuid()) @db.Uuid
+  userId      String               @db.Uuid
+  tokenHash   String               @unique
+  purpose     PasswordTokenPurpose
+  expiresAt   DateTime             @db.Timestamptz(6)
+  usedAt      DateTime?            @db.Timestamptz(6)
+  createdById String?              @db.Uuid
+  createdAt   DateTime             @default(now()) @db.Timestamptz(6)
+
+  user      User  @relation("PasswordTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("PasswordTokenCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, purpose])
+}
+
+/// Token de uso único (60 s) para o ADMIN entrar na conta de outro usuário ("Acessar como").
+model ImpersonationToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  tokenHash    String    @unique
+  adminId      String    @db.Uuid
+  targetUserId String    @db.Uuid
+  expiresAt    DateTime  @db.Timestamptz(6)
+  usedAt       DateTime? @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+
+  admin  User @relation("ImpersonationAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+  target User @relation("ImpersonationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {

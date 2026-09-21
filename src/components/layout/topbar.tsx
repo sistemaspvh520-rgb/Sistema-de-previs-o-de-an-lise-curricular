@@ -19,7 +19,7 @@ import { ROLE_LABELS } from "@/lib/rbac";
 import type { Role } from "@/generated/prisma/enums";
 import { logoutAction } from "@/features/auth/actions";
 
-export function Topbar({ user }: { user: { name: string; email: string; role: Role } }) {
+export function Topbar({ user }: { user: { name: string; email: string; role: Role; impersonator?: { id: string; name: string } | null } }) {
   const [open, setOpen] = useState(false);
   const initials = user.name
     .split(" ")
@@ -29,6 +29,15 @@ export function Topbar({ user }: { user: { name: string; email: string; role: Ro
     .join("");
 
   return (
+    <>
+    {user.impersonator && (
+      <div className="flex items-center justify-between gap-3 bg-brand-gold px-4 py-1.5 text-xs font-medium text-brand-navy md:px-6">
+        <span>Você ({user.impersonator.name}) está acessando como <strong>{user.name}</strong> — modo de suporte.</span>
+        <form action={logoutAction}>
+          <button type="submit" className="rounded border border-brand-navy/30 px-2 py-0.5 hover:bg-brand-navy hover:text-white">Encerrar</button>
+        </form>
+      </div>
+    )}
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur md:px-6">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
@@ -74,5 +83,6 @@ export function Topbar({ user }: { user: { name: string; email: string; role: Ro
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
+    </>
   );
 }

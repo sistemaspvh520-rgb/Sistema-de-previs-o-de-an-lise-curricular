@@ -5,6 +5,13 @@
 - Sessão JWT em cookie `HttpOnly`, `SameSite=Lax`, `Secure` em produção, expiração 8h com renovação.
 - Login com rate limit (5 tentativas/min por IP) e mensagem genérica.
 
+## Senhas temporárias, convites e suporte
+- Contas são criadas com senha temporária gerada (alfabeto sem caracteres ambíguos), armazenada como hash argon2id **e** cifrada (AES-256-GCM) para consulta do ADMIN até o primeiro acesso; ao definir a própria senha, a cópia cifrada é apagada.
+- `mustChangePassword` no JWT força a troca no primeiro acesso (proxy redireciona para `/settings/account`).
+- Convite e redefinição usam tokens aleatórios de 32 bytes; só o SHA-256 é persistido (`PasswordToken`), uso único, validade 7 dias (convite) / 60 min (redefinição); emitir um novo invalida o anterior. "Esqueci minha senha" responde sempre de forma genérica e é limitado por IP e por e-mail.
+- "Acessar como": token de uso único (60 s) emitido por ADMIN ativo; a sessão resultante carrega `impersonatorId`; evento `admin.impersonate` na auditoria. O usuário não é notificado (decisão da instituição); o registro de auditoria é a salvaguarda.
+- E-mails saem por SMTP autenticado (senha de app), sem senha em texto no corpo dos convites; a auditoria registra `email.sent`/`email.failed` sem conteúdo.
+
 ## Autorização (RBAC)
 - Perfis ADMIN / ANALYST / VIEWER. Matriz de permissões em `src/lib/rbac.ts`.
 - Verificação em `middleware.ts` (rotas), em cada server action/route handler (`requireRole`) e na UI.

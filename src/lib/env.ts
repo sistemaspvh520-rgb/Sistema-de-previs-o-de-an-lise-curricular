@@ -26,6 +26,14 @@ const envSchema = z.object({
   SUPABASE_SECRET_KEY: z.string().min(20).optional(),
   SUPABASE_STORAGE_BUCKET: z.string().default("documents"),
   CRON_SECRET: z.string().min(16),
+  /** E-mail transacional (Gmail/Workspace com senha de app). Opcional: sem ele o sistema usa só senha temporária. */
+  EMAIL_USER: z.string().email().optional(),
+  EMAIL_APP_PASSWORD: z.string().min(8).optional(),
+  EMAIL_FROM: z.string().optional(),
+  EMAIL_SMTP_HOST: z.string().default("smtp.gmail.com"),
+  EMAIL_SMTP_PORT: z.coerce.number().int().default(465),
+  /** URL pública do app (base dos links de e-mail). */
+  APP_URL: z.string().url().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_NAME: z.string().optional(),
   ADMIN_PASSWORD: z.string().min(8).optional(),

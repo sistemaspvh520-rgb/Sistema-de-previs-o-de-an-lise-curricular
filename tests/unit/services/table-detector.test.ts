@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parsePdf, extractHeaderFields } from "@/services/pdf/parser";
-import { detectTables, effectiveRows, mergeContinuation, tableToText } from "@/services/pdf/table-detector";
+import { effectiveRows, mergeContinuation, tableToText } from "@/services/pdf/table-detector";
 import { crossCheckWithLocalTable, readHeaderMetadata } from "@/services/pipeline/cross-check";
 import { redactPersonalData } from "@/services/pdf/redaction";
 

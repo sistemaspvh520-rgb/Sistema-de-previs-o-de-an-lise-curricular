@@ -36,6 +36,25 @@ Aplicado via `supabase db query --linked` (Management API, sem senha do banco):
 
 Após criar uma nova migração no futuro: `supabase db query -f prisma/migrations/<nova>/migration.sql --linked`, registrar em `_prisma_migrations` (ou deixar o `vercel-build` fazer isso com `DIRECT_URL` configurada) e reexecutar `prisma/supabase-rls.sql`.
 
+## E-mail (convites e redefinição de senha)
+
+Remetente: `cruzeirogpt@gmail.com` via SMTP do Google (`EMAIL_USER`, `EMAIL_FROM`, `APP_URL` já configurados na Vercel).
+Falta **`EMAIL_APP_PASSWORD`** — senha de app da conta Google, que só o responsável deve cadastrar:
+
+1. Entre em `cruzeirogpt@gmail.com` → myaccount.google.com → Segurança → ative a **Verificação em duas etapas**.
+2. Em myaccount.google.com/apppasswords crie uma senha de app (nome: "Análise Curricular"). Copie os 16 caracteres.
+3. Vercel → analise-curricular → Settings → Environment Variables → `EMAIL_APP_PASSWORD` (Production) → Redeploy.
+
+Sem essa variável o sistema funciona normalmente, mas convites/links ficam desativados (aviso na tela de Usuários) e o admin repassa a senha temporária. Limite do Gmail: ~500 e-mails/dia.
+
+## Senhas, primeiro acesso e "Acessar como"
+
+- Contas novas recebem **senha temporária** (cifrada com `APP_ENCRYPTION_KEY`) e um **convite por e-mail** com link (7 dias) para definir a senha oficial. O ADMIN vê/copia a temporária até o primeiro acesso; depois ela é apagada.
+- Todo usuário com senha temporária é obrigado a definir a própria senha ao entrar (`/settings/account`).
+- Redefinição: o ADMIN gera nova temporária ou envia link (60 min); o usuário também pode usar "Esqueci minha senha".
+- **Acessar como**: o ADMIN entra na conta de qualquer usuário para suporte (faixa amarela no topo, botão Encerrar). Registrado na Auditoria; o usuário não é notificado.
+- Rotação de `APP_ENCRYPTION_KEY` em 21/09/2026: variáveis "sensíveis" da Vercel não podem ser lidas de volta; como nada estava cifrado, a chave foi trocada e as 14 senhas temporárias gravadas com a nova.
+
 ## O que acontece no deploy
 
 `npm run vercel-build` (`scripts/vercel-build.mjs`) executa:

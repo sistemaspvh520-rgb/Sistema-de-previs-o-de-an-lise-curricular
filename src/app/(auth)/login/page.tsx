@@ -7,6 +7,7 @@ export const metadata: Metadata = { title: "Entrar" };
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
   const callbackUrl = typeof params.callbackUrl === "string" ? params.callbackUrl : undefined;
+  const passwordSet = params.senha === "ok";
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-navy px-4">
@@ -23,6 +24,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <p className="mt-1 text-sm text-muted-foreground">
             Acesse com sua conta institucional para analisar documentos.
           </p>
+          {passwordSet && (
+            <p className="mt-4 rounded-md bg-status-success-bg px-3 py-2 text-sm text-status-success">Senha definida com sucesso. Entre com seu login e a nova senha.</p>
+          )}
           <div className="mt-6">
             <LoginForm callbackUrl={callbackUrl} />
           </div>

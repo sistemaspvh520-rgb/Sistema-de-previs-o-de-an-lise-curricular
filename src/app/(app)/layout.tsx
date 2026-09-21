@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <Sidebar role={user.role} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar user={user} />
+        <Topbar user={{ name: user.name, email: user.email, role: user.role, impersonator: user.impersonator }} />
         <main className="flex-1 animate-in fade-in-0 duration-300 px-4 py-5 md:px-6 md:py-7 xl:px-8 xl:py-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>

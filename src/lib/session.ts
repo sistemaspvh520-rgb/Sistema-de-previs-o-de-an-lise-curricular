@@ -9,6 +9,8 @@ export interface SessionUser {
   email: string;
   name: string;
   role: Role;
+  mustChangePassword: boolean;
+  impersonator: { id: string; name: string } | null;
 }
 
 export class ForbiddenError extends Error {
@@ -33,6 +35,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     email: session.user.email ?? "",
     name: session.user.name ?? "",
     role: session.user.role,
+    mustChangePassword: Boolean(session.user.mustChangePassword),
+    impersonator: session.user.impersonatorId ? { id: session.user.impersonatorId, name: session.user.impersonatorName ?? "Administrador" } : null,
   };
 }
 

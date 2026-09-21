@@ -8,11 +8,19 @@ import { ROLE_LABELS } from "@/lib/rbac";
 export const metadata: Metadata = { title: "Minha conta" };
 export const dynamic = "force-dynamic";
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: PageProps<"/settings/account">) {
   const user = await requireUser();
+  const params = await searchParams;
+  const first = params.first === "1" || user.mustChangePassword;
   return (
     <>
       <PageHeader eyebrow="Configurações" title="Minha conta" description={`${user.name} · ${user.email} · ${ROLE_LABELS[user.role]}`} />
+      {first && (
+        <div className="mb-6 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning">
+          <div className="font-semibold">Primeiro acesso</div>
+          Defina agora a sua senha definitiva. Até isso acontecer, o restante do sistema fica bloqueado e a senha temporária permanece visível ao administrador.
+        </div>
+      )}
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Alterar senha</CardTitle>

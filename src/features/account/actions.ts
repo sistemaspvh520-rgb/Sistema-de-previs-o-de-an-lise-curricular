@@ -4,6 +4,8 @@ import { z } from "zod";
 import { hash, verify } from "@node-rs/argon2";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, UnauthorizedError } from "@/lib/session";
+import { unstable_update } from "@/lib/auth";
+import { clearTemporaryPassword } from "@/features/users/initial-password";
 import { recordAudit } from "@/services/audit-log/audit-log";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
@@ -30,8 +32,9 @@ export async function changeOwnPasswordAction(input: unknown): Promise<ActionRes
     const record = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
     if (!(await verify(record.passwordHash, parsed.data.currentPassword))) return fail("Senha atual incorreta.");
 
-    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(parsed.data.newPassword) } });
-    await recordAudit({ userId: user.id, action: "user.password_changed", entityType: "User", entityId: user.id });
+    await clearTemporaryPassword(user.id, await hash(parsed.data.newPassword));
+    await recordAudit({ userId: user.id, action: "user.password_changed", entityType: "User", entityId: user.id, metadata: { firstAccess: record.mustChangePassword } });
+    await unstable_update({}); // atualiza o token (mustChangePassword = false) sem novo login
     return ok(undefined, "Senha alterada com sucesso.");
   } catch (err) {
     return toActionError(err);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,9 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
         {pending && <Loader2 className="size-4 animate-spin" />}
         Entrar
       </Button>
+      <p className="text-center text-sm">
+        <Link href="/esqueci-senha" className="text-muted-foreground underline hover:text-foreground">Esqueci minha senha</Link>
+      </p>
     </form>
   );
 }

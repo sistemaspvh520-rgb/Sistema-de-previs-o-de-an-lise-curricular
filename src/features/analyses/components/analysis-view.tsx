@@ -31,7 +31,7 @@ const PdfViewer = dynamic(() => import("@/features/analyses/components/pdf-viewe
   loading: () => <div className="flex h-full items-center justify-center rounded-xl border"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>,
 });
 
-export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: boolean; complete: boolean; rules: boolean; diagnostics: boolean } }) {
+export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = null }: { vm: AnalysisVM; perms: { review: boolean; complete: boolean; rules: boolean; diagnostics: boolean }; matrices?: MatrixOption[]; suggestedMatrixId?: string | null }) {
   const [tab, setTab] = useState("summary");
   const [showPdf, setShowPdf] = useState(false);
   const [page, setPage] = useState(1);
@@ -110,6 +110,11 @@ export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: b
 
           <TabsContent value="summary" className="mt-4">
             <SummaryTab vm={vm} onLocate={locate} selectedId={selected?.id} showDiagnostics={perms.diagnostics} />
+            {perms.review && (
+              <div className="mt-4">
+                <MatrixLinkSelect analysisId={vm.id} matrices={matrices} currentId={vm.matrix?.id ?? null} suggestedId={suggestedMatrixId} canEdit={editable} />
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="grade" className="mt-4">
             <GradeTable subjects={vm.subjects} canEdit={editable} onEdit={setEditing} onLocate={locate} selectedId={selected?.id} />

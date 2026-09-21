@@ -6,10 +6,16 @@ declare module "next-auth" {
     user: {
       id: string;
       role: Role;
+      mustChangePassword: boolean;
+      impersonatorId?: string | null;
+      impersonatorName?: string | null;
     } & DefaultSession["user"];
   }
   interface User {
     role?: Role;
+    mustChangePassword?: boolean;
+    impersonatorId?: string | null;
+    impersonatorName?: string | null;
   }
 }
 
@@ -18,5 +24,8 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: Role;
     checkedAt?: number;
+    mustChangePassword?: boolean;
+    impersonatorId?: string;
+    impersonatorName?: string;
   }
 }

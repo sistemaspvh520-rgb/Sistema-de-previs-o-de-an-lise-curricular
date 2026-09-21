@@ -5,7 +5,7 @@ import { can, ROUTE_PERMISSIONS } from "@/lib/rbac";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/cron"];
+const PUBLIC_PATHS = ["/login", "/definir-senha", "/esqueci-senha", "/api/auth", "/api/cron", "/api/health"];
 
 export const proxy = auth((req) => {
   const { nextUrl } = req;
@@ -27,6 +27,11 @@ export const proxy = auth((req) => {
     const loginUrl = new URL("/login", nextUrl);
     if (path !== "/") loginUrl.searchParams.set("callbackUrl", path);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Primeiro acesso: obriga a definir a própria senha antes de usar o sistema (exceto em impersonação).
+  if (req.auth?.user?.mustChangePassword && !req.auth.user.impersonatorId && !path.startsWith("/settings/account") && !path.startsWith("/api/")) {
+    return NextResponse.redirect(new URL("/settings/account?first=1", nextUrl));
   }
 
   if (path === "/") {
