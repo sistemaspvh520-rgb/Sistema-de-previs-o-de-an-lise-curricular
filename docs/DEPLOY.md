@@ -55,6 +55,12 @@ Sem essa variável o sistema funciona normalmente, mas convites/links ficam desa
 - **Acessar como**: o ADMIN entra na conta de qualquer usuário para suporte (faixa amarela no topo, botão Encerrar). Registrado na Auditoria; o usuário não é notificado.
 - Rotação de `APP_ENCRYPTION_KEY` em 21/09/2026: variáveis "sensíveis" da Vercel não podem ser lidas de volta; como nada estava cifrado, a chave foi trocada e as 14 senhas temporárias gravadas com a nova.
 
+## Incidentes conhecidos (resolvidos em 21/09/2026)
+
+- **Upload falhava com "PDF corrompido"**: (1) o worker/fontes do pdf.js não entravam no bundle serverless — resolvido com `outputFileTracingIncludes` em `next.config.ts`; (2) `require.resolve("pdfjs-dist/package.json")` era transformado pelo Turbopack em id numérico no build — resolvido em `src/services/pdf/parser.ts` com resolução dinâmica + fallback. A causa real agora é registrada em `pdf.open_failed` nos logs.
+- **Storage "Invalid Compact JWS"**: `supabase projects api-keys` sem `--reveal` devolve a chave `sb_secret_` **mascarada**; use sempre `--reveal` ao copiar a chave para `SUPABASE_SECRET_KEY`.
+- **Links de e-mail caíam no login da Vercel**: usar sempre `APP_URL=https://analise-curricular.vercel.app` (domínio de produção); a URL `…-sistemas-pvh.vercel.app` é de deployment. A Vercel Authentication foi desativada pelo responsável em 21/09.
+
 ## O que acontece no deploy
 
 `npm run vercel-build` (`scripts/vercel-build.mjs`) executa:

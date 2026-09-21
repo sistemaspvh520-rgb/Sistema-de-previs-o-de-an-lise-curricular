@@ -93,3 +93,14 @@ Pendências externas (não são defeitos): conectar a **API Key** do projeto Ope
 **Backlog:** S10–S12, S14, A7, A10, F6, F9, F10, F12.
 
 Critério de saída para "pronto para produção": Sprint 1 concluída + fluxo com IA real validado em ≥ 10 PDFs reais com 0 alertas `LOCAL_*` não explicados + CI verde.
+
+---
+
+## 6. Registro de incidentes de produção (21/09/2026)
+
+| Incidente | Causa | Correção |
+|-----------|-------|----------|
+| Upload retornava "PDF corrompido" para qualquer arquivo | Worker do pdf.js fora do bundle serverless + `require.resolve` convertido em id numérico pelo Turbopack; exceção original não era logada | Tracing explícito, resolução dinâmica do diretório do pdfjs-dist, log `pdf.open_failed` com stack |
+| Upload retornava "não foi possível criar a análise" | `SUPABASE_SECRET_KEY` gravada mascarada (CLI sem `--reveal`) → Storage "Invalid Compact JWS" | Chave completa gravada na Vercel; documentado |
+| Link de e-mail abria login da Vercel | `APP_URL` apontava para a URL de deployment (protegida) | `APP_URL` = domínio de produção |
+| "Esqueci minha senha" não enviava | E-mail testado não estava cadastrado (login era o padrão `nome.sobrenome@…`) | Login do admin trocado para o e-mail real; ação "Editar" permite corrigir os demais |

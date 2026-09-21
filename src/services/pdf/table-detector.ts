@@ -88,16 +88,17 @@ function detectHeader(page: ParsedPage): ColumnLayout | null {
 
 /** Classifica cada parte de texto em uma coluna pelo X mais próximo dos limites entre colunas. */
 function columnOf(x: number, layout: ColumnLayout): TableColumn {
-  const bounds = [
-    layout.code !== null ? (layout.code + layout.name) / 2 : layout.name - 1,
-    (layout.name + layout.workload) / 2 + 20, // nomes longos avançam sobre a coluna C.H.; tolerância
-    (layout.workload + layout.period) / 2,
-    (layout.period + layout.used) / 2,
-  ];
-  if (layout.code !== null && x < bounds[0]) return "code";
-  if (x < bounds[1] - 20) return "name";
-  if (x < bounds[2]) return "workload";
-  if (x < bounds[3]) return "period";
+  // C.H. e Série são colunas estreitas (números de 1–4 dígitos): o texto da "Disciplina Utilizada", quando longo,
+  // é centralizado e pode começar bem à esquerda do centro da coluna — por isso o limite da última coluna fica
+  // logo após a posição da Série, e não no ponto médio.
+  const codeBound = layout.code !== null ? (layout.code + layout.name) / 2 : layout.name - 1;
+  const nameBound = layout.workload - 12;
+  const workloadBound = (layout.workload + layout.period) / 2;
+  const periodBound = layout.period + 25;
+  if (layout.code !== null && x < codeBound) return "code";
+  if (x < nameBound) return "name";
+  if (x < workloadBound) return "workload";
+  if (x < periodBound) return "period";
   return "used";
 }
 

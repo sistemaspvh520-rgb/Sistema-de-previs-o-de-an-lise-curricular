@@ -59,7 +59,9 @@ describe("table-detector (PDF real em samples/, pulado se ausente)", () => {
     expect(rows.every((r) => r.code && r.period && r.workload !== null)).toBe(true);
     const byPeriod = rows.reduce<Record<number, number>>((a, r) => ((a[r.period!] = (a[r.period!] ?? 0) + 1), a), {});
     expect(byPeriod).toEqual({ 1: 11, 2: 9, 3: 9, 4: 9, 5: 9, 6: 9, 7: 9, 8: 9 });
-    expect(rows.filter((r) => r.usedSubject).length).toBe(26);
+    expect(rows.filter((r) => r.usedSubject).length).toBe(28);
+    // textos longos da coluna "Disciplina Utilizada" começam à esquerda do centro da coluna
+    expect(rows.find((r) => r.code === "3583")?.usedSubject).toContain("ESTRUTURA DE DADOS");
     const meta = readHeaderMetadata(local);
     expect(meta.entryPeriod).toBe(4);
     expect(meta.course).toContain("CIÊNCIA DA COMPUTAÇÃO");
@@ -68,5 +70,19 @@ describe("table-detector (PDF real em samples/, pulado se ausente)", () => {
     expect(crossCheckWithLocalTable(local, asExtracted)).toEqual([]);
     const missing = crossCheckWithLocalTable(local, asExtracted.slice(1));
     expect(missing.map((w) => w.code)).toEqual(["LOCAL_ROW_COUNT_MISMATCH", "LOCAL_ROW_NOT_EXTRACTED"]);
+  });
+});
+
+describe("table-detector (PDF real 2 — Pedagogia, pulado se ausente)", () => {
+  it("64 linhas, 16 aproveitamentos, ingresso 4", async (ctx) => {
+    const p = path.join(process.cwd(), "samples/analise-real-02-pedagogia.pdf");
+    if (!existsSync(p)) return ctx.skip();
+    const local = await parsePdf(readFileSync(p));
+    const rows = effectiveRows(local.table!);
+    expect(rows).toHaveLength(64);
+    expect(rows.filter((r) => r.usedSubject).length).toBe(16);
+    expect(rows.find((r) => r.code === "13472")?.usedSubject).toContain("FUNCIONAMENTO DA EDUCAÇÃO");
+    expect(readHeaderMetadata(local).entryPeriod).toBe(4);
+    expect(readHeaderMetadata(local).course).toContain("PEDAGOGIA");
   });
 });
