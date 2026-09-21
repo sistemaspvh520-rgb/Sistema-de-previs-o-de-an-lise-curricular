@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { logger } from "@/lib/logger";
@@ -47,10 +46,20 @@ const Y_TOLERANCE = 3.5;
 type PdfJs = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
 let pdfjsPromise: Promise<PdfJs> | null = null;
 
-/** Diretório real do pacote pdfjs-dist (funciona local e em serverless, onde caminhos relativos ao módulo falham). */
+/**
+ * Diretório real do pacote pdfjs-dist. A resolução é feita de forma que o bundler (Turbopack) não consiga
+ * analisar estaticamente — caso contrário `require.resolve` vira um id numérico de módulo no build de produção.
+ */
 function pdfjsDir(): string {
-  const req = createRequire(import.meta.url);
-  return path.dirname(req.resolve("pdfjs-dist/package.json"));
+  const specifier = ["pdfjs-dist", "package.json"].join("/");
+  try {
+    const nodeModule = process.getBuiltinModule("module") as typeof import("node:module");
+    const resolved: unknown = nodeModule.createRequire(import.meta.url).resolve(specifier);
+    if (typeof resolved === "string") return path.dirname(resolved);
+  } catch {
+    // cai no fallback abaixo
+  }
+  return path.join(process.cwd(), "node_modules", "pdfjs-dist");
 }
 
 async function loadPdfJs(): Promise<PdfJs> {

@@ -50,7 +50,7 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
   } catch (err) {
     // registra a causa real (ex.: worker do pdf.js ausente no bundle) — o usuário só vê a mensagem amigável
     const message = err instanceof Error ? err.message : String(err);
-    logger.error("pdf.open_failed", { originalName: input.originalName, sizeBytes: input.bytes.length, err: message });
+    logger.error("pdf.open_failed", { originalName: input.originalName, sizeBytes: input.bytes.length, err: message, stack: err instanceof Error ? err.stack?.split("\n").slice(0, 8).join(" | ") : undefined });
     const looksInternal = /worker|Cannot find module|ENOENT|import|fetch/i.test(message);
     throw new PdfValidationError(
       "NOT_PDF",
