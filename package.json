@@ -18,7 +18,8 @@
     "retention:run": "tsx scripts/run-retention.ts",
     "postinstall": "node scripts/copy-pdf-worker.mjs && prisma generate",
     "prebuild": "node scripts/copy-pdf-worker.mjs",
-    "vercel-build": "prisma migrate deploy && tsx prisma/seed.ts && prisma generate && next build"
+    "vercel-build": "node scripts/vercel-build.mjs",
+    "seed:sql": "tsx scripts/generate-seed-sql.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.1",

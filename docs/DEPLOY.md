@@ -25,13 +25,23 @@ DIRECT_URL   = postgresql://postgres.gflvyhutqhfrfpdpcgii:[SENHA]@aws-0-sa-east-
 - Copie os hosts exatos da tela *Connect* do Supabase (pode ser `aws-1-…` em projetos novos). Se a senha tiver caracteres especiais, faça URL-encode.
 - Se esqueceu a senha: Supabase → Settings → Database → *Reset database password*.
 
+## Estado do banco no Supabase (feito em 21/09/2026)
+
+Aplicado via `supabase db query --linked` (Management API, sem senha do banco):
+
+- 4 migrações do Prisma aplicadas e registradas em `_prisma_migrations` com os checksums originais — `prisma migrate deploy` reconhece o histórico;
+- seed aplicado (`npm run seed:sql` gera o SQL idempotente: ADMIN, regras v1.0, configurações, integração OpenAI);
+- **RLS ativado em todas as 22 tabelas** e `REVOKE` para `anon`/`authenticated` (`prisma/supabase-rls.sql`) — o app usa a role `postgres` via Prisma; a Data API pública não expõe nada;
+- bucket privado `documents` criado (limite 50 MB, somente `application/pdf`).
+
+Após criar uma nova migração no futuro: `supabase db query -f prisma/migrations/<nova>/migration.sql --linked`, registrar em `_prisma_migrations` (ou deixar o `vercel-build` fazer isso com `DIRECT_URL` configurada) e reexecutar `prisma/supabase-rls.sql`.
+
 ## O que acontece no deploy
 
-`npm run vercel-build` executa, nesta ordem:
+`npm run vercel-build` (`scripts/vercel-build.mjs`) executa:
 
-1. `prisma migrate deploy` — aplica as migrações em `prisma/migrations` (via `DIRECT_URL`);
-2. `tsx prisma/seed.ts` — idempotente: cria o ADMIN (`ADMIN_EMAIL`/`ADMIN_PASSWORD`) se não existir, as regras v1.0 e as configurações padrão;
-3. `prisma generate` + `next build`.
+1. se `DIRECT_URL`/`DATABASE_URL` existirem: `prisma migrate deploy` + `tsx prisma/seed.ts` (idempotente);
+2. `prisma generate` + `next build` — o build **não** depende do banco; o app só exige `DATABASE_URL` em runtime.
 
 Cron de retenção LGPD: `vercel.json` agenda `GET /api/cron/retention` diariamente às 03:00 UTC; a Vercel envia `Authorization: Bearer CRON_SECRET` automaticamente.
 
