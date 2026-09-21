@@ -1,3 +1,6 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { logger } from "@/lib/logger";
 import { detectTables, type DetectedTable } from "@/services/pdf/table-detector";
 
@@ -44,9 +47,29 @@ const Y_TOLERANCE = 3.5;
 type PdfJs = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
 let pdfjsPromise: Promise<PdfJs> | null = null;
 
+/** Diretório real do pacote pdfjs-dist (funciona local e em serverless, onde caminhos relativos ao módulo falham). */
+function pdfjsDir(): string {
+  const req = createRequire(import.meta.url);
+  return path.dirname(req.resolve("pdfjs-dist/package.json"));
+}
+
 async function loadPdfJs(): Promise<PdfJs> {
-  pdfjsPromise ??= import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjsPromise ??= import("pdfjs-dist/legacy/build/pdf.mjs").then((mod) => {
+    // Node: o pdf.js carrega um "fake worker" por import() dinâmico; caminho absoluto garante que exista no bundle.
+    const workerPath = path.join(pdfjsDir(), "legacy", "build", "pdf.worker.mjs");
+    mod.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+    return mod;
+  });
   return pdfjsPromise;
+}
+
+function fontOptions() {
+  const dir = pdfjsDir();
+  return {
+    standardFontDataUrl: pathToFileURL(path.join(dir, "standard_fonts") + path.sep).href,
+    cMapUrl: pathToFileURL(path.join(dir, "cmaps") + path.sep).href,
+    cMapPacked: true,
+  };
 }
 
 interface RawItem {
@@ -121,6 +144,7 @@ export async function parsePdf(bytes: Buffer, opts?: { maxPages?: number }): Pro
     useSystemFonts: true,
     disableFontFace: true,
     verbosity: 0,
+    ...fontOptions(),
   });
   const doc = await task.promise;
 
@@ -170,7 +194,7 @@ export function extractHeaderFields(lines: string[]): Record<string, string> {
 /** Apenas a contagem de páginas (rápido, usado na validação do upload). */
 export async function countPdfPages(bytes: Buffer): Promise<number> {
   const pdfjs = await loadPdfJs();
-  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 });
+  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0, ...fontOptions() });
   const doc = await task.promise;
   try {
     return doc.numPages;

@@ -30,8 +30,17 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["pdfjs-dist", "@node-rs/argon2", "@prisma/client", "pg"],
-  // a logo dos e-mails é lida do disco em runtime — precisa ir junto na função serverless
-  outputFileTracingIncludes: { "/**": ["./src/services/email/assets/**"] },
+  // Arquivos lidos em runtime que o rastreamento automático não vê: logo dos e-mails e o worker/fontes do pdf.js
+  // (carregados por import() dinâmico em Node) — sem isso o upload falha na Vercel com "PDF corrompido".
+  outputFileTracingIncludes: {
+    "/**": [
+      "./src/services/email/assets/**",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+      "./node_modules/pdfjs-dist/standard_fonts/**",
+      "./node_modules/pdfjs-dist/cmaps/**",
+    ],
+  },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },

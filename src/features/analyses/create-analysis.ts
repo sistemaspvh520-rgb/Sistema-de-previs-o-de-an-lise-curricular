@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { getStorage } from "@/services/storage/storage";
 import { validatePdfBytes, PdfValidationError } from "@/services/pdf/validate";
 import { countPdfPages } from "@/services/pdf/parser";
@@ -46,8 +47,17 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
   let pageCount: number;
   try {
     pageCount = await countPdfPages(input.bytes);
-  } catch {
-    throw new PdfValidationError("NOT_PDF", "Não foi possível abrir o PDF. O arquivo pode estar corrompido ou protegido.");
+  } catch (err) {
+    // registra a causa real (ex.: worker do pdf.js ausente no bundle) — o usuário só vê a mensagem amigável
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error("pdf.open_failed", { originalName: input.originalName, sizeBytes: input.bytes.length, err: message });
+    const looksInternal = /worker|Cannot find module|ENOENT|import|fetch/i.test(message);
+    throw new PdfValidationError(
+      "NOT_PDF",
+      looksInternal
+        ? "Falha interna ao ler o PDF (leitor indisponível). A equipe técnica foi notificada; tente novamente em instantes."
+        : "Não foi possível abrir o PDF. O arquivo pode estar corrompido ou protegido por senha.",
+    );
   }
   if (pageCount > settings.maxPdfPages) {
     throw new PdfValidationError("TOO_MANY_PAGES", `O PDF tem ${pageCount} páginas; o limite é ${settings.maxPdfPages}.`);
