@@ -21,7 +21,7 @@ export function buildCandidateSummary(vm: AnalysisVM): string {
     `Previsão estimada de conclusão: ${previsao}`,
     ...(vm.narrative ? ["", ...vm.narrative.headerLines.filter((l) => l.startsWith("⚠️") || l.startsWith("Semestres")), "", "A previsão fica assim:", "", ...vm.narrative.bulletLines, "", vm.narrative.conclusionLine ?? ""] : []),
     "",
-    "A previsão considera a análise curricular e as regras acadêmicas atualmente cadastradas.",
+    "A previsão considera a análise curricular e as regras acadêmicas.",
   ]
     .filter((l) => l !== null)
     .join("\n");

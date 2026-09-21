@@ -102,7 +102,7 @@ export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = nul
             <TabsTrigger value="projection">Previsão</TabsTrigger>
             {perms.diagnostics && <TabsTrigger value="pdf">PDF original</TabsTrigger>}
             {perms.diagnostics && <TabsTrigger value="audit">
-              Auditoria IA
+              Conferência
               {vm.warnings.filter((w) => !w.resolvedAt).length > 0 && (
                 <span className="ml-1.5 rounded-full bg-status-warning px-1.5 text-[10px] font-semibold text-white">{vm.warnings.filter((w) => !w.resolvedAt).length}</span>
               )}
@@ -135,7 +135,7 @@ export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = nul
             )}
           </TabsContent>}
           {perms.diagnostics && <TabsContent value="audit" className="mt-4">
-            <AuditTab vm={vm} canEdit={editable} onLocateSubject={locateById} />
+            <AuditTab vm={vm} canEdit={editable} onLocateSubject={locateById} onEditSubject={setEditing} />
           </TabsContent>}
           {perms.diagnostics && <TabsContent value="history" className="mt-4">
             <HistoryTab vm={vm} />

@@ -18,7 +18,8 @@ export function crossCheckWithLocalTable(local: LocalExtraction | null, subjects
       code: "LOCAL_ROW_COUNT_MISMATCH",
       severity: "CRITICAL",
       source: "VALIDATOR",
-      message: `O parser local reconstruiu ${rows.length} linha(s) na tabela, mas a IA extraiu ${subjects.length}. Confira omissões ou duplicações.`,
+      message: `A tabela do PDF tem ${rows.length} disciplinas e a análise ficou com ${subjects.length}. Confira se falta ou sobra alguma linha na grade.`,
+      data: { kind: "COUNT_MISMATCH", localCount: rows.length, aiCount: subjects.length },
     });
   }
 
@@ -31,16 +32,31 @@ export function crossCheckWithLocalTable(local: LocalExtraction | null, subjects
         code: "LOCAL_ROW_NOT_EXTRACTED",
         severity: "CRITICAL",
         source: "VALIDATOR",
-        message: `Linha "${r.name}" (código ${r.code}, p.${r.page}) existe na tabela do PDF mas não foi extraída pela IA.`,
+        message: `A disciplina "${r.name}" (código ${r.code}, página ${r.page}) está na tabela do PDF, mas não entrou na análise.`,
         sourcePage: r.page,
+        data: { kind: "MISSING_ROW", row: { code: r.code, name: r.name, workload: r.workload, period: r.period, usedSubject: r.usedSubject, page: r.page, rowIndex: r.rowIndex } },
       });
       continue;
     }
     if (r.period !== null && r.period !== s.period) {
-      warnings.push({ code: "LOCAL_PERIOD_MISMATCH", severity: "CRITICAL", source: "VALIDATOR", message: `"${s.name}": série ${r.period} no PDF (leitura local) × ${s.period} na extração da IA.`, sourcePage: r.page });
+      warnings.push({
+        code: "LOCAL_PERIOD_MISMATCH",
+        severity: "CRITICAL",
+        source: "VALIDATOR",
+        message: `"${s.name}": o PDF indica ${r.period}º período; a análise ficou com ${s.period}º.`,
+        sourcePage: r.page,
+        data: { kind: "FIELD_MISMATCH", rowHash: s.rowHash, field: "period", localValue: r.period, aiValue: s.period, recommended: "LOCAL" },
+      });
     }
     if (r.workload !== null && r.workload !== s.workload) {
-      warnings.push({ code: "LOCAL_WORKLOAD_MISMATCH", severity: "WARNING", source: "VALIDATOR", message: `"${s.name}": C.H. ${r.workload} no PDF (leitura local) × ${s.workload} na extração da IA.`, sourcePage: r.page });
+      warnings.push({
+        code: "LOCAL_WORKLOAD_MISMATCH",
+        severity: "WARNING",
+        source: "VALIDATOR",
+        message: `"${s.name}": o PDF indica ${r.workload}h; a análise ficou com ${s.workload}h.`,
+        sourcePage: r.page,
+        data: { kind: "FIELD_MISMATCH", rowHash: s.rowHash, field: "workload", localValue: r.workload, aiValue: s.workload, recommended: "LOCAL" },
+      });
     }
     const localExempted = hasValidUsedSubject(r.usedSubject);
     const aiExempted = hasValidUsedSubject(s.usedSubject);
@@ -49,8 +65,11 @@ export function crossCheckWithLocalTable(local: LocalExtraction | null, subjects
         code: "LOCAL_USED_SUBJECT_MISMATCH",
         severity: "CRITICAL",
         source: "VALIDATOR",
-        message: `"${s.name}": Disciplina Utilizada ${localExempted ? `"${r.usedSubject}"` : "vazia"} no PDF (leitura local) × ${aiExempted ? `"${s.usedSubject}"` : "vazia"} na IA.`,
+        message: aiExempted
+          ? `"${s.name}": a análise considerou aproveitada por "${s.usedSubject}", mas a leitura simples do PDF não encontrou disciplina utilizada.`
+          : `"${s.name}": a leitura simples do PDF encontrou "${r.usedSubject}" como disciplina utilizada, mas a análise considerou pendente.`,
         sourcePage: r.page,
+        data: { kind: "FIELD_MISMATCH", rowHash: s.rowHash, field: "usedSubject", localValue: r.usedSubject, aiValue: s.usedSubject, recommended: "AI" },
       });
     }
   }

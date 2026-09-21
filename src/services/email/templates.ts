@@ -4,7 +4,6 @@
  */
 
 const NAVY = "#003E69";
-const CYAN = "#00B9E4";
 const TEXT = "#17212B";
 const MUTED = "#5B6B7B";
 const BG = "#F5F7FA";

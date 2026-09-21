@@ -50,6 +50,7 @@ export interface ProjectionVM {
 export interface WarningVM {
   id: string;
   code: string;
+  data: Record<string, unknown> | null;
   severity: WarningSeverity;
   source: WarningSource;
   message: string;
@@ -255,6 +256,7 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
     warnings: a.warnings.map((w) => ({
       id: w.id,
       code: w.code,
+      data: (w.data as Record<string, unknown> | null) ?? null,
       severity: w.severity,
       source: w.source,
       message: w.message,

@@ -130,6 +130,7 @@ export async function computeAndPersist(analysisId: string, opts?: { resetAudito
           message: w.message,
           subjectId: w.subjectId ?? null,
           sourcePage: w.sourcePage ?? null,
+          data: (w.data ?? undefined) as Prisma.InputJsonValue | undefined,
         })),
       });
     }

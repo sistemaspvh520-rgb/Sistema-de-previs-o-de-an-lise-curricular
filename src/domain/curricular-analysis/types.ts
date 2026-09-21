@@ -74,6 +74,8 @@ export interface AnalysisWarningInput {
   message: string;
   subjectId?: string | null;
   sourcePage?: number | null;
+  /** Dados estruturados para ações na UI. */
+  data?: Record<string, unknown> | null;
 }
 
 export type ReliabilityLevel = "HIGH" | "REVIEW_RECOMMENDED" | "REVIEW_REQUIRED";

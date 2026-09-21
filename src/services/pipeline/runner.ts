@@ -180,7 +180,8 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
               data: out.data.documentClaims.map((c) => ({ analysisId, type: c.type, value: c.value, sourcePage: c.sourcePage, rawText: c.rawText })),
             });
           }
-          if (detected !== null) {
+          const aiHasEntryClaim = out.data.documentClaims.some((c) => c.type === "ENTRY_PERIOD" && c.value === detected);
+          if (detected !== null && !aiHasEntryClaim) {
             await tx.documentClaim.create({
               data: {
                 analysisId,
@@ -210,13 +211,18 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
         await setStep(analysisId, steps, "CLASSIFYING", "done", `${exempted} dispensada(s), ${normalized.length - exempted} pendente(s)/a revisar`);
         // Alertas persistentes desta etapa (ambiguidades da IA + cruzamento local × IA). O recálculo preserva a fonte EXTRACTION.
         await prisma.analysisWarning.deleteMany({ where: { analysisId, source: "EXTRACTION" } });
+        const persisted = await prisma.analyzedSubject.findMany({ where: { analysisId }, select: { id: true, rowHash: true } });
+        const idByHash = new Map(persisted.map((p) => [p.rowHash, p.id]));
         const extractionWarnings = [
-          ...out.data.ambiguities.map((a) => ({ code: "EXTRACTOR_AMBIGUITY", severity: "WARNING" as const, message: a.message, sourcePage: a.sourcePage as number | null })),
-          ...extraWarnings.map((w) => ({ code: w.code, severity: w.severity, message: w.message, sourcePage: w.sourcePage ?? null })),
+          ...out.data.ambiguities.map((a) => ({ code: "EXTRACTOR_AMBIGUITY", severity: "WARNING" as const, message: a.message, sourcePage: a.sourcePage as number | null, subjectId: null as string | null, data: null as Prisma.InputJsonValue | null })),
+          ...extraWarnings.map((w) => {
+            const rowHash = typeof w.data?.rowHash === "string" ? w.data.rowHash : null;
+            return { code: w.code, severity: w.severity, message: w.message, sourcePage: w.sourcePage ?? null, subjectId: rowHash ? (idByHash.get(rowHash) ?? null) : null, data: (w.data ?? null) as Prisma.InputJsonValue | null };
+          }),
         ];
         if (extractionWarnings.length) {
           await prisma.analysisWarning.createMany({
-            data: extractionWarnings.map((w) => ({ analysisId, code: w.code, severity: w.severity, source: "EXTRACTION" as const, message: w.message, sourcePage: w.sourcePage })),
+            data: extractionWarnings.map((w) => ({ analysisId, code: w.code, severity: w.severity, source: "EXTRACTION" as const, message: w.message, sourcePage: w.sourcePage, subjectId: w.subjectId, data: w.data ?? undefined })),
           });
         }
       } catch (err) {
