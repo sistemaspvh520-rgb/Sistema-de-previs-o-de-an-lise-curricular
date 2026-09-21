@@ -11,7 +11,8 @@ import { RULE_DEFINITIONS } from "../src/domain/curricular-analysis/rules/types"
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
 async function main() {
-  const email = (process.env.ADMIN_EMAIL ?? "admin@cruzeirodosul.local").toLowerCase();
+  const email = process.env.ADMIN_EMAIL?.toLowerCase();
+  if (!email) throw new Error("ADMIN_EMAIL é obrigatório.");
   const name = process.env.ADMIN_NAME ?? "Administrador";
   const password = process.env.ADMIN_PASSWORD;
   if (!password || password.length < 8) throw new Error("ADMIN_PASSWORD (mín. 8) é obrigatório.");

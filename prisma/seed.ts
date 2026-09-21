@@ -8,7 +8,8 @@ const adapter = new PrismaPg({ connectionString: process.env.DIRECT_URL ?? proce
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const email = (process.env.ADMIN_EMAIL ?? "admin@cruzeirodosul.local").toLowerCase();
+  const email = process.env.ADMIN_EMAIL?.toLowerCase();
+  if (!email) throw new Error("ADMIN_EMAIL é obrigatório para o seed.");
   const name = process.env.ADMIN_NAME ?? "Administrador";
   const password = process.env.ADMIN_PASSWORD;
   if (!password || password.length < 8) {

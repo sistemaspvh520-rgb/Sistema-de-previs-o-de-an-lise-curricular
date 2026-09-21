@@ -25,7 +25,7 @@ jobs:
       APP_ENCRYPTION_KEY: ${{ secrets.CI_APP_ENCRYPTION_KEY || 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=' }}
       APP_ENCRYPTION_KEY_VERSION: "1"
       CRON_SECRET: ci-cron-secret-1234567890
-      ADMIN_EMAIL: admin@ci.local
+      ADMIN_EMAIL: ci.admin@cruzeirodosul.edu.br
       ADMIN_NAME: CI
       ADMIN_PASSWORD: ci-password-123
       STORAGE_DIR: ./storage

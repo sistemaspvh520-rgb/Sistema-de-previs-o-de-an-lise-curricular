@@ -30,7 +30,7 @@ npm run db:seed                 # cria o ADMIN, as regras v1.0 e as configuraç�
 npm run dev                     # http://localhost:3000
 ```
 
-1. Entre com `ADMIN_EMAIL` / `ADMIN_PASSWORD` do `.env`.
+1. Entre com `ADMIN_EMAIL` / `ADMIN_PASSWORD` do `.env` (e-mail institucional `@cruzeirodosul.edu.br`).
 2. **Configurações → OpenAI → Conectar OpenAI**: cole a API Key do projeto dedicado. A chave é validada com uma
    chamada real, cifrada com AES-256-GCM e nunca devolvida ao navegador.
 3. **Nova análise**: envie o PDF, escolha o semestre letivo de ingresso e acompanhe o processamento.

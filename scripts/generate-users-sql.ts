@@ -20,7 +20,7 @@ async function main() {
       `INSERT INTO "User" ("id","email","name","passwordHash","role","isActive","createdAt","updatedAt") VALUES (gen_random_uuid(), ${q(u.email.toLowerCase())}, ${q(u.name)}, ${q(h)}, ${q(u.role)}, true, now(), now()) ON CONFLICT ("email") DO UPDATE SET "name" = EXCLUDED."name", "role" = EXCLUDED."role", "passwordHash" = EXCLUDED."passwordHash", "isActive" = true, "updatedAt" = now();`,
     );
     lines.push(
-      `INSERT INTO "AuditLog" ("id","userId","action","entityType","entityId","metadata","createdAt") SELECT gen_random_uuid(), (SELECT id FROM "User" WHERE email = 'sistemaspvh520@gmail.com'), 'user.create', 'User', u.id::text, jsonb_build_object('email', u.email, 'role', u.role, 'via', 'scripts/generate-users-sql.ts'), now() FROM "User" u WHERE u.email = ${q(u.email.toLowerCase())};`,
+      `INSERT INTO "AuditLog" ("id","userId","action","entityType","entityId","metadata","createdAt") SELECT gen_random_uuid(), (SELECT id FROM "User" WHERE email = ${q((process.env.ADMIN_EMAIL ?? users[0].email).toLowerCase())}), 'user.create', 'User', u.id::text, jsonb_build_object('email', u.email, 'role', u.role, 'via', 'scripts/generate-users-sql.ts'), now() FROM "User" u WHERE u.email = ${q(u.email.toLowerCase())};`,
     );
   }
   lines.push("COMMIT;");
