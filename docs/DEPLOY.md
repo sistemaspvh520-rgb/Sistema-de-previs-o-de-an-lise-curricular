@@ -5,7 +5,7 @@ Produção roda na **Vercel** (Next.js, região `gru1`) com **Supabase** (Postgr
 | Recurso | Identificação |
 |---------|---------------|
 | Projeto Supabase | `Sistema de previsão de análise curricular` · ref `gflvyhutqhfrfpdpcgii` · `sa-east-1` |
-| Projeto Vercel | `analise-curricular` · time `Sistemas PVH` · conectado ao GitHub `main` |
+| Projeto Vercel | `analise-curricular` · time `Sistemas PVH` · conectado ao GitHub `main` · **URL pública: https://analise-curricular.vercel.app** (a URL com sufixo `-sistemas-pvh` é protegida pela Deployment Protection e não deve ser usada em links) |
 | Storage | bucket privado `documents` (criado automaticamente no primeiro upload) |
 
 ## Variáveis de ambiente (Vercel → Settings → Environment Variables → Production)
