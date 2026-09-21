@@ -11,6 +11,8 @@ describe("templates de e-mail", () => {
     expect(m.html).not.toMatch(/senha tempor/i);
     expect(m.text).toContain("https://app/definir-senha?token=abc");
     expect(m.html).toContain("<!doctype html>");
+    expect(m.html).toContain('src="cid:logo-cruzeiro"');
+    expect(m.html).toContain("Sistema de Análise Curricular Inteligente");
   });
   it("redefinição informa validade em minutos", () => {
     const m = resetEmail({ name: "Joel", login: "joel@x", url: "https://app/definir-senha?token=t", validMinutes: 60, institution: "Cruzeiro" });

@@ -30,6 +30,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["pdfjs-dist", "@node-rs/argon2", "@prisma/client", "pg"],
+  // a logo dos e-mails é lida do disco em runtime — precisa ir junto na função serverless
+  outputFileTracingIncludes: { "/**": ["./src/services/email/assets/**"] },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },

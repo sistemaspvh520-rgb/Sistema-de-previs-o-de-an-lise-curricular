@@ -1,9 +1,11 @@
 import "server-only";
 import nodemailer from "nodemailer";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { getEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import type { EmailContent } from "@/services/email/templates";
+import { LOGO_CID, type EmailContent } from "@/services/email/templates";
 
 export class EmailNotConfiguredError extends Error {
   constructor() {
@@ -18,6 +20,13 @@ export function isEmailConfigured(): boolean {
 }
 
 let transporter: nodemailer.Transporter | null = null;
+let logoBuffer: Buffer | null = null;
+
+/** Logo institucional embutida (CID) — funciona no Gmail/Outlook sem depender de URL pública. */
+function getLogo(): Buffer {
+  logoBuffer ??= readFileSync(path.join(process.cwd(), "src/services/email/assets/logo-cruzeiro.png"));
+  return logoBuffer;
+}
 
 function getTransporter(): nodemailer.Transporter {
   if (transporter) return transporter;
@@ -54,6 +63,7 @@ export async function sendMail(input: SendMailInput): Promise<{ messageId: strin
       html: input.content.html,
       replyTo: env.EMAIL_USER,
       headers: { "X-Auto-Response-Suppress": "All", "Auto-Submitted": "auto-generated" },
+      attachments: [{ filename: "logo-cruzeiro.png", content: getLogo(), cid: LOGO_CID, contentType: "image/png", contentDisposition: "inline" }],
     });
     await prisma.auditLog.create({
       data: { userId: input.actorUserId ?? null, action: "email.sent", entityType: "User", entityId: input.targetUserId ?? null, metadata: { kind: input.kind, to: input.to, messageId: info.messageId } },

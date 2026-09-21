@@ -31,11 +31,9 @@ function layout(opts: { preheader: string; title: string; intro: string; button?
 <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;">${escape(opts.preheader)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:32px 12px;"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #DFE5EC;">
-  <tr><td style="background:${NAVY};padding:22px 28px;">
-    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td style="width:34px;height:34px;background:${CYAN};border-radius:8px;text-align:center;color:${NAVY};font-weight:700;font-size:16px;line-height:34px;">AC</td>
-      <td style="padding-left:12px;color:#ffffff;font-size:15px;font-weight:600;line-height:1.2;">Análise Curricular Inteligente<br><span style="font-size:11px;font-weight:400;letter-spacing:.08em;text-transform:uppercase;opacity:.8;">${escape(opts.institution)}</span></td>
-    </tr></table>
+  <tr><td style="background:${NAVY};padding:22px 28px 18px;">
+    <img src="cid:logo-cruzeiro" alt="Cruzeiro do Sul Virtual" width="276" height="65" style="display:block;width:276px;max-width:100%;height:auto;border:0;" />
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.18);color:#ffffff;font-size:14px;font-weight:600;letter-spacing:.01em;">Sistema de Análise Curricular Inteligente</div>
   </td></tr>
   <tr><td style="padding:28px 28px 8px;">
     <h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;color:${TEXT};">${escape(opts.title)}</h1>
@@ -45,7 +43,7 @@ function layout(opts: { preheader: string; title: string; intro: string; button?
     ${opts.note ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.6;color:${MUTED};">${opts.note}</p>` : ""}
   </td></tr>
   <tr><td style="padding:18px 28px 24px;border-top:1px solid #EEF1F5;font-size:12px;line-height:1.6;color:${MUTED};">
-    Este é um e-mail automático do sistema interno de análise curricular. Se você não esperava esta mensagem, ignore-a — nenhuma ação será feita na sua conta.
+    Mensagem automática do <strong style="color:${TEXT};">Sistema de Análise Curricular Inteligente</strong> · ${escape(opts.institution)}.<br>Se você não esperava esta mensagem, ignore-a — nenhuma ação será feita na sua conta.
   </td></tr>
 </table>
 </td></tr></table>
@@ -58,27 +56,31 @@ export interface EmailContent {
   text: string;
 }
 
+/** Content-ID da logo embutida (anexada pelo mailer). */
+export const LOGO_CID = "logo-cruzeiro";
+export const SYSTEM_NAME = "Sistema de Análise Curricular Inteligente";
+
 export function inviteEmail(p: { name: string; login: string; url: string; invitedBy: string; validDays: number; institution: string }): EmailContent {
   const first = p.name.split(" ")[0];
   return {
-    subject: "Sua conta no sistema de Análise Curricular foi criada",
+    subject: "Sua conta no Sistema de Análise Curricular Inteligente foi criada",
     html: layout({
       preheader: "Defina sua senha para começar a usar o sistema.",
       title: `Olá, ${first}! Sua conta está pronta.`,
-      intro: `${escape(p.invitedBy)} criou o seu acesso ao <strong>sistema de Análise Curricular Inteligente</strong>. Para começar, defina a sua senha pessoal clicando no botão abaixo.`,
+      intro: `${escape(p.invitedBy)} criou o seu acesso ao <strong>Sistema de Análise Curricular Inteligente</strong> da ${escape(p.institution)}. Para começar, defina a sua senha pessoal clicando no botão abaixo.`,
       details: [["Login", p.login], ["Validade do link", `${p.validDays} dias`]],
       button: { label: "Definir minha senha", url: p.url },
       note: "Por segurança, o link só pode ser usado uma vez. Depois de definir a senha, entre pelo endereço do sistema com o seu login.",
       institution: p.institution,
     }),
-    text: `Olá, ${first}!\n\n${p.invitedBy} criou o seu acesso ao sistema de Análise Curricular Inteligente.\n\nLogin: ${p.login}\nDefina sua senha (link válido por ${p.validDays} dias):\n${p.url}\n\nO link só pode ser usado uma vez. Se você não esperava esta mensagem, ignore-a.`,
+    text: `Olá, ${first}!\n\n${p.invitedBy} criou o seu acesso ao Sistema de Análise Curricular Inteligente (${p.institution}).\n\nLogin: ${p.login}\nDefina sua senha (link válido por ${p.validDays} dias):\n${p.url}\n\nO link só pode ser usado uma vez. Se você não esperava esta mensagem, ignore-a.`,
   };
 }
 
 export function resetEmail(p: { name: string; login: string; url: string; validMinutes: number; institution: string }): EmailContent {
   const first = p.name.split(" ")[0];
   return {
-    subject: "Redefinição de senha — Análise Curricular",
+    subject: "Redefinição de senha — Sistema de Análise Curricular Inteligente",
     html: layout({
       preheader: "Use o link para criar uma nova senha.",
       title: `${first}, vamos redefinir sua senha`,
@@ -95,7 +97,7 @@ export function resetEmail(p: { name: string; login: string; url: string; validM
 export function temporaryPasswordEmail(p: { name: string; login: string; password: string; loginUrl: string; institution: string }): EmailContent {
   const first = p.name.split(" ")[0];
   return {
-    subject: "Senha temporária — Análise Curricular",
+    subject: "Senha temporária — Sistema de Análise Curricular Inteligente",
     html: layout({
       preheader: "Sua senha temporária de acesso.",
       title: `${first}, aqui está sua senha temporária`,
