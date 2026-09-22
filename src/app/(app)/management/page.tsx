@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BookOpenCheck, CheckCircle2, CircleAlert, Clock3, Trash2, Users } from "lucide-react";
+import { CheckCircle2, Trash2, Users } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/utils";
 import { formatRelativeTime, daysSince, startOfCurrentMonth } from "@/lib/time";
-import { ATTENTION_STATUSES, PROCESSING_STATUSES } from "@/domain/curricular-analysis/status-groups";
 import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
 
@@ -18,12 +17,8 @@ export default async function ManagementPage() {
   await requirePagePermission("audit:read");
   const monthStart = startOfCurrentMonth();
 
-  const [ready, inProgress, attention, activeUsers, courses, users, totalsByUser, completedByUser, monthByUser, deletedByUser, byPolo] = await Promise.all([
-    prisma.curricularAnalysis.count({ where: { status: "COMPLETED" } }),
-    prisma.curricularAnalysis.count({ where: { status: { in: [...PROCESSING_STATUSES] } } }),
-    prisma.curricularAnalysis.count({ where: { status: { in: [...ATTENTION_STATUSES] } } }),
+  const [activeUsers, users, totalsByUser, completedByUser, monthByUser, deletedByUser, byPolo] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
-    prisma.curricularAnalysis.groupBy({ by: ["courseName"], where: { courseName: { not: null } }, _count: { _all: true }, orderBy: { _count: { courseName: "desc" } }, take: 5 }),
     prisma.user.findMany({ where: { isActive: true }, orderBy: [{ lastActiveAt: { sort: "desc", nulls: "last" } }, { name: "asc" }], take: 20, select: { id: true, name: true, role: true, lastActiveAt: true, analyses: { select: { courseName: true, studentName: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 } } }),
     prisma.curricularAnalysis.groupBy({ by: ["createdById"], _count: { _all: true } }),
     prisma.curricularAnalysis.groupBy({ by: ["createdById"], where: { status: "COMPLETED" }, _count: { _all: true } }),
@@ -38,17 +33,15 @@ export default async function ManagementPage() {
   const deletedCountByUser = new Map(deletedByUser.flatMap((item) => (item.userId ? [[item.userId, item._count._all] as const] : [])));
   const deletedSinceTracking = deletedByUser.reduce((total, item) => total + item._count._all, 0);
   const cards = [
-    { label: "Entregues", value: ready, icon: CheckCircle2, tone: "text-status-success", hint: "Análises prontas para consulta", href: "/analyses?status=COMPLETED" },
-    { label: "Em andamento", value: inProgress, icon: Clock3, tone: "text-brand-cyan-700", hint: "O sistema ainda está trabalhando", href: "/analyses?filter=PROCESSING" },
-    { label: "Precisam de atenção", value: attention, icon: CircleAlert, tone: "text-status-danger", hint: "Situações que precisam de intervenção", href: "/reviews" },
-    { label: "Excluídas", value: deletedSinceTracking, icon: Trash2, tone: "text-status-danger", hint: "Registradas a partir desta atualização", href: "#atividade-por-usuario" },
     { label: "Usuários ativos", value: activeUsers, icon: Users, tone: "text-brand-navy", hint: "Com acesso ao sistema", href: "#atividade-por-usuario" },
+    { label: "Exclusões registradas", value: deletedSinceTracking, icon: Trash2, tone: "text-status-danger", hint: "Desde a ativação do rastreamento", href: "#atividade-por-usuario" },
+    { label: "Entregas da equipe", value: Array.from(deliveredByUser.values()).reduce((total, count) => total + count, 0), icon: CheckCircle2, tone: "text-status-success", hint: "Análises concluídas por consultor", href: "#atividade-por-usuario" },
   ];
 
   return (
     <>
-      <PageHeader eyebrow="Gestão" title="Acompanhamento operacional" description="Situação das análises, atividade da equipe e atendimentos por polo. O consumo de IA fica em Configurações → OpenAI." />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <PageHeader eyebrow="Gestão" title="Equipe e relatórios" description="Acompanhe a atividade dos consultores e os relatórios por polo. A fila e o status das análises ficam na aba Análises." />
+      <div className="grid gap-4 sm:grid-cols-3">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
@@ -61,24 +54,8 @@ export default async function ManagementPage() {
           );
         })}
       </div>
-      <div className="mt-6 grid gap-6 xl:grid-cols-5">
-        <Card className="shadow-sm xl:col-span-2">
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BookOpenCheck className="size-4 text-brand-cyan-700" /> Cursos mais analisados</CardTitle></CardHeader>
-          <CardContent>
-            {courses.length === 0 ? <p className="text-sm text-muted-foreground">Ainda não há cursos identificados.</p> : (
-              <ol className="space-y-3">
-                {courses.map((course, index) => (
-                  <li key={course.courseName} className="flex items-center gap-3">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">{index + 1}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{course.courseName}</span>
-                    <span className="text-sm font-semibold text-brand-navy">{course._count._all}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </CardContent>
-        </Card>
-        <Card id="atividade-por-usuario" className="overflow-hidden shadow-sm xl:col-span-3">
+      <div className="mt-6">
+        <Card id="atividade-por-usuario" className="overflow-hidden shadow-sm">
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Users className="size-4 text-brand-cyan-700" /> Atividade por usuário</CardTitle></CardHeader>
           <CardContent className="p-0">
             <div className="divide-y">

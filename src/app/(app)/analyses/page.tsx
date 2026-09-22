@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FilePlus2, Search, UserRound } from "lucide-react";
+import { ChevronDown, FilePlus2, Search, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { listAnalyses } from "@/repositories/analysis-repository";
@@ -83,17 +83,23 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input name="q" defaultValue={q} placeholder="Buscar por aluno, curso ou arquivo" className="pl-9" aria-label="Buscar por aluno, curso ou arquivo" />
           </div>
-          <select name="polo" defaultValue={poloCode ?? ""} aria-label="Filtrar por polo" className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm sm:w-56">
-            <option value="">Todos os polos</option>
-            {POLOS.map((p) => <option key={p.code} value={p.code}>{p.code} · {p.name}</option>)}
-          </select>
-          {isAdmin && (
-            <select name="user" defaultValue={userFilter ?? ""} aria-label="Filtrar por responsável" className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm sm:w-52">
-              <option value="">Todos os responsáveis</option>
-              {team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+          <div className="relative w-full sm:w-64">
+            <select name="polo" defaultValue={poloCode ?? ""} aria-label="Filtrar por polo" className="h-10 w-full appearance-none rounded-lg border border-input bg-card py-2 pr-10 pl-3 text-sm shadow-xs outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/50">
+              <option value="">Todos os polos</option>
+              {POLOS.map((p) => <option key={p.code} value={p.code}>{p.code} · {p.name}</option>)}
             </select>
+            <ChevronDown aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
+          {isAdmin && (
+            <div className="relative w-full sm:w-60">
+              <select name="user" defaultValue={userFilter ?? ""} aria-label="Filtrar por responsável" className="h-10 w-full appearance-none rounded-lg border border-input bg-card py-2 pr-10 pl-3 text-sm shadow-xs outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/50">
+                <option value="">Todos os responsáveis</option>
+                {team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+              </select>
+              <ChevronDown aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
           )}
-          <Button type="submit" variant="outline" className="sm:shrink-0">Filtrar</Button>
+          <Button type="submit" variant="outline" className="h-10 sm:shrink-0">Filtrar</Button>
         </form>
       </div>
       <Card className="overflow-hidden shadow-sm">
@@ -148,8 +154,8 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
           <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
             <span>Página {page} de {pages}</span>
             <div className="flex gap-2">
-              {page > 1 && <Button asChild variant="outline" size="sm"><Link href={{ pathname: "/analyses", query: { ...(q ? { q } : {}), ...(statusGroup ? { filter: statusGroup } : status !== "ALL" ? { status } : {}), page: page - 1 } }}>Anterior</Link></Button>}
-              {page < pages && <Button asChild variant="outline" size="sm"><Link href={{ pathname: "/analyses", query: { ...(q ? { q } : {}), ...(statusGroup ? { filter: statusGroup } : status !== "ALL" ? { status } : {}), page: page + 1 } }}>Próxima</Link></Button>}
+              {page > 1 && <Button asChild variant="outline" size="sm"><Link href={{ pathname: "/analyses", query: { ...(q ? { q } : {}), ...(poloCode ? { polo: poloCode } : {}), ...(userFilter ? { user: userFilter } : {}), ...(followUpDue ? { followUp: "due" } : statusGroup ? { filter: statusGroup } : status !== "ALL" ? { status } : {}), page: page - 1 } }}>Anterior</Link></Button>}
+              {page < pages && <Button asChild variant="outline" size="sm"><Link href={{ pathname: "/analyses", query: { ...(q ? { q } : {}), ...(poloCode ? { polo: poloCode } : {}), ...(userFilter ? { user: userFilter } : {}), ...(followUpDue ? { followUp: "due" } : statusGroup ? { filter: statusGroup } : status !== "ALL" ? { status } : {}), page: page + 1 } }}>Próxima</Link></Button>}
             </div>
           </div>
         )}

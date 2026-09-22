@@ -31,12 +31,12 @@ export function GeneralSettingsForm({
     });
   }
   return (
-    <form action={submit} className="grid max-w-xl gap-5">
+    <form action={submit} className="grid gap-5">
       <div className="space-y-2">
         <Label htmlFor="institutionName">Nome da instituição</Label>
         <Input id="institutionName" name="institutionName" defaultValue={initial.institutionName} disabled={readOnly} />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="maxUploadMb">Tamanho máximo do PDF (MB)</Label>
           <Input id="maxUploadMb" name="maxUploadMb" type="number" min={1} max={50} defaultValue={initial.maxUploadMb} disabled={readOnly} />

@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
+import { Clock3, GraduationCap, MapPin } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
 import { getSystemSettings } from "@/repositories/settings-repository";
-import { getActiveRuleSet } from "@/repositories/rules-repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GeneralSettingsForm } from "@/features/settings/general-form";
-import { RulesSummary } from "@/features/settings/rules-summary";
 import { POLOS } from "@/domain/polos";
 import { COURSE_FORMATS } from "@/domain/course-formats";
 import { APP_TIME_ZONE } from "@/lib/time";
@@ -15,47 +14,32 @@ export const dynamic = "force-dynamic";
 
 export default async function GeneralSettingsPage() {
   await requirePagePermission("privacy:manage");
-  const [settings, ruleSet] = await Promise.all([getSystemSettings(), getActiveRuleSet()]);
+  const settings = await getSystemSettings();
 
   return (
     <>
-      <PageHeader eyebrow="Configurações" title="Geral" description="Identificação da instituição, limites de upload e parâmetros fixos do atendimento." />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="shadow-sm lg:col-span-2">
+      <PageHeader eyebrow="Configurações" title="Geral" description="Defina a identificação exibida no sistema e os limites aplicados no envio de documentos." />
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Instituição e limites</CardTitle>
-            <CardDescription>Estes limites são aplicados no servidor durante o upload.</CardDescription>
+            <CardDescription>As alterações são aplicadas no servidor no próximo envio de PDF.</CardDescription>
           </CardHeader>
           <CardContent>
             <GeneralSettingsForm initial={settings} readOnly={false} />
           </CardContent>
         </Card>
-        <div className="grid gap-6">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">Regras acadêmicas em vigor</CardTitle>
-              <CardDescription>Aplicadas em toda previsão e gravadas em cada análise.</CardDescription>
-            </CardHeader>
-            <CardContent><RulesSummary rules={ruleSet.rules} version={ruleSet.version} /></CardContent>
-          </Card>
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">Polos e formatos</CardTitle>
-              <CardDescription>Opções oferecidas no envio de uma nova análise.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Polos ({POLOS.length})</div>
-                <ul className="divide-y">{POLOS.map((p) => <li key={p.code} className="flex justify-between gap-3 py-1.5"><span className="min-w-0 truncate">{p.name}</span><span className="shrink-0 font-mono text-xs text-muted-foreground">{p.code}</span></li>)}</ul>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Formatos de curso</div>
-                <div className="flex flex-wrap gap-2">{COURSE_FORMATS.map((f) => <span key={f.code} className="rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs">{f.label}</span>)}</div>
-              </div>
-              <p className="text-xs text-muted-foreground">Fuso horário do sistema: {APP_TIME_ZONE}. Para incluir um polo ou formato, solicite à equipe técnica.</p>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Escopo do atendimento</CardTitle>
+            <CardDescription>Informações mantidas pela equipe técnica e usadas no envio das análises.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex gap-3"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">{POLOS.length} polos disponíveis</p><p className="text-xs text-muted-foreground">Selecione o polo ao iniciar uma análise.</p></div></div>
+            <div className="flex gap-3"><GraduationCap className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">Formatos de curso</p><div className="mt-1 flex flex-wrap gap-1.5">{COURSE_FORMATS.map((format) => <span key={format.code} className="rounded-full bg-muted px-2 py-0.5 text-xs">{format.label}</span>)}</div></div></div>
+            <div className="flex gap-3"><Clock3 className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">Fuso do sistema</p><p className="text-xs text-muted-foreground">{APP_TIME_ZONE}</p></div></div>
+          </CardContent>
+        </Card>
       </div>
     </>
   );
