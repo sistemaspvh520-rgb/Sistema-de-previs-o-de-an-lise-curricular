@@ -24,6 +24,7 @@ const decisionSchema = z.object({
 function invalidate(analysisId?: string) {
   revalidatePath("/analyses");
   revalidatePath("/dashboard");
+  revalidatePath("/management");
   revalidatePath("/settings/maintenance");
   if (analysisId) revalidatePath(`/analyses/${analysisId}`);
 }
@@ -88,7 +89,7 @@ export async function decideAnalysisDeletionRequestAction(input: unknown): Promi
     if (document && !document.deletedAt) {
       await getStorage().delete(document.storageKey).catch((err) => logger.warn("analysis.requested_file_delete_failed", { key: document.storageKey, err: String(err) }));
     }
-    await recordAudit({ userId: admin.id, action: "analysis.deletion_approved", entityType: "CurricularAnalysis", entityId: request.analysisId, metadata: { requestId: request.id, requestedBy: request.requestedBy.name, courseName: request.analysis.courseName, originalName: document?.originalName ?? null, note: parsed.data.note || null } });
+    await recordAudit({ userId: admin.id, action: "analysis.deletion_approved.tracked", entityType: "CurricularAnalysis", entityId: request.analysisId, metadata: { requestId: request.id, requestedBy: request.requestedBy.name, courseName: request.analysis.courseName, originalName: document?.originalName ?? null, note: parsed.data.note || null } });
     invalidate();
     return ok(undefined, "Solicitação aprovada e análise excluída definitivamente.");
   } catch (err) {

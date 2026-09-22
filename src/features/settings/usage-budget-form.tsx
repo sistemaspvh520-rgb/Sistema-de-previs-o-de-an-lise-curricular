@@ -19,9 +19,13 @@ export function UsageBudgetForm({ budgetUsd, brlRate }: { budgetUsd: number; brl
   }
   return (
     <form action={submit} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-      <div className="space-y-1.5"><Label htmlFor="aiMonthlyBudgetUsd">Orçamento mensal (US$)</Label><Input id="aiMonthlyBudgetUsd" name="aiMonthlyBudgetUsd" type="number" min="0" step="0.01" defaultValue={budgetUsd} /></div>
-      <div className="space-y-1.5"><Label htmlFor="usdBrlReferenceRate">Cotação de referência (R$/US$)</Label><Input id="usdBrlReferenceRate" name="usdBrlReferenceRate" type="number" min="0.01" step="0.01" defaultValue={brlRate} /></div>
+      <div className="space-y-1.5"><Label htmlFor="aiMonthlyBudgetUsd">Orçamento mensal (US$)</Label><Input id="aiMonthlyBudgetUsd" name="aiMonthlyBudgetUsd" type="text" inputMode="decimal" autoComplete="off" defaultValue={formatForInput(budgetUsd)} placeholder="Ex.: 5,00" /><p className="text-[11px] text-muted-foreground">Aceita vírgula, ponto e valores colados.</p></div>
+      <div className="space-y-1.5"><Label htmlFor="usdBrlReferenceRate">Cotação de referência (R$/US$)</Label><Input id="usdBrlReferenceRate" name="usdBrlReferenceRate" type="text" inputMode="decimal" autoComplete="off" defaultValue={formatForInput(brlRate)} placeholder="Ex.: 5,456" /><p className="text-[11px] text-muted-foreground">Ex.: 5,456 ou 1.234,56.</p></div>
       <Button type="submit" disabled={pending}>{pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar</Button>
     </form>
   );
+}
+
+function formatForInput(value: number) {
+  return new Intl.NumberFormat("pt-BR", { useGrouping: false, maximumFractionDigits: 6 }).format(value);
 }

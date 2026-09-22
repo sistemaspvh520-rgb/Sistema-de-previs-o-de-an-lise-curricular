@@ -110,9 +110,10 @@ export async function deleteAnalysisAction(input: unknown): Promise<ActionResult
     if (a.document && !a.document.deletedAt) {
       await getStorage().delete(a.document.storageKey).catch((err) => logger.warn("analysis.file_delete_failed", { err: String(err) }));
     }
-    await recordAudit({ userId: user.id, action: "analysis.delete", entityType: "CurricularAnalysis", entityId: a.id, metadata: { courseName: a.courseName, originalName: a.document?.originalName ?? null } });
+    await recordAudit({ userId: user.id, action: "analysis.delete.tracked", entityType: "CurricularAnalysis", entityId: a.id, metadata: { courseName: a.courseName, originalName: a.document?.originalName ?? null } });
     revalidatePath("/analyses");
     revalidatePath("/dashboard");
+    revalidatePath("/management");
     return ok(undefined, "Análise excluída definitivamente.");
   } catch (err) {
     logger.error("deleteAnalysisAction", { err: String(err) });
