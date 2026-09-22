@@ -5,9 +5,10 @@ import { appUrl, isEmailConfigured, sendMail } from "@/services/email/mailer";
 import { followUpEmail } from "@/services/email/templates";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { sendPushToUser } from "@/services/push/web-push";
+import { businessDaysSince, isBusinessHours } from "@/lib/time";
 
-/** Depois do primeiro aviso, lembra de novo a cada 3 dias enquanto não houver retorno. */
-export const FOLLOW_UP_REPEAT_MS = 3 * 24 * 60 * 60_000;
+/** Depois do primeiro aviso, cobra novamente no próximo dia útil enquanto não houver retorno. */
+export const FOLLOW_UP_REPEAT_BUSINESS_DAYS = 1;
 
 const dueWhere = (now: Date) => ({ status: "COMPLETED" as const, enrollmentStatus: "PENDING" as const, followUpDueAt: { lte: now } });
 
@@ -28,20 +29,21 @@ export async function countDueFollowUps(userId: string | undefined): Promise<num
 
 /**
  * Cobra os retornos vencidos por e-mail (um por consultor, com a lista) e push (um por consultor).
- * Roda no cron diário; repete a cada 3 dias enquanto o consultor não responder.
+ * Só executa em horário comercial; o primeiro aviso acontece na primeira janela útil depois das 24h.
  */
 export async function notifyDueFollowUps(now = new Date()) {
+  if (!isBusinessHours(now)) return { analyses: 0, users: 0, emails: 0, pushes: 0, skippedOutsideBusinessHours: true };
   const due = await prisma.curricularAnalysis.findMany({
     where: {
       ...dueWhere(now),
-      OR: [{ followUpNotifiedAt: null }, { followUpNotifiedAt: { lte: new Date(now.getTime() - FOLLOW_UP_REPEAT_MS) } }],
     },
     orderBy: { followUpDueAt: "asc" },
-    select: { id: true, studentName: true, courseName: true, poloName: true, completedAt: true, createdBy: { select: { id: true, name: true, email: true, isActive: true } } },
+    select: { id: true, studentName: true, courseName: true, poloName: true, completedAt: true, followUpNotifiedAt: true, createdBy: { select: { id: true, name: true, email: true, isActive: true } } },
   });
   const byUser = new Map<string, typeof due>();
   for (const a of due) {
     if (!a.createdBy.isActive) continue;
+    if (a.followUpNotifiedAt && businessDaysSince(a.followUpNotifiedAt, now) < FOLLOW_UP_REPEAT_BUSINESS_DAYS) continue;
     byUser.set(a.createdBy.id, [...(byUser.get(a.createdBy.id) ?? []), a]);
   }
   const settings = await getSystemSettings();
@@ -50,10 +52,12 @@ export async function notifyDueFollowUps(now = new Date()) {
   for (const [userId, items] of byUser) {
     const user = items[0].createdBy;
     const list = items.map((a) => ({ id: a.id, student: a.studentName ?? "Aluno não identificado", course: a.courseName ?? "Curso não identificado", polo: a.poloName ?? "—", url: appUrl(`/analyses/${a.id}`), completedAt: a.completedAt }));
+    let emailDelivered = false;
     if (isEmailConfigured()) {
       try {
         await sendMail({ to: user.email, kind: "FOLLOW_UP", targetUserId: userId, content: followUpEmail({ name: user.name, items: list, listUrl: appUrl("/analyses?followUp=due"), institution: settings.institutionName }) });
         emails += 1;
+        emailDelivered = true;
       } catch (err) {
         logger.warn("follow_up.email_failed", { userId, err: String(err) });
       }
@@ -62,7 +66,11 @@ export async function notifyDueFollowUps(now = new Date()) {
     const body = items.length === 1 ? `${list[0].student} · ${list[0].course}. Informe se houve matrícula.` : `Informe se ${list.map((i) => i.student).slice(0, 3).join(", ")}${items.length > 3 ? " e outros" : ""} se matricularam.`;
     const result = await sendPushToUser(userId, { title, body, url: items.length === 1 ? `/analyses/${items[0].id}` : "/analyses?followUp=due", tag: "follow-up" });
     pushes += result.sent;
-    await prisma.curricularAnalysis.updateMany({ where: { id: { in: items.map((a) => a.id) } }, data: { followUpNotifiedAt: now } });
+    // Só registra o aviso se algum canal o aceitou. Assim uma falha de e-mail
+    // ou push volta a ser tentada na próxima execução útil.
+    if (emailDelivered || result.sent > 0) {
+      await prisma.curricularAnalysis.updateMany({ where: { id: { in: items.map((a) => a.id) } }, data: { followUpNotifiedAt: now } });
+    }
   }
-  return { analyses: due.length, users: byUser.size, emails, pushes };
+  return { analyses: due.length, users: byUser.size, emails, pushes, skippedOutsideBusinessHours: false };
 }

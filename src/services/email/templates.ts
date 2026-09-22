@@ -110,7 +110,7 @@ export function temporaryPasswordEmail(p: { name: string; login: string; passwor
   };
 }
 
-/** Cobrança do retorno de matrícula: enviada 24h após a entrega e repetida a cada 3 dias sem resposta. */
+/** Cobrança do retorno de matrícula: enviada na primeira janela útil após 24h e repetida em dias úteis. */
 export function followUpEmail(p: { name: string; items: Array<{ id: string; student: string; course: string; polo: string; url: string; completedAt: Date | null }>; listUrl: string; institution: string }): EmailContent {
   const single = p.items.length === 1;
   const title = single ? "O aluno se matriculou?" : `${p.items.length} retornos de matrícula pendentes`;
@@ -126,7 +126,7 @@ export function followUpEmail(p: { name: string; items: Array<{ id: string; stud
       intro,
       details,
       button: { label: single ? "Responder agora" : "Ver retornos pendentes", url: single ? p.items[0].url : p.listUrl },
-      note: "O retorno alimenta os relatórios de conversão do gestor. Você receberá um novo lembrete a cada 3 dias enquanto não responder.",
+      note: "O retorno alimenta os relatórios de conversão do gestor. Você receberá um novo lembrete em dia útil enquanto não responder.",
       institution: p.institution,
     }),
     text: [`${title}`, "", ...p.items.map((i) => `- ${i.student} — ${i.course} · Polo ${i.polo}: ${i.url}`), "", `Responder: ${single ? p.items[0].url : p.listUrl}`].join("\n"),

@@ -24,6 +24,31 @@ export function zonedDateParts(now: Date = new Date()): { year: number; month: n
   return { year: get("year"), month: get("month"), day: get("day") };
 }
 
+/** Segunda a sexta, das 08:00 às 17:59, no horário de Rondônia. */
+export function isBusinessHours(now: Date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: APP_TIME_ZONE, weekday: "short", hourCycle: "h23", hour: "numeric" }).formatToParts(now);
+  const weekday = parts.find((part) => part.type === "weekday")?.value;
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  return weekday !== "Sat" && weekday !== "Sun" && hour >= 8 && hour < 18;
+}
+
+/** Quantidade de dias úteis transcorridos entre dois instantes, no fuso da aplicação. */
+export function businessDaysSince(from: DateInput, until: Date = new Date()): number {
+  if (!from) return 0;
+  const start = zonedDateParts(new Date(from));
+  const end = zonedDateParts(until);
+  const cursor = new Date(Date.UTC(start.year, start.month - 1, start.day));
+  const last = new Date(Date.UTC(end.year, end.month - 1, end.day));
+  let days = 0;
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  while (cursor <= last) {
+    const weekday = cursor.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) days += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
 /** Deslocamento do fuso da aplicação em minutos para um instante (Porto Velho = -240, sem horário de verão). */
 function zoneOffsetMinutes(at: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: APP_TIME_ZONE, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" }).formatToParts(at);

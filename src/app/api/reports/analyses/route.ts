@@ -9,7 +9,8 @@ import { formatCourseFormat } from "@/domain/course-formats";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const HEADER = ["Data de envio", "Aluno", "Polo (código)", "Polo", "Curso", "Formato do curso", "Período de ingresso", "Semestre de ingresso", "Status", "Verificação", "Observações", "Total da grade", "Dispensadas", "Pendentes", "Previsão de conclusão", "Concluída em", "Responsável", "Arquivo"];
+const HEADER = ["Data de envio", "Aluno", "Polo (código)", "Polo", "Curso", "Formato do curso", "Período de ingresso", "Semestre de ingresso", "Status", "Retorno de matrícula", "Atualizado em", "Verificação", "Observações", "Total da grade", "Dispensadas", "Pendentes", "Previsão de conclusão", "Concluída em", "Responsável", "Arquivo"];
+const ENROLLMENT_LABELS = { PENDING: "Aguardando retorno", ENROLLED: "Matriculado", NOT_ENROLLED: "Não matriculado" } as const;
 
 function cell(value: string | number | null | undefined): string {
   const text = value === null || value === undefined ? "" : String(value);
@@ -43,6 +44,8 @@ export async function GET(req: Request) {
       a.entryPeriod ? `${a.entryPeriod}º` : "",
       a.entryTerm ?? a.startTerm,
       ANALYSIS_STATUS_LABELS[a.status],
+      ENROLLMENT_LABELS[a.enrollmentStatus],
+      a.enrollmentUpdatedAt ? formatDateTime(a.enrollmentUpdatedAt) : "",
       a.reliability ? RELIABILITY_LABELS[a.reliability] : "",
       a.reviewItemsCount,
       a._count.subjects,

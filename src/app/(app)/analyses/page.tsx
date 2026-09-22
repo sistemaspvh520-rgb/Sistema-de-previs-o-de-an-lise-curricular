@@ -16,6 +16,7 @@ import type { AnalysisStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { POLOS, isPoloCode } from "@/domain/polos";
 import { formatCourseFormat } from "@/domain/course-formats";
+import { countDueFollowUps } from "@/services/follow-up/follow-up";
 
 export const metadata: Metadata = { title: "Análises" };
 export const dynamic = "force-dynamic";
@@ -41,9 +42,13 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
   // Gestor pode filtrar por responsável; demais perfis só veem as próprias análises.
   const isAdmin = user.role === "ADMIN";
   const userFilter = isAdmin && typeof params.user === "string" && /^[0-9a-f-]{36}$/.test(params.user) ? params.user : undefined;
-  const team = isAdmin ? await prisma.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : [];
   const page = Number(params.page ?? 1) || 1;
-  const { items, total, pageSize } = await listAnalyses({ status, statusGroup, q, page, poloCode, followUpDue, createdById: isAdmin ? userFilter : user.id });
+  const [team, listed, dueTotal] = await Promise.all([
+    isAdmin ? prisma.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : [],
+    listAnalyses({ status, statusGroup, q, page, poloCode, followUpDue, createdById: isAdmin ? userFilter : user.id }),
+    countDueFollowUps(isAdmin ? userFilter : user.id),
+  ]);
+  const { items, total, pageSize } = listed;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const showDiagnostics = can(user.role, "audit:read");
   const showOwner = user.role === "ADMIN";
@@ -63,7 +68,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
       />
       <div className="mb-4 grid gap-3">
         <div className="flex min-w-0 flex-wrap gap-1.5">
-          <Link href={{ pathname: "/analyses", query: { followUp: "due", ...(userFilter ? { user: userFilter } : {}) } }} className={cn("shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium leading-none transition-colors", followUpDue ? "border-status-warning bg-status-warning text-white" : "border-status-warning/40 bg-status-warning-bg text-status-warning hover:bg-status-warning/20")}>Retorno pendente</Link>
+          <Link href={{ pathname: "/analyses", query: { followUp: "due", ...(userFilter ? { user: userFilter } : {}) } }} className={cn("shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium leading-none transition-colors", followUpDue ? dueTotal > 0 ? "animate-pulse border-status-danger bg-status-danger font-semibold text-white shadow-sm motion-reduce:animate-none" : "border-status-warning bg-status-warning text-white" : dueTotal > 0 ? "animate-pulse border-status-danger bg-status-danger-bg font-semibold text-status-danger shadow-sm motion-reduce:animate-none" : "border-status-warning/40 bg-status-warning-bg text-status-warning hover:bg-status-warning/20")}>Retorno pendente{dueTotal > 0 ? ` (${dueTotal})` : ""}</Link>
           {STATUS_FILTERS.map((f) => (
             <Link
               key={f.id}

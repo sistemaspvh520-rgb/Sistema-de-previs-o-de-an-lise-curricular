@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDateTime, formatRelativeTime, startOfCurrentMonth, zonedDateParts, daysSince } from "@/lib/time";
+import { businessDaysSince, daysSince, formatDateTime, formatRelativeTime, isBusinessHours, startOfCurrentMonth, zonedDateParts } from "@/lib/time";
 import { suggestStartTerm } from "@/domain/curricular-analysis/simulation/terms";
 
 describe("fuso horário da aplicação (America/Porto_Velho, UTC-4)", () => {
@@ -32,5 +32,13 @@ describe("fuso horário da aplicação (America/Porto_Velho, UTC-4)", () => {
     expect(formatRelativeTime("2026-09-09T12:00:00.000Z", now)).toBe("há 12 dias");
     expect(daysSince("2026-09-09T12:00:00.000Z", now)).toBe(12);
     expect(daysSince(null)).toBeNull();
+  });
+
+  it("respeita horário comercial e fins de semana para lembretes", () => {
+    expect(isBusinessHours(new Date("2026-09-21T12:00:00.000Z"))).toBe(true); // segunda, 08:00 em Porto Velho
+    expect(isBusinessHours(new Date("2026-09-21T21:59:00.000Z"))).toBe(true); // 17:59
+    expect(isBusinessHours(new Date("2026-09-21T22:00:00.000Z"))).toBe(false); // 18:00
+    expect(isBusinessHours(new Date("2026-09-19T15:00:00.000Z"))).toBe(false); // sábado
+    expect(businessDaysSince("2026-09-18T21:00:00.000Z", new Date("2026-09-21T13:00:00.000Z"))).toBe(1);
   });
 });

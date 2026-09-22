@@ -144,6 +144,8 @@ export async function listAnalysesForReport(filters: ReportFilters) {
       createdAt: true,
       completedAt: true,
       status: true,
+      enrollmentStatus: true,
+      enrollmentUpdatedAt: true,
       studentName: true,
       poloCode: true,
       poloName: true,
