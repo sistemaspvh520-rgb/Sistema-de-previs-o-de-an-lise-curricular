@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FilePlus2, Search } from "lucide-react";
+import { FilePlus2, Search, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { listAnalyses } from "@/repositories/analysis-repository";
@@ -37,6 +37,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
   const { items, total, pageSize } = await listAnalyses({ status, statusGroup, q, page, createdById: user.role === "ADMIN" ? undefined : user.id });
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const showDiagnostics = can(user.role, "audit:read");
+  const showOwner = user.role === "ADMIN";
 
   return (
     <>
@@ -69,7 +70,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
         <form className="relative w-full max-w-sm 2xl:max-w-none 2xl:justify-self-end">
           {statusGroup ? <input type="hidden" name="filter" value={statusGroup} /> : status !== "ALL" && <input type="hidden" name="status" value={status} />}
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" defaultValue={q} placeholder="Buscar por curso ou arquivo" className="pl-9" aria-label="Buscar por curso ou arquivo" />
+          <Input name="q" defaultValue={q} placeholder="Buscar por curso, candidato ou arquivo" className="pl-9" aria-label="Buscar por curso, candidato ou arquivo" />
         </form>
       </div>
       <Card className="overflow-hidden shadow-sm">
@@ -79,6 +80,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
               <TableHead>Análise</TableHead>
               <TableHead className="hidden sm:table-cell">Ingresso</TableHead>
               <TableHead className="hidden md:table-cell">Disciplinas</TableHead>
+              {showOwner && <TableHead className="hidden xl:table-cell">Responsável</TableHead>}
               <TableHead>Status</TableHead>
               {showDiagnostics && <TableHead className="hidden lg:table-cell">Verificação</TableHead>}
               <TableHead className="hidden sm:table-cell">Data</TableHead>
@@ -87,7 +89,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
           <TableBody>
             {items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={showDiagnostics ? 6 : 5} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={(showDiagnostics ? 6 : 5) + (showOwner ? 1 : 0)} className="py-10 text-center text-sm text-muted-foreground">
                   Nenhuma análise encontrada{statusGroup ? " neste filtro" : status !== "ALL" ? ` com status "${ANALYSIS_STATUS_LABELS[status]}"` : ""}.
                 </TableCell>
               </TableRow>
@@ -98,10 +100,13 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
                   <Link href={`/analyses/${a.id}`} className="block">
                     <div className="font-medium">{a.courseName ?? "Curso não identificado"}</div>
                     <div className="max-w-[42rem] truncate text-xs text-muted-foreground" title={a.document?.originalName ?? undefined}>{a.document?.originalName ?? "Arquivo não disponível"}</div>
+                    {a.candidateLabel && <div className="mt-0.5 truncate text-xs text-muted-foreground">Candidato: {a.candidateLabel}</div>}
+                    {showOwner && <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground xl:hidden"><UserRound className="size-3" /> Responsável: {a.createdBy.name}</div>}
                   </Link>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">{ordinal(a.entryPeriod)}</TableCell>
                 <TableCell className="hidden md:table-cell">{a._count.subjects || "—"}</TableCell>
+                {showOwner && <TableCell className="hidden xl:table-cell"><div className="flex min-w-0 items-center gap-2"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-navy-50 text-xs font-semibold text-brand-navy">{a.createdBy.name.split(" ").filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase() || "—"}</span><span className="min-w-0 truncate text-sm" title={a.createdBy.name}>{a.createdBy.name}</span></div></TableCell>}
                 <TableCell><AnalysisStatusBadge status={a.status} /></TableCell>
                 {showDiagnostics && <TableCell className="hidden lg:table-cell">
                   <ReliabilityBadge level={a.reliability} />

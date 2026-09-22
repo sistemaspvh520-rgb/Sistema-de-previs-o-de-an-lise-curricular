@@ -149,3 +149,27 @@
     @apply font-sans;
   }
 }
+
+/* A tabela de usuários só aparece quando a área útil comporta suas ações.
+   Assim, o menu lateral aberto não força os ícones a quebrarem verticalmente. */
+.users-table-shell {
+  container-type: inline-size;
+}
+
+.users-desktop-table {
+  display: none;
+}
+
+.users-mobile-list {
+  display: block;
+}
+
+@container (min-width: 1700px) {
+  .users-desktop-table {
+    display: block;
+  }
+
+  .users-mobile-list {
+    display: none;
+  }
+}

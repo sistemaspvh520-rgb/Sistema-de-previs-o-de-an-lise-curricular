@@ -36,8 +36,8 @@ export default async function UsersPage() {
           <AlertDescription>Convites e links de redefinição ficam desativados. Configure EMAIL_USER e EMAIL_APP_PASSWORD (ver docs/DEPLOY.md). Enquanto isso, repasse a senha temporária.</AlertDescription>
         </Alert>
       )}
-      <Card className="overflow-hidden shadow-sm">
-        <div className="hidden xl:block">
+      <Card className="users-table-shell overflow-hidden shadow-sm">
+        <div className="users-desktop-table">
         <Table>
           <TableHeader>
             <TableRow>
@@ -82,7 +82,7 @@ export default async function UsersPage() {
           </TableBody>
         </Table>
         </div>
-        <div className="divide-y xl:hidden">
+        <div className="users-mobile-list divide-y">
           {users.map((u) => (
             <article key={u.id} className="space-y-3 p-4">
               <div className="flex min-w-0 items-start justify-between gap-3">
