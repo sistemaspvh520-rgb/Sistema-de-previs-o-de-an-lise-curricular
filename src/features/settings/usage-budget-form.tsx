@@ -18,10 +18,10 @@ export function UsageBudgetForm({ budgetUsd, brlRate }: { budgetUsd: number; brl
     });
   }
   return (
-    <form action={submit} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-      <div className="space-y-1.5"><Label htmlFor="aiMonthlyBudgetUsd">Orçamento mensal (US$)</Label><Input id="aiMonthlyBudgetUsd" name="aiMonthlyBudgetUsd" type="text" inputMode="decimal" autoComplete="off" defaultValue={formatForInput(budgetUsd)} placeholder="Ex.: 5,00" /><p className="text-[11px] text-muted-foreground">Aceita vírgula, ponto e valores colados.</p></div>
-      <div className="space-y-1.5"><Label htmlFor="usdBrlReferenceRate">Cotação de referência (R$/US$)</Label><Input id="usdBrlReferenceRate" name="usdBrlReferenceRate" type="text" inputMode="decimal" autoComplete="off" defaultValue={formatForInput(brlRate)} placeholder="Ex.: 5,456" /><p className="text-[11px] text-muted-foreground">Ex.: 5,456 ou 1.234,56.</p></div>
-      <Button type="submit" disabled={pending}>{pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar</Button>
+    <form action={submit} className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-rows-[2.5rem_2.5rem_auto] gap-1.5"><Label htmlFor="aiMonthlyBudgetUsd" className="leading-tight">Orçamento mensal<br />(US$)</Label><Input id="aiMonthlyBudgetUsd" name="aiMonthlyBudgetUsd" type="text" inputMode="decimal" autoComplete="off" defaultValue={formatForInput(budgetUsd)} placeholder="Ex.: 5,00" /><p className="text-[11px] leading-4 text-muted-foreground">Aceita vírgula, ponto e valores colados.</p></div>
+      <div className="grid grid-rows-[2.5rem_2.5rem_auto] gap-1.5"><Label htmlFor="usdBrlReferenceRate" className="leading-tight">Cotação de referência<br />(R$/US$)</Label><Input id="usdBrlReferenceRate" name="usdBrlReferenceRate" type="text" inputMode="decimal" autoComplete="off" defaultValue={formatForInput(brlRate)} placeholder="Ex.: 5,456" /><p className="text-[11px] leading-4 text-muted-foreground">Ex.: 5,456 ou 1.234,56.</p></div>
+      <Button type="submit" disabled={pending} className="sm:col-start-2 sm:justify-self-end">{pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar</Button>
     </form>
   );
 }
