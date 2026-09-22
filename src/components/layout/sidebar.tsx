@@ -50,7 +50,7 @@ export function Sidebar({ role, onNavigate }: { role: Role; onNavigate?: () => v
   }
 
   return (
-    <aside className={cn("relative z-30 flex h-full flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-300", mode === "expanded" ? "w-64" : mode === "collapsed" ? "w-16" : "w-16 xl:w-64")}>
+    <aside className={cn("relative z-30 flex h-screen min-h-screen flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-300", mode === "expanded" ? "w-64" : mode === "collapsed" ? "w-16" : "w-16 xl:w-64")}>
       <div className={cn("flex items-center pb-4 pt-5 text-white", expanded ? "justify-between px-5" : mode === "collapsed" ? "justify-center px-3" : "justify-center px-3 xl:justify-between xl:px-5")}>
         {mode === "collapsed" ? (
           <button type="button" onClick={toggle} className="rounded-md p-1 text-white transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-sidebar-primary" aria-label="Expandir menu lateral" title="Expandir menu lateral">

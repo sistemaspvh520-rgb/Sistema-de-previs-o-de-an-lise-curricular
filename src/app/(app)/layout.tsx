@@ -6,7 +6,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
   return (
     <div className="flex min-h-screen overflow-x-clip">
-      <div className="hidden md:block md:sticky md:top-0 md:h-screen">
+      <div className="hidden md:block md:sticky md:top-0 md:h-screen md:self-start md:bg-sidebar">
         <Sidebar role={user.role} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">

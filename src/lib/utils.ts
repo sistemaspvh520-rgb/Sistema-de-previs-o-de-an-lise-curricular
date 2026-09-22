@@ -24,6 +24,10 @@ export function formatCurrencyUSD(value: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(value);
 }
 
+export function formatCurrencyBRL(value: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(value);
+}
+
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat("pt-BR").format(value);
 }

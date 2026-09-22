@@ -10,6 +10,8 @@ export interface SystemSettings {
   maxUploadMb: number;
   maxPdfPages: number;
   defaultStartTerm: string | null;
+  aiMonthlyBudgetUsd: number;
+  usdBrlReferenceRate: number;
 }
 
 const DEFAULTS: SystemSettings = {
@@ -19,6 +21,8 @@ const DEFAULTS: SystemSettings = {
   maxUploadMb: 20,
   maxPdfPages: 60,
   defaultStartTerm: "2027.1",
+  aiMonthlyBudgetUsd: 0,
+  usdBrlReferenceRate: 5.5,
 };
 
 export async function getSystemSettings(): Promise<SystemSettings> {
@@ -31,6 +35,8 @@ export async function getSystemSettings(): Promise<SystemSettings> {
     maxUploadMb: Number(map.maxUploadMb ?? DEFAULTS.maxUploadMb),
     maxPdfPages: Number(map.maxPdfPages ?? DEFAULTS.maxPdfPages),
     defaultStartTerm: typeof map.defaultStartTerm === "string" ? map.defaultStartTerm : DEFAULTS.defaultStartTerm,
+    aiMonthlyBudgetUsd: Number(map.aiMonthlyBudgetUsd ?? DEFAULTS.aiMonthlyBudgetUsd),
+    usdBrlReferenceRate: Number(map.usdBrlReferenceRate ?? DEFAULTS.usdBrlReferenceRate),
   };
 }
 
