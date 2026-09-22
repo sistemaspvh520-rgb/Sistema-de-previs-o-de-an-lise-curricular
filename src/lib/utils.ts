@@ -5,15 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDateTime(d: Date | string | null | undefined): string {
-  if (!d) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(d));
-}
-
-export function formatDate(d: Date | string | null | undefined): string {
-  if (!d) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(d));
-}
+export { formatDateTime, formatDate, formatRelativeTime, daysSince, APP_TIME_ZONE } from "@/lib/time";
 
 export function ordinal(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";

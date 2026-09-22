@@ -45,6 +45,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.email = current.email;
         token.mustChangePassword = token.impersonatorId ? false : current.mustChangePassword;
         token.checkedAt = Date.now();
+        // Registro de atividade real (não só login), no máximo uma escrita a cada SESSION_RECHECK_MS.
+        if (!token.impersonatorId) await prisma.user.update({ where: { id: userId }, data: { lastActiveAt: new Date() } });
       }
       return token;
     },
@@ -80,7 +82,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const ok = await verify(user.passwordHash, parsed.data.password);
         if (!ok) return null;
 
-        await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+        await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), lastActiveAt: new Date() } });
         await prisma.auditLog.create({
           data: { userId: user.id, action: "auth.login", entityType: "User", entityId: user.id, ip },
         });

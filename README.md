@@ -64,6 +64,6 @@ storage/      PDFs enviados (gitignored, fora de /public)
 
 | Perfil | Pode |
 |--------|------|
-| ADMIN | tudo: usuários, OpenAI, regras, matrizes, privacidade, auditoria, uso de IA |
-| ANALYST | criar, revisar, corrigir, recalcular, concluir análises e gerar resumo |
+| ADMIN | tudo: usuários, OpenAI, regras, privacidade, auditoria, uso de IA, gestão |
+| ANALYST | criar, revisar, corrigir, recalcular análises e gerar resumo |
 | VIEWER | consultar análises |

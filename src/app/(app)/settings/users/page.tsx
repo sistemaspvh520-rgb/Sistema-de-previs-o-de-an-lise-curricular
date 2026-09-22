@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { formatDateTime } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/time";
 import { UserFormDialog } from "@/features/users/user-form-dialog";
 import { UserRowActions } from "@/features/users/user-row-actions";
 import { isEmailConfigured } from "@/services/email/mailer";
@@ -86,7 +87,7 @@ export default async function UsersPage() {
                     <Badge variant="outline" className="border-transparent bg-status-success-bg text-status-success">Definida pelo usuário</Badge>
                   )}
                 </TableCell>
-                <TableCell className="text-muted-foreground">{formatDateTime(u.lastLoginAt)}</TableCell>
+                <TableCell className="text-muted-foreground" title={u.lastActiveAt ? formatDateTime(u.lastActiveAt) : undefined}>{u.lastActiveAt ? formatRelativeTime(u.lastActiveAt) : "nunca acessou"}</TableCell>
                 <TableCell>
                   <UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} />
                 </TableCell>
@@ -111,7 +112,7 @@ export default async function UsersPage() {
               </div>
               <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
                 <span>{u.mustChangePassword ? (u.inviteSentAt ? `Convite enviado em ${formatDateTime(u.inviteSentAt)}` : "Convite ainda não enviado") : "Senha definida pelo usuário"}</span>
-                <span>Último acesso: {formatDateTime(u.lastLoginAt)}</span>
+                <span>Último acesso: {u.lastActiveAt ? `${formatRelativeTime(u.lastActiveAt)} · ${formatDateTime(u.lastActiveAt)}` : "nunca acessou"}</span>
               </div>
               <div className="border-t pt-2"><UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} /></div>
             </article>

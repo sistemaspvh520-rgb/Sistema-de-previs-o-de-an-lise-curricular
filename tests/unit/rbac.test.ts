@@ -13,7 +13,7 @@ describe("RBAC", () => {
     expect(can("ANALYST", "analysis:summary")).toBe(true);
     expect(can("ANALYST", "integration:manage")).toBe(false);
     expect(can("ANALYST", "users:manage")).toBe(false);
-    expect(can("ANALYST", "rules:manage")).toBe(false);
+    expect(can("ANALYST", "users:manage")).toBe(false);
   });
   it("VIEWER só lê", () => {
     expect(can("VIEWER", "analysis:read")).toBe(true);

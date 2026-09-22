@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
@@ -10,8 +11,8 @@ import { AnalysisStatusBadge } from "@/components/shared/status-badge";
 import { ProcessingPanel } from "@/features/analyses/components/processing-panel";
 import { AnalysisView } from "@/features/analyses/components/analysis-view";
 import { formatDateTime } from "@/lib/utils";
-import { prisma } from "@/lib/prisma";
-import { suggestMatrix } from "@/features/analyses/suggest-matrix";
+import { formatPolo } from "@/domain/polos";
+import { formatCourseFormat } from "@/domain/course-formats";
 
 export const metadata: Metadata = { title: "Análise" };
 export const dynamic = "force-dynamic";
@@ -26,9 +27,6 @@ export default async function AnalysisPage({ params }: PageProps<"/analyses/[id]
   if (!detail) notFound();
   if (user.role !== "ADMIN" && detail.createdById !== user.id) notFound();
   const vm = buildAnalysisViewModel(detail);
-  const matrixRows = await prisma.curriculumMatrix.findMany({ where: { isActive: true }, include: { course: true }, orderBy: [{ course: { name: "asc" } }, { year: "desc" }] });
-  const matrices = matrixRows.map((m) => ({ id: m.id, label: m.label, course: m.course.name, year: m.year, version: m.version }));
-  const suggestedMatrixId = suggestMatrix(matrices, { courseName: vm.courseName, matrixLabel: vm.matrixLabel });
   const failed = vm.status === "FAILED" || vm.status === "AI_ERROR";
   const hasData = vm.subjects.length > 0;
 
@@ -40,10 +38,14 @@ export default async function AnalysisPage({ params }: PageProps<"/analyses/[id]
             Análise curricular <AnalysisStatusBadge status={vm.status} />
           </span>
         }
-        title={vm.courseName ?? vm.document?.originalName ?? "Análise"}
+        title={vm.studentName ?? vm.courseName ?? "Análise curricular"}
         description={
           <>
-            {vm.document?.originalName}
+            {vm.studentName && vm.courseName && <span className="block font-medium text-foreground">{vm.courseName}{vm.courseFormat ? ` · ${formatCourseFormat(vm.courseFormat)}` : ""}</span>}
+            {vm.poloCode && <span className="block">Polo {formatPolo(vm.poloCode, vm.poloName)}</span>}
+            {vm.reanalysisOf && <span className="block text-status-warning">Reanálise de <Link href={`/analyses/${vm.reanalysisOf.id}`} className="underline">{vm.reanalysisOf.courseName ?? "análise"} de {formatDateTime(vm.reanalysisOf.createdAt)}</Link></span>}
+            {vm.reanalyses.length > 0 && <span className="block text-status-warning">Reanalisada em <Link href={`/analyses/${vm.reanalyses[0].id}`} className="underline">{formatDateTime(vm.reanalyses[0].createdAt)}</Link></span>}
+            {vm.document?.originalName && <span className="break-all">{vm.document.originalName}</span>}
             {vm.candidateLabel ? ` · ${vm.candidateLabel}` : ""} · enviado por {vm.createdBy.name} em {formatDateTime(vm.createdAt)}
           </>
         }
@@ -63,9 +65,7 @@ export default async function AnalysisPage({ params }: PageProps<"/analyses/[id]
       {!vm.isProcessing && (!failed || hasData) && (
         <AnalysisView
           vm={vm}
-          perms={{ review: can(user.role, "analysis:review"), complete: !failed && can(user.role, "analysis:complete"), rules: can(user.role, "rules:manage"), diagnostics: can(user.role, "analysis:review"), delete: can(user.role, "analysis:delete"), requestDelete: user.role !== "ADMIN" }}
-          matrices={matrices}
-          suggestedMatrixId={suggestedMatrixId}
+          perms={{ review: can(user.role, "analysis:review"), diagnostics: can(user.role, "analysis:review"), delete: can(user.role, "analysis:delete"), requestDelete: user.role !== "ADMIN" }}
         />
       )}
     </>

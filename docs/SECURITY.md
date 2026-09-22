@@ -18,7 +18,7 @@
 
 ## Autorização (RBAC)
 - Perfis ADMIN / ANALYST / VIEWER. Matriz de permissões em `src/lib/rbac.ts`.
-- Verificação em `middleware.ts` (rotas), em cada server action/route handler (`requireRole`) e na UI.
+- Verificação em `src/proxy.ts` (rotas, `ROUTE_PERMISSIONS`), em cada server action/route handler (`requirePermission`) e na UI.
 
 ## Segredos
 - `APP_ENCRYPTION_KEY` (AES-256-GCM), `AUTH_SECRET`, `DATABASE_URL`, `CRON_SECRET` apenas em variáveis de ambiente do servidor.

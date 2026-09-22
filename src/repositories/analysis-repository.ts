@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AnalysisStatus, Prisma } from "@/generated/prisma/client";
+import { ATTENTION_STATUSES, PROCESSING_STATUSES } from "@/domain/curricular-analysis/status-groups";
 
 export interface ListFilters {
   status?: AnalysisStatus | "ALL";
@@ -9,6 +10,9 @@ export interface ListFilters {
   pageSize?: number;
   createdById?: string;
   statusGroup?: "PROCESSING" | "ATTENTION";
+  poloCode?: string;
+  /** Somente entregues há mais de 24h sem retorno de matrícula. */
+  followUpDue?: boolean;
 }
 
 export async function listAnalyses(filters: ListFilters) {
@@ -17,14 +21,17 @@ export async function listAnalyses(filters: ListFilters) {
   const where: Prisma.CurricularAnalysisWhereInput = {};
   if (filters.status && filters.status !== "ALL") where.status = filters.status;
   if (filters.statusGroup === "PROCESSING") {
-    where.status = { in: ["UPLOADED", "PARSING", "AI_EXTRACTION", "NORMALIZING", "CALCULATING", "VALIDATING", "AI_AUDIT"] };
+    where.status = { in: [...PROCESSING_STATUSES] };
   }
   if (filters.statusGroup === "ATTENTION") {
-    where.status = { in: ["WAITING_REVIEW", "FAILED", "AI_ERROR"] };
+    where.status = { in: [...ATTENTION_STATUSES] };
   }
   if (filters.createdById) where.createdById = filters.createdById;
+  if (filters.poloCode) where.poloCode = filters.poloCode;
+  if (filters.followUpDue) Object.assign(where, { status: "COMPLETED", enrollmentStatus: "PENDING", followUpDueAt: { lte: new Date() } });
   if (filters.q) {
     where.OR = [
+      { studentName: { contains: filters.q, mode: "insensitive" } },
       { courseName: { contains: filters.q, mode: "insensitive" } },
       { candidateLabel: { contains: filters.q, mode: "insensitive" } },
       { document: { originalName: { contains: filters.q, mode: "insensitive" } } },
@@ -41,6 +48,12 @@ export async function listAnalyses(filters: ListFilters) {
         status: true,
         courseName: true,
         candidateLabel: true,
+        studentName: true,
+        poloCode: true,
+        poloName: true,
+        courseFormat: true,
+        enrollmentStatus: true,
+        followUpDueAt: true,
         entryPeriod: true,
         reliability: true,
         reviewItemsCount: true,
@@ -53,7 +66,20 @@ export async function listAnalyses(filters: ListFilters) {
     }),
     prisma.curricularAnalysis.count({ where }),
   ]);
-  return { items, total, page, pageSize };
+  const now = new Date();
+  return {
+    items: items.map((analysis) => ({
+      ...analysis,
+      followUpIsDue:
+        analysis.status === "COMPLETED" &&
+        analysis.enrollmentStatus === "PENDING" &&
+        analysis.followUpDueAt !== null &&
+        analysis.followUpDueAt <= now,
+    })),
+    total,
+    page,
+    pageSize,
+  };
 }
 
 export async function getAnalysisDetail(id: string) {
@@ -61,6 +87,9 @@ export async function getAnalysisDetail(id: string) {
     where: { id },
     include: {
       createdBy: { select: { id: true, name: true, email: true } },
+      enrollmentUpdatedBy: { select: { name: true } },
+      reanalysisOf: { select: { id: true, createdAt: true, courseName: true } },
+      reanalyses: { select: { id: true, createdAt: true }, orderBy: { createdAt: "desc" } },
       document: true,
       ruleSetVersion: { include: { rules: true } },
       subjects: { orderBy: { sortIndex: "asc" } },
@@ -71,9 +100,65 @@ export async function getAnalysisDetail(id: string) {
       reviews: { orderBy: { createdAt: "desc" }, take: 1 },
       extractions: { orderBy: { createdAt: "desc" }, take: 1, select: { model: true, promptVersion: true, privacyMode: true, durationMs: true, status: true, createdAt: true } },
       usages: { orderBy: { createdAt: "asc" } },
-      curriculumMatrix: { include: { course: true } },
     },
   });
 }
 
 export type AnalysisDetail = NonNullable<Awaited<ReturnType<typeof getAnalysisDetail>>>;
+
+export interface ReportFilters {
+  createdById?: string;
+  poloCode?: string;
+  from?: Date;
+  to?: Date;
+}
+
+/** Contagem de análises por polo (total e no período), para os relatórios. */
+export async function countAnalysesByPolo(filters: ReportFilters & { monthStart: Date }) {
+  const where: Prisma.CurricularAnalysisWhereInput = { poloCode: { not: null } };
+  if (filters.createdById) where.createdById = filters.createdById;
+  const [total, month, completed] = await Promise.all([
+    prisma.curricularAnalysis.groupBy({ by: ["poloCode", "poloName"], where, _count: { _all: true } }),
+    prisma.curricularAnalysis.groupBy({ by: ["poloCode"], where: { ...where, createdAt: { gte: filters.monthStart } }, _count: { _all: true } }),
+    prisma.curricularAnalysis.groupBy({ by: ["poloCode"], where: { ...where, status: "COMPLETED" }, _count: { _all: true } }),
+  ]);
+  const monthBy = new Map(month.map((m) => [m.poloCode, m._count._all]));
+  const completedBy = new Map(completed.map((m) => [m.poloCode, m._count._all]));
+  return total
+    .map((row) => ({ code: row.poloCode as string, name: row.poloName ?? "Polo não cadastrado", total: row._count._all, month: monthBy.get(row.poloCode) ?? 0, completed: completedBy.get(row.poloCode) ?? 0 }))
+    .sort((a, b) => b.total - a.total || a.code.localeCompare(b.code));
+}
+
+/** Linhas do relatório exportável (CSV): uma por análise, com totais e previsão. */
+export async function listAnalysesForReport(filters: ReportFilters) {
+  const where: Prisma.CurricularAnalysisWhereInput = {};
+  if (filters.createdById) where.createdById = filters.createdById;
+  if (filters.poloCode) where.poloCode = filters.poloCode;
+  if (filters.from || filters.to) where.createdAt = { ...(filters.from ? { gte: filters.from } : {}), ...(filters.to ? { lte: filters.to } : {}) };
+  return prisma.curricularAnalysis.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: 5000,
+    select: {
+      id: true,
+      createdAt: true,
+      completedAt: true,
+      status: true,
+      studentName: true,
+      poloCode: true,
+      poloName: true,
+      courseFormat: true,
+      courseName: true,
+      entryPeriod: true,
+      entryTerm: true,
+      startTerm: true,
+      reliability: true,
+      reviewItemsCount: true,
+      createdBy: { select: { name: true } },
+      document: { select: { originalName: true } },
+      projections: { orderBy: { index: "desc" }, take: 1, select: { term: true } },
+      _count: { select: { subjects: true } },
+      subjects: { select: { status: true } },
+    },
+  });
+}

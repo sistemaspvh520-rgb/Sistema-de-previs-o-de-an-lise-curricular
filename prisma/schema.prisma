@@ -76,7 +76,6 @@ enum WarningSource {
   PIPELINE
   VALIDATOR
   AUDITOR
-  MATRIX
   EXTRACTION
 }
 
@@ -86,6 +85,18 @@ enum AIOperation {
   AUDIT
   FINAL_EXPLANATION
   CONNECTION_TEST
+}
+
+/** Retorno do consultor sobre a matrícula do aluno após a análise. */
+enum EnrollmentStatus {
+  PENDING
+  ENROLLED
+  NOT_ENROLLED
+}
+
+enum CourseFormat {
+  EAD_DIGITAL
+  SEMIPRESENCIAL
 }
 
 enum AIReviewStatus {
@@ -141,6 +152,8 @@ model User {
   role         Role      @default(ANALYST)
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime? @db.Timestamptz(6)
+  /** Última atividade com sessão válida (atualizada com throttle pelo callback de sessão). */
+  lastActiveAt DateTime? @db.Timestamptz(6)
   /** Obriga a definir uma senha própria no próximo acesso. */
   mustChangePassword       Boolean   @default(false)
   /** Senha temporária cifrada (AES-256-GCM); apagada quando o usuário define a própria senha. */
@@ -167,6 +180,8 @@ model User {
   impersonationsAsTarget ImpersonationToken[] @relation("ImpersonationTarget")
   deletionRequests        AnalysisDeletionRequest[] @relation("DeletionRequestedBy")
   deletionRequestsReviewed AnalysisDeletionRequest[] @relation("DeletionReviewedBy")
+  enrollmentUpdates       CurricularAnalysis[] @relation("EnrollmentUpdatedBy")
+  pushSubscriptions       PushSubscription[]
 }
 
 /// Token de uso único para definir (convite) ou redefinir a senha por link de e-mail. Só o hash é armazenado.
@@ -231,6 +246,20 @@ model CurricularAnalysis {
   campus                 String?
   modality               String?
   candidateLabel         String?
+  /** Informados pelo analista no envio (obrigatórios; nulos apenas em registros legados). */
+  studentName            String?
+  poloCode               String?
+  poloName               String?
+  courseFormat           CourseFormat?
+  /** Reanálise: aponta para a análise anterior do mesmo aluno (novo PDF obrigatório). */
+  reanalysisOfId         String?            @db.Uuid
+  /** Retorno de matrícula: cobrado 24h após a entrega (followUpDueAt) por push + e-mail. */
+  enrollmentStatus       EnrollmentStatus   @default(PENDING)
+  enrollmentUpdatedAt    DateTime?          @db.Timestamptz(6)
+  enrollmentUpdatedById  String?            @db.Uuid
+  enrollmentNote         String?
+  followUpDueAt          DateTime?          @db.Timestamptz(6)
+  followUpNotifiedAt     DateTime?          @db.Timestamptz(6)
   entryPeriod            Int?
   entryPeriodSource      EntryPeriodSource?
   entryTerm              String?
@@ -246,7 +275,6 @@ model CurricularAnalysis {
   auditorPromptVersion   String?
   extractionModel        String?
   auditModel             String?
-  curriculumMatrixId     String?            @db.Uuid
   projectionIncomplete   Boolean            @default(false)
   completedAt            DateTime?          @db.Timestamptz(6)
   lastCalculatedAt       DateTime?          @db.Timestamptz(6)
@@ -254,8 +282,10 @@ model CurricularAnalysis {
   updatedAt              DateTime           @updatedAt @db.Timestamptz(6)
 
   createdBy        User               @relation("AnalysisCreatedBy", fields: [createdById], references: [id])
+  enrollmentUpdatedBy User?           @relation("EnrollmentUpdatedBy", fields: [enrollmentUpdatedById], references: [id], onDelete: SetNull)
+  reanalysisOf     CurricularAnalysis? @relation("Reanalysis", fields: [reanalysisOfId], references: [id], onDelete: SetNull)
+  reanalyses       CurricularAnalysis[] @relation("Reanalysis")
   ruleSetVersion   RuleSetVersion     @relation(fields: [ruleSetVersionId], references: [id])
-  curriculumMatrix CurriculumMatrix?  @relation(fields: [curriculumMatrixId], references: [id], onDelete: SetNull)
   document         UploadedDocument?
   subjects         AnalyzedSubject[]
   projections      SemesterProjection[]
@@ -269,6 +299,25 @@ model CurricularAnalysis {
 
   @@index([status, createdAt(sort: Desc)])
   @@index([createdById])
+  @@index([poloCode])
+  @@index([enrollmentStatus, followUpDueAt])
+  @@index([reanalysisOfId])
+}
+
+/** Inscrição Web Push de um navegador do usuário (notificações de retorno de matrícula). */
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  lastUsedAt DateTime? @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /** Solicitação de exclusão feita pelo responsável pela análise e decidida por um administrador. */
@@ -546,65 +595,4 @@ model SystemSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
-}
-
-// ------------------------------------------------------------------
-// Matrizes curriculares
-// ------------------------------------------------------------------
-
-model Course {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  code      String?
-  modality  String?
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
-
-  matrices CurriculumMatrix[]
-
-  @@unique([name, modality])
-}
-
-model CurriculumMatrix {
-  id        String    @id @default(uuid()) @db.Uuid
-  courseId  String    @db.Uuid
-  label     String
-  year      Int
-  version   String
-  validFrom DateTime? @db.Date
-  validTo   DateTime? @db.Date
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
-
-  course   Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  periods  CurriculumPeriod[]
-  analyses CurricularAnalysis[]
-
-  @@unique([courseId, year, version])
-}
-
-model CurriculumPeriod {
-  id       String  @id @default(uuid()) @db.Uuid
-  matrixId String  @db.Uuid
-  number   Int
-  label    String?
-
-  matrix   CurriculumMatrix   @relation(fields: [matrixId], references: [id], onDelete: Cascade)
-  subjects CurriculumSubject[]
-
-  @@unique([matrixId, number])
-}
-
-model CurriculumSubject {
-  id            String @id @default(uuid()) @db.Uuid
-  periodId      String @db.Uuid
-  name          String
-  workload      Int
-  prerequisites Json   @default("[]")
-  order         Int    @default(0)
-
-  period CurriculumPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
-
-  @@index([periodId, order])
 }

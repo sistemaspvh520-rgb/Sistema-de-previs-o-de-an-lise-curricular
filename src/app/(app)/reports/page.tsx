@@ -7,21 +7,23 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnalysisStatusBadge } from "@/components/shared/status-badge";
 import { formatDateTime, pluralize } from "@/lib/utils";
+import { startOfCurrentMonth } from "@/lib/time";
+import { countAnalysesByPolo } from "@/repositories/analysis-repository";
+import { PoloReportCard } from "@/features/analyses/components/polo-report";
 
 export const metadata: Metadata = { title: "Meus relatórios" };
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
   const user = await requireUser();
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const [total, thisMonth, completed, courses, recent] = await Promise.all([
+  const monthStart = startOfCurrentMonth();
+  const [total, thisMonth, completed, courses, recent, byPolo] = await Promise.all([
     prisma.curricularAnalysis.count({ where: { createdById: user.id } }),
     prisma.curricularAnalysis.count({ where: { createdById: user.id, createdAt: { gte: monthStart } } }),
     prisma.curricularAnalysis.count({ where: { createdById: user.id, status: "COMPLETED" } }),
     prisma.curricularAnalysis.groupBy({ by: ["courseName"], where: { createdById: user.id, courseName: { not: null } }, _count: { _all: true }, orderBy: { _count: { courseName: "desc" } }, take: 5 }),
-    prisma.curricularAnalysis.findMany({ where: { createdById: user.id }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, courseName: true, status: true, createdAt: true } }),
+    prisma.curricularAnalysis.findMany({ where: { createdById: user.id }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, courseName: true, studentName: true, poloCode: true, status: true, createdAt: true } }),
+    countAnalysesByPolo({ createdById: user.id, monthStart }),
   ]);
   const cards = [
     { label: "Minhas análises", value: total, icon: FileText, hint: "Desde o início", href: "/analyses" },
@@ -36,7 +38,8 @@ export default async function ReportsPage() {
     </div>
     <div className="mt-6 grid gap-6 lg:grid-cols-2">
       <Card className="shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><BookOpenCheck className="size-4 text-brand-cyan-700" /> Cursos mais analisados</CardTitle></CardHeader><CardContent>{courses.length === 0 ? <p className="text-sm text-muted-foreground">Suas análises ainda não possuem um curso identificado.</p> : <ol className="space-y-3">{courses.map((course, index) => <li key={course.courseName} className="flex items-center gap-3"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-medium">{course.courseName}</span><span className="text-sm text-muted-foreground">{pluralize(course._count._all, "análise")}</span></li>)}</ol>}</CardContent></Card>
-      <Card className="shadow-sm"><CardHeader><CardTitle className="text-base">Últimas análises</CardTitle></CardHeader><CardContent className="p-0">{recent.length === 0 ? <p className="px-6 pb-6 text-sm text-muted-foreground">Você ainda não iniciou nenhuma análise.</p> : <ul className="divide-y">{recent.map((analysis) => <li key={analysis.id}><Link href={`/analyses/${analysis.id}`} className="flex items-center gap-3 px-6 py-3 transition-colors hover:bg-muted/60"><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{analysis.courseName ?? "Curso não identificado"}</div><div className="text-xs text-muted-foreground">{formatDateTime(analysis.createdAt)}</div></div><AnalysisStatusBadge status={analysis.status} /></Link></li>)}</ul>}</CardContent></Card>
+      <Card className="shadow-sm"><CardHeader><CardTitle className="text-base">Últimas análises</CardTitle></CardHeader><CardContent className="p-0">{recent.length === 0 ? <p className="px-6 pb-6 text-sm text-muted-foreground">Você ainda não iniciou nenhuma análise.</p> : <ul className="divide-y">{recent.map((analysis) => <li key={analysis.id}><Link href={`/analyses/${analysis.id}`} className="flex items-center gap-3 px-6 py-3 transition-colors hover:bg-muted/60"><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{analysis.studentName ?? analysis.courseName ?? "Curso não identificado"}</div><div className="truncate text-xs text-muted-foreground">{analysis.studentName ? `${analysis.courseName ?? "Curso não identificado"}${analysis.poloCode ? ` · Polo ${analysis.poloCode}` : ""} · ` : ""}{formatDateTime(analysis.createdAt)}</div></div><AnalysisStatusBadge status={analysis.status} /></Link></li>)}</ul>}</CardContent></Card>
     </div>
+    <PoloReportCard className="mt-6 shadow-sm" title="Minhas análises por polo" description="Clique no polo para ver a lista ou exporte o relatório em CSV (Excel)." rows={byPolo} />
   </>;
 }

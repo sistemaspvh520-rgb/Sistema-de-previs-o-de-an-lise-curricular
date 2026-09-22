@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ProcessingStep } from "@/services/pipeline/steps";
+import { FINAL_STATUSES } from "@/domain/curricular-analysis/status-groups";
 import { retryAnalysisAction } from "@/features/analyses/actions";
 import { OPENAI_ERROR_MESSAGES } from "@/services/openai/error-messages";
 
@@ -18,7 +19,6 @@ interface StatusPayload {
   errorMessage: string | null;
 }
 
-const FINAL = ["COMPLETED", "WAITING_REVIEW", "FAILED", "AI_ERROR"];
 
 export function ProcessingPanel({
   analysisId,
@@ -38,7 +38,7 @@ export function ProcessingPanel({
   const router = useRouter();
   const [data, setData] = useState<StatusPayload>({ status: initialStatus, steps: initialSteps, errorCode, errorMessage });
   const [pending, start] = useTransition();
-  const processing = !FINAL.includes(data.status);
+  const processing = !(FINAL_STATUSES as readonly string[]).includes(data.status);
 
   useEffect(() => {
     if (!processing) return;
@@ -50,7 +50,7 @@ export function ProcessingPanel({
         const body = (await res.json()) as StatusPayload;
         if (!alive) return;
         setData(body);
-        if (FINAL.includes(body.status)) router.refresh();
+        if ((FINAL_STATUSES as readonly string[]).includes(body.status)) router.refresh();
       } catch {
         /* tenta de novo no próximo tick */
       }

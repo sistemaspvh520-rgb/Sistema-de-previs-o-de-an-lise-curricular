@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCourseFormat } from "@/domain/course-formats";
 import { useState } from "react";
 import { Copy, Check, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +15,9 @@ export function buildCandidateSummary(vm: AnalysisVM): string {
   return [
     "Analisamos seu aproveitamento curricular 🎓",
     "",
-    vm.courseName ? `Curso: ${vm.courseName}` : null,
+    vm.studentName ? `Aluno(a): ${vm.studentName}` : null,
+    vm.courseName ? `Curso: ${vm.courseName}${vm.courseFormat ? ` (${formatCourseFormat(vm.courseFormat)})` : ""}` : null,
+    vm.poloName ? `Polo: ${vm.poloName}` : null,
     `Ingresso previsto: ${ingresso}`,
     `Disciplinas aproveitadas: ${vm.totals.exempted}`,
     `Pendências identificadas: ${vm.totals.pending + vm.totals.review}`,

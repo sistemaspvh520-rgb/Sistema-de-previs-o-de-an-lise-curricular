@@ -12,5 +12,4 @@ export * from "@/domain/curricular-analysis/validators/claims";
 export * from "@/domain/curricular-analysis/validators/inconsistencies";
 export * from "@/domain/curricular-analysis/validators/validate";
 export * from "@/domain/curricular-analysis/validators/status";
-export * from "@/domain/curricular-analysis/validators/matrix";
 export * from "@/domain/curricular-analysis/simulation/narrative";

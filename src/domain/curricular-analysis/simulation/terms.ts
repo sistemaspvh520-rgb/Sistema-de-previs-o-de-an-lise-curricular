@@ -1,3 +1,5 @@
+import { zonedDateParts } from "@/lib/time";
+
 /** Termos letivos no formato "YYYY.S" (S = 1 ou 2). */
 export interface Term {
   year: number;
@@ -35,8 +37,7 @@ export function termSequence(start: string, n: number, unit: TermUnit = "SEMESTE
 
 /** Próximo semestre letivo a partir de uma data (padrão sugerido para startTerm). */
 export function suggestStartTerm(now = new Date()): string {
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const { year, month } = zonedDateParts(now);
   // Jan–Jun: ainda cabe ingressar em X.2; Jul–Dez: próximo é (X+1).1
   return month <= 6 ? `${year}.2` : `${year + 1}.1`;
 }

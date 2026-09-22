@@ -60,11 +60,12 @@ mais disciplinas que o teto, nenhuma disciplina regular é removida e não há v
 - Dispensadas de períodos anteriores ao ingresso não entram no backlog.
 - Ordem: período mais antigo primeiro; dentro do período, ordem original do documento. Sem pré-requisitos inventados.
 
-## 5. Período de ingresso — CONFIRMADO (cascata) / CONFIGURÁVEL (regra)
+## 5. Período de ingresso — CONFIRMADO PELO USUÁRIO (obrigatório)
 
-Ordem de determinação: (1) explícito no documento → (2) campo estruturado → (3) regra institucional
-`entryPeriodDefault` → (4) confirmação manual. Sem determinação: `PERÍODO DE INGRESSO PRECISA SER CONFIRMADO`.
-Após a seleção, toda a previsão é recalculada.
+O período e o semestre de ingresso são informados e confirmados pelo analista **antes** de iniciar a análise
+(fonte `USER`); o sistema não os lê do PDF. O cabeçalho ("Série: N") e a IA servem apenas para conferência:
+divergência gera o alerta `ENTRY_PERIOD_MISMATCH`, nunca substitui o valor informado. Registros legados sem
+ingresso ficam em "Ingresso pendente" até a confirmação no banner; após a seleção, toda a previsão é recalculada.
 
 ## 6. Simulador semestral — CONFIRMADO
 

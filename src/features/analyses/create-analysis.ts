@@ -8,7 +8,11 @@ import { countPdfPages } from "@/services/pdf/parser";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { getActiveRuleSet } from "@/repositories/rules-repository";
 import { ENGINE_VERSION } from "@/domain/curricular-analysis/version";
-import { suggestStartTerm, isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
+import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
+import { findPolo } from "@/domain/polos";
+import { cleanStudentName, normalizeStudentName } from "@/domain/student-name";
+import { isCourseFormat } from "@/domain/course-formats";
+import type { CourseFormat } from "@/generated/prisma/enums";
 import { initialSteps } from "@/services/pipeline/steps";
 import { recordAudit } from "@/services/audit-log/audit-log";
 import type { Prisma } from "@/generated/prisma/client";
@@ -32,11 +36,31 @@ export interface CreateAnalysisInput {
   userId: string;
   bytes: Buffer;
   originalName: string;
-  entryPeriod?: number | null;
-  entryTerm?: string | null;
+  /** Obrigatórios: são a fonte oficial da previsão e nunca são lidos do PDF. */
+  entryPeriod: number;
+  entryTerm: string;
+  /** Identificação do atendimento, informada pelo analista. */
+  studentName: string;
+  poloCode: string;
+  courseFormat: CourseFormat;
+  /** Primeiro semestre da previsão; por padrão igual ao semestre de ingresso. */
   startTerm?: string | null;
-  /** Reenviar mesmo que já exista análise com o mesmo SHA-256. */
-  force?: boolean;
+  /** Reanálise do mesmo aluno: id da análise anterior (exige um PDF diferente). */
+  reanalysisOfId?: string | null;
+}
+
+export class StudentAlreadyAnalyzedError extends Error {
+  constructor(readonly existingAnalysisId: string, readonly existingStudentName: string) {
+    super("Já existe uma análise para este aluno. Abra a análise existente ou marque este envio como reanálise com o novo PDF.");
+    this.name = "StudentAlreadyAnalyzedError";
+  }
+}
+
+export class InvalidReanalysisError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidReanalysisError";
+  }
 }
 
 /** Valida, armazena e cria a análise em estado UPLOADED. Não executa o pipeline. */
@@ -63,17 +87,33 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
     throw new PdfValidationError("TOO_MANY_PAGES", `O PDF tem ${pageCount} páginas; o limite é ${settings.maxPdfPages}.`);
   }
 
+  if (!Number.isInteger(input.entryPeriod) || input.entryPeriod < 1 || input.entryPeriod > 20) throw new Error("Período de ingresso inválido.");
+  if (!isValidTerm(input.entryTerm)) throw new Error("Semestre de ingresso inválido.");
+  const studentName = cleanStudentName(input.studentName);
+  if (studentName.length < 3) throw new Error("Informe o nome do aluno.");
+  const polo = findPolo(input.poloCode);
+  if (!polo) throw new Error("Polo inválido.");
+  if (!isCourseFormat(input.courseFormat)) throw new Error("Formato do curso inválido.");
+
   const ruleSet = await getActiveRuleSet();
   const sha256 = createHash("sha256").update(input.bytes).digest("hex");
-  if (!input.force) {
-    const existing = await prisma.uploadedDocument.findFirst({ where: { sha256 }, orderBy: { createdAt: "desc" }, select: { analysisId: true } });
-    if (existing) throw new DuplicateDocumentError(existing.analysisId);
+  // O mesmo PDF nunca gera duas análises — nem como reanálise (reanálise exige o novo PDF).
+  const existingDoc = await prisma.uploadedDocument.findFirst({ where: { sha256 }, orderBy: { createdAt: "desc" }, select: { analysisId: true } });
+  if (existingDoc) throw new DuplicateDocumentError(existingDoc.analysisId);
+  // Um aluno só tem nova análise se for declarada como reanálise da anterior.
+  const previous = await findLatestAnalysisForStudent(studentName);
+  if (input.reanalysisOfId) {
+    const target = await prisma.curricularAnalysis.findUnique({ where: { id: input.reanalysisOfId }, select: { id: true, studentName: true } });
+    if (!target) throw new InvalidReanalysisError("A análise anterior indicada não existe mais.");
+    if (!target.studentName || normalizeStudentName(target.studentName) !== normalizeStudentName(studentName)) throw new InvalidReanalysisError("A análise anterior indicada pertence a outro aluno.");
+  } else if (previous) {
+    throw new StudentAlreadyAnalyzedError(previous.id, previous.studentName);
   }
   const storage = getStorage();
   const stored = await storage.save(input.bytes, { extension: "pdf" });
-  const startTerm = input.startTerm && isValidTerm(input.startTerm) ? input.startTerm : suggestStartTerm();
-  const entryTerm = input.entryTerm && isValidTerm(input.entryTerm) ? input.entryTerm : null;
-  const entryPeriod = input.entryPeriod && Number.isInteger(input.entryPeriod) && input.entryPeriod >= 1 && input.entryPeriod <= 20 ? input.entryPeriod : null;
+  const entryTerm = input.entryTerm;
+  const entryPeriod = input.entryPeriod;
+  const startTerm = input.startTerm && isValidTerm(input.startTerm) ? input.startTerm : entryTerm;
   const safeName = input.originalName.replace(/[\\/:*?"<>|]/g, "_").slice(0, 200) || "documento.pdf";
 
   try {
@@ -84,7 +124,12 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
         startTerm,
         entryTerm,
         entryPeriod,
-        entryPeriodSource: entryPeriod === null ? null : "USER",
+        entryPeriodSource: "USER",
+        studentName,
+        poloCode: polo.code,
+        poloName: polo.name,
+        courseFormat: input.courseFormat,
+        reanalysisOfId: input.reanalysisOfId ?? null,
         ruleSetVersionId: ruleSet.id,
         engineVersion: ENGINE_VERSION,
         processingSteps: initialSteps() as unknown as Prisma.InputJsonValue,
@@ -111,4 +156,25 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
     await storage.delete(stored.key).catch(() => undefined);
     throw err;
   }
+}
+
+/** Análises anteriores do mesmo aluno (comparação sem acentos/caixa), mais recente primeiro. */
+export async function findAnalysesForStudent(name: string, take = 5) {
+  const normalized = normalizeStudentName(name);
+  if (normalized.length < 3) return [];
+  const candidates = await prisma.curricularAnalysis.findMany({
+    where: { studentName: { contains: normalized.split(" ")[0], mode: "insensitive" } },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: { id: true, studentName: true, courseName: true, poloName: true, status: true, createdAt: true, createdById: true, enrollmentStatus: true, createdBy: { select: { name: true } } },
+  });
+  return candidates
+    .filter((a) => a.studentName && normalizeStudentName(a.studentName) === normalized)
+    .slice(0, take)
+    .map((a) => ({ ...a, studentName: a.studentName as string }));
+}
+
+async function findLatestAnalysisForStudent(name: string) {
+  const [latest] = await findAnalysesForStudent(name, 1);
+  return latest ?? null;
 }

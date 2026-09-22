@@ -2,6 +2,7 @@
  * Integração: pipeline completo contra o PostgreSQL real (docker compose) com o SDK OpenAI mockado.
  * Pulado automaticamente se o banco não estiver acessível.
  */
+import { randomUUID } from "node:crypto";
 import { readFileSync, mkdtempSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -79,16 +80,34 @@ afterAll(async () => {
 });
 
 describe("pipeline (integração)", () => {
-  it("upload → parsing → extração → cálculo → auditoria → WAITING_REVIEW por ingresso não confirmado; confirmação recalcula", async (ctx) => {
+  it("upload com ingresso obrigatório → pipeline completo → COMPLETED; legado sem ingresso fica WAITING_REVIEW até confirmação", async (ctx) => {
     if (!dbOk) return ctx.skip();
     const { createAnalysisFromUpload } = await import("@/features/analyses/create-analysis");
     const { runAnalysisPipeline, recalculateAnalysis } = await import("@/services/pipeline/runner");
     const { prisma } = prismaMod;
 
-    const { id } = await createAnalysisFromUpload({ userId, bytes: fixture, originalName: "sample.pdf", startTerm: "2026.2", force: true });
+    // O banco de integração pode conter execuções anteriores; torna o hash do
+    // documento e o nome do aluno únicos, preservando o PDF válido para o parser.
+    const idSuffix = randomUUID();
+    const testFixture = Buffer.concat([fixture, Buffer.from(`\n% test-run:${idSuffix}`)]);
+    const { id } = await createAnalysisFromUpload({ userId, bytes: testFixture, originalName: "sample.pdf", entryPeriod: 4, entryTerm: "2026.2", studentName: `Aluno Teste ${idSuffix}`, poloCode: "2085", courseFormat: "EAD_DIGITAL" });
     created.push(id);
-    // mesmo SHA-256 sem force → detecção de duplicado apontando para uma análise existente
-    await expect(createAnalysisFromUpload({ userId, bytes: fixture, originalName: "sample.pdf", startTerm: "2026.2" })).rejects.toMatchObject({ name: "DuplicateDocumentError" });
+    // mesmo SHA-256 → duplicado, mesmo declarado como reanálise (reanálise exige o novo PDF)
+    await expect(createAnalysisFromUpload({ userId, bytes: testFixture, originalName: "sample.pdf", entryPeriod: 4, entryTerm: "2026.2", studentName: `Aluno Teste ${idSuffix}`, poloCode: "2085", courseFormat: "EAD_DIGITAL", reanalysisOfId: id })).rejects.toMatchObject({ name: "DuplicateDocumentError" });
+    // mesmo aluno com outro PDF sem declarar reanálise → bloqueado apontando a análise anterior
+    const other = Buffer.concat([testFixture, Buffer.from("\n%reanalise")]);
+    await expect(createAnalysisFromUpload({ userId, bytes: other, originalName: "sample-2.pdf", entryPeriod: 4, entryTerm: "2026.2", studentName: `aluno  TESTE ${idSuffix}`, poloCode: "2085", courseFormat: "EAD_DIGITAL" })).rejects.toMatchObject({ name: "StudentAlreadyAnalyzedError", existingAnalysisId: id });
+    // o ingresso informado no envio é a fonte oficial
+    const fresh = await prisma.curricularAnalysis.findUniqueOrThrow({ where: { id } });
+    expect(fresh.entryPeriod).toBe(4);
+    expect(fresh.entryPeriodSource).toBe("USER");
+    expect(fresh.startTerm).toBe("2026.2");
+    expect(fresh.studentName).toBe(`Aluno Teste ${idSuffix}`);
+    expect(fresh.poloName).toBe("Porto Velho - Centro - RO");
+    expect(fresh.courseFormat).toBe("EAD_DIGITAL");
+
+    // Rede de segurança para registros legados: sem ingresso, o pipeline não simula e aguarda confirmação.
+    await prisma.curricularAnalysis.update({ where: { id }, data: { entryPeriod: null, entryPeriodSource: null } });
     await runAnalysisPipeline(id);
 
     let a = await prisma.curricularAnalysis.findUniqueOrThrow({ where: { id }, include: { subjects: true, warnings: true, projections: true, claims: true, usages: true, reviews: true } });

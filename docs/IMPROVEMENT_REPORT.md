@@ -53,7 +53,7 @@ Pendências externas (não são defeitos): conectar a **API Key** do projeto Ope
 | A1 | Pipeline executa em `after()` do Next: **não é durável** (restart perde o job), sem fila, sem limite de concorrência, sem retry automático | P0 | G | Tabela `Job` (status, tentativas, `nextRunAt`) + worker (`npm run worker`) ou BullMQ/Redis; `after()` apenas enfileira. Retomada já é suportada pelo runner |
 | A2 | Duas frentes de trabalho em paralelo geraram **duas formas de informar o ingresso** (no upload e no banner pós-processamento) | P1 | P | Manter o ingresso no upload como fonte oficial (`USER`); o banner só aparece quando não informado; documentar no `ARCHITECTURE.md` |
 | A3 | `features/analyses/actions.ts` concentra 9 ações; `runner.ts` tem 300+ linhas | P2 | M | Separar `subject-actions.ts`, `review-actions.ts`, `lifecycle-actions.ts`; extrair cada etapa do runner para `steps/*.ts` |
-| A4 | Páginas consultam Prisma diretamente em vez de repositórios (dashboard, audit, usage, matrices) | P2 | M | Consolidar em `repositories/*` para facilitar testes e cache |
+| A4 | Páginas consultam Prisma diretamente em vez de repositórios (management, reports, audit, usage) | P2 | M | Consolidar em `repositories/*` para facilitar testes e cache |
 | A5 | | A5 | ✅ **Feito** — `.github/workflows/ci.yml` (Postgres 17, migrate, seed, lint, typecheck, test, build). (achado original:sem CI) | P1 | P | GitHub Actions com serviço Postgres (workflow abaixo) |
 | A6 | | A6 | ✅ Parcial — `GET /api/health` (banco + versão). Pendente: Dockerfile para hospedagem própria (na Vercel não é necessário). (achado original:sem artefato de deploy) | P1 | M | `Dockerfile` multi-stage (`output: "standalone"`), `GET /api/health` (DB + storage), `prisma migrate deploy` no entrypoint |
 | A7 | Observabilidade limitada a logs JSON; sem request-id, métricas ou tracing | P2 | M | `x-request-id` no proxy; OpenTelemetry (Next suporta `instrumentation.ts`); métricas de duração por etapa do pipeline |
@@ -71,7 +71,7 @@ Pendências externas (não são defeitos): conectar a **API Key** do projeto Ope
 | # | Item | Prio | Esf. | Detalhe |
 |---|------|------|------|---------|
 | F1 | **Calibração com IA real** | P0 | P | Conectar a chave, processar `samples/analise-real-01.pdf`, comparar com a leitura local (deve dar 0 alertas `LOCAL_*`) e ajustar o prompt se necessário |
-| F2 | | F2 | ✅ **Feito** — seletor de matriz oficial na aba Resumo, com sugestão automática pela `Grade:`/curso do documento. (achado original:faltava a UI) | P1 | P | A ação `linkMatrixToAnalysisAction` existe, mas falta o seletor na aba Resumo; sugerir automaticamente pela `Grade:` do cabeçalho (`20221/2023-2`) |
+| F2 | | F2 | ❌ **Removido em 22/09/2026** — o recurso de matrizes oficiais (páginas, actions, validador e tabelas) foi retirado por decisão da equipe: o pipeline nunca dependeu dele e a comparação só gerava alertas. | — | — | — |
 | F3 | | F3 | ✅ **Feito** — upload com mesmo SHA-256 responde 409 e a tela oferece “Abrir existente” ou “Enviar mesmo assim”. (achado original:detecção de PDF já analisado) | P2 | P | Avisar e oferecer abrir a análise existente |
 | F4 | Excluir/arquivar análise (permissão `analysis:delete` existe sem ação/UI) | P2 | P | Soft-delete com auditoria e remoção do arquivo |
 | F5 | Exportação do resultado (PDF/impressão e CSV da grade) | P2 | M | Rota `print` com layout institucional |

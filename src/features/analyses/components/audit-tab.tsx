@@ -246,7 +246,6 @@ function pointTitle(w: WarningVM, data: FieldMismatch | MissingRow | null, subje
   if (w.code === "ENTRY_PERIOD_MISMATCH") return "Período de ingresso diverge do documento";
   if (w.code === "DOCUMENT_TOTAL_MISMATCH") return "Um total do documento não bate com o cálculo";
   if (w.source === "AUDITOR") return subject ? `${subject.name}: a verificação por IA pede confirmação` : "A verificação por IA pede confirmação";
-  if (w.source === "MATRIX") return "Diferença em relação à matriz oficial";
   if (w.severity === "CRITICAL") return "Divergência que pode alterar o resultado";
   return subject ? `${subject.name}: ponto a conferir` : "Ponto a conferir";
 }

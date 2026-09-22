@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReliabilityBadge } from "@/components/shared/status-badge";
 import { SourceBadge } from "@/features/analyses/components/source-badge";
@@ -32,15 +33,15 @@ export function SummaryCards({ vm, showSources = true }: { vm: AnalysisVM; showS
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
       {cards.map((c) => (
-        <Card key={c.label} className="shadow-sm">
+        <Card key={c.label} className={cn("shadow-sm", c.label === "Curso" && "col-span-2 md:col-span-1")}>
           <CardContent className="space-y-1.5">
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{c.label}</div>
             <div className={`min-w-0 break-words text-xl font-semibold tracking-tight ${c.tone ?? ""}`} title={typeof c.value === "string" ? c.value : undefined}>
               {c.value}
             </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
               {showSources && c.source ? <SourceBadge label={c.source.label} detail={c.source.detail} /> : <span />}
-              {c.hint && <span className="text-[11px] text-muted-foreground">{c.hint}</span>}
+              {c.hint && <span className="min-w-0 text-[11px] text-muted-foreground">{c.hint}</span>}
             </div>
           </CardContent>
         </Card>

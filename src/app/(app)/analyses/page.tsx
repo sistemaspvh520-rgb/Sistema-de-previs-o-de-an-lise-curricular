@@ -4,6 +4,7 @@ import { FilePlus2, Search, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { listAnalyses } from "@/repositories/analysis-repository";
+import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import { AnalysisStatusBadge, ReliabilityBadge, ANALYSIS_STATUS_LABELS } from "@
 import { formatDateTime, ordinal, pluralize } from "@/lib/utils";
 import type { AnalysisStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import { POLOS, isPoloCode } from "@/domain/polos";
+import { formatCourseFormat } from "@/domain/course-formats";
 
 export const metadata: Metadata = { title: "Análises" };
 export const dynamic = "force-dynamic";
@@ -33,8 +36,14 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
   const status = (typeof params.status === "string" ? params.status : "ALL") as AnalysisStatus | "ALL";
   const statusGroup = params.filter === "PROCESSING" || params.filter === "ATTENTION" ? params.filter : undefined;
   const q = typeof params.q === "string" ? params.q : "";
+  const poloCode = typeof params.polo === "string" && isPoloCode(params.polo) ? params.polo : undefined;
+  const followUpDue = params.followUp === "due";
+  // Gestor pode filtrar por responsável; demais perfis só veem as próprias análises.
+  const isAdmin = user.role === "ADMIN";
+  const userFilter = isAdmin && typeof params.user === "string" && /^[0-9a-f-]{36}$/.test(params.user) ? params.user : undefined;
+  const team = isAdmin ? await prisma.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : [];
   const page = Number(params.page ?? 1) || 1;
-  const { items, total, pageSize } = await listAnalyses({ status, statusGroup, q, page, createdById: user.role === "ADMIN" ? undefined : user.id });
+  const { items, total, pageSize } = await listAnalyses({ status, statusGroup, q, page, poloCode, followUpDue, createdById: isAdmin ? userFilter : user.id });
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const showDiagnostics = can(user.role, "audit:read");
   const showOwner = user.role === "ADMIN";
@@ -52,25 +61,39 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
           )
         }
       />
-      <div className="mb-4 grid gap-3 2xl:grid-cols-[minmax(0,1fr)_16rem] 2xl:items-center">
+      <div className="mb-4 grid gap-3">
         <div className="flex min-w-0 flex-wrap gap-1.5">
+          <Link href={{ pathname: "/analyses", query: { followUp: "due", ...(userFilter ? { user: userFilter } : {}) } }} className={cn("shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium leading-none transition-colors", followUpDue ? "border-status-warning bg-status-warning text-white" : "border-status-warning/40 bg-status-warning-bg text-status-warning hover:bg-status-warning/20")}>Retorno pendente</Link>
           {STATUS_FILTERS.map((f) => (
             <Link
               key={f.id}
-              href={{ pathname: "/analyses", query: { ...(q ? { q } : {}), ...(f.group ? { filter: f.group } : f.value !== "ALL" ? { status: f.value } : {}) } }}
+              href={{ pathname: "/analyses", query: { ...(q ? { q } : {}), ...(poloCode ? { polo: poloCode } : {}), ...(userFilter ? { user: userFilter } : {}), ...(f.group ? { filter: f.group } : f.value !== "ALL" ? { status: f.value } : {}) } }}
               className={cn(
                 "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium leading-none transition-colors",
-                (f.group ? statusGroup === f.group : !statusGroup && status === f.value) ? "border-brand-navy bg-brand-navy text-white" : "bg-card hover:bg-muted",
+                !followUpDue && (f.group ? statusGroup === f.group : !statusGroup && status === f.value) ? "border-brand-navy bg-brand-navy text-white" : "bg-card hover:bg-muted",
               )}
             >
               {f.label}
             </Link>
           ))}
         </div>
-        <form className="relative w-full max-w-sm 2xl:max-w-none 2xl:justify-self-end">
+        <form className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {statusGroup ? <input type="hidden" name="filter" value={statusGroup} /> : status !== "ALL" && <input type="hidden" name="status" value={status} />}
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" defaultValue={q} placeholder="Buscar por curso, candidato ou arquivo" className="pl-9" aria-label="Buscar por curso, candidato ou arquivo" />
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input name="q" defaultValue={q} placeholder="Buscar por aluno, curso ou arquivo" className="pl-9" aria-label="Buscar por aluno, curso ou arquivo" />
+          </div>
+          <select name="polo" defaultValue={poloCode ?? ""} aria-label="Filtrar por polo" className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm sm:w-56">
+            <option value="">Todos os polos</option>
+            {POLOS.map((p) => <option key={p.code} value={p.code}>{p.code} · {p.name}</option>)}
+          </select>
+          {isAdmin && (
+            <select name="user" defaultValue={userFilter ?? ""} aria-label="Filtrar por responsável" className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm sm:w-52">
+              <option value="">Todos os responsáveis</option>
+              {team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+            </select>
+          )}
+          <Button type="submit" variant="outline" className="sm:shrink-0">Filtrar</Button>
         </form>
       </div>
       <Card className="overflow-hidden shadow-sm">
@@ -96,10 +119,11 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
             )}
             {items.map((a) => (
               <TableRow key={a.id} className="cursor-pointer animate-in fade-in slide-in-from-bottom-1 duration-300">
-                <TableCell>
-                  <Link href={`/analyses/${a.id}`} className="block">
-                    <div className="font-medium">{a.courseName ?? "Curso não identificado"}</div>
-                    <div className="max-w-[42rem] truncate text-xs text-muted-foreground" title={a.document?.originalName ?? undefined}>{a.document?.originalName ?? "Arquivo não disponível"}</div>
+                <TableCell className="w-full max-w-0 whitespace-normal">
+                  <Link href={`/analyses/${a.id}`} className="block min-w-0">
+                    <div className="font-medium">{a.studentName ?? a.courseName ?? "Curso não identificado"}</div>
+                    {a.studentName && <div className="truncate text-xs text-foreground/80">{a.courseName ?? "Curso não identificado"}{a.courseFormat ? ` · ${formatCourseFormat(a.courseFormat)}` : ""}{a.poloCode ? ` · Polo ${a.poloCode}` : ""}</div>}
+                    <div className="truncate text-xs text-muted-foreground" title={a.document?.originalName ?? undefined}>{a.document?.originalName ?? "Arquivo não disponível"}</div>
                     {a.candidateLabel && <div className="mt-0.5 truncate text-xs text-muted-foreground">Candidato: {a.candidateLabel}</div>}
                     {showOwner && <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground xl:hidden"><UserRound className="size-3" /> Responsável: {a.createdBy.name}</div>}
                   </Link>
@@ -107,7 +131,10 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
                 <TableCell className="hidden sm:table-cell">{ordinal(a.entryPeriod)}</TableCell>
                 <TableCell className="hidden md:table-cell">{a._count.subjects || "—"}</TableCell>
                 {showOwner && <TableCell className="hidden xl:table-cell"><div className="flex min-w-0 items-center gap-2"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-navy-50 text-xs font-semibold text-brand-navy">{a.createdBy.name.split(" ").filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase() || "—"}</span><span className="min-w-0 truncate text-sm" title={a.createdBy.name}>{a.createdBy.name}</span></div></TableCell>}
-                <TableCell><AnalysisStatusBadge status={a.status} /></TableCell>
+                <TableCell>
+                  <AnalysisStatusBadge status={a.status} />
+                  {a.status === "COMPLETED" && <div className={cn("mt-1 text-[11px]", a.enrollmentStatus === "ENROLLED" ? "text-status-success" : a.enrollmentStatus === "NOT_ENROLLED" ? "text-muted-foreground" : a.followUpIsDue ? "font-medium text-status-warning" : "text-muted-foreground")}>{a.enrollmentStatus === "ENROLLED" ? "Matriculado" : a.enrollmentStatus === "NOT_ENROLLED" ? "Não matriculado" : a.followUpIsDue ? "Retorno pendente" : "Aguardando retorno"}</div>}
+                </TableCell>
                 {showDiagnostics && <TableCell className="hidden lg:table-cell">
                   <ReliabilityBadge level={a.reliability} />
                   {a.reviewItemsCount > 0 && <div className="mt-1 text-[11px] text-muted-foreground">{pluralize(a.reviewItemsCount, "observação", "observações")}</div>}

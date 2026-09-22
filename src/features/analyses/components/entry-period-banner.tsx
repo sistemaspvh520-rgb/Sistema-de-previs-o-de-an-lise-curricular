@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -55,7 +54,7 @@ export function EntryPeriodBanner({ analysisId, periods, canEdit }: { analysisId
   );
 }
 
-export function AdditionalRuleBanner({ canManageRules }: { canManageRules: boolean }) {
+export function AdditionalRuleBanner() {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 md:flex-row md:items-center md:justify-between">
       <div className="flex items-start gap-3">
@@ -63,15 +62,10 @@ export function AdditionalRuleBanner({ canManageRules }: { canManageRules: boole
         <div>
           <div className="font-semibold text-status-warning">Defina como concluir disciplinas após o último período</div>
           <p className="text-sm text-status-warning/90">
-            Ainda há disciplinas após o último período oficial. Configure a capacidade do semestre adicional para concluir a previsão com a regra institucional correta.
+            Ainda há disciplinas após o último período oficial e a regra do semestre adicional não está definida. Avise a equipe técnica para ajustar a regra institucional.
           </p>
         </div>
       </div>
-      {canManageRules && (
-        <Button asChild variant="outline" className="shrink-0 bg-card">
-          <Link href="/settings/rules">Configurar regra</Link>
-        </Button>
-      )}
     </div>
   );
 }

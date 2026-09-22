@@ -4,7 +4,8 @@ import { buildRulesFromRecords, type AcademicRules } from "@/domain/curricular-a
 import { calculateCurriculumTotals, explainProjection, buildProjectionNarrative, type ProjectionExplanation, type ProjectionNarrative } from "@/domain/curricular-analysis";
 import type { ProcessingStep } from "@/services/pipeline/steps";
 import { parseSteps } from "@/services/pipeline/steps";
-import type { AnalysisStatus, EntryPeriodSource, Readability, ReliabilityLevel, SubjectOrigin, SubjectStatus, WarningSeverity, WarningSource } from "@/generated/prisma/enums";
+import { PROCESSING_STATUSES } from "@/domain/curricular-analysis/status-groups";
+import type { AnalysisStatus, CourseFormat, EnrollmentStatus, EntryPeriodSource, Readability, ReliabilityLevel, SubjectOrigin, SubjectStatus, WarningSeverity, WarningSource } from "@/generated/prisma/enums";
 
 export interface SubjectVM {
   id: string;
@@ -91,6 +92,13 @@ export interface AnalysisVM {
   courseName: string | null;
   matrixLabel: string | null;
   candidateLabel: string | null;
+  studentName: string | null;
+  poloCode: string | null;
+  poloName: string | null;
+  courseFormat: CourseFormat | null;
+  reanalysisOf: { id: string; createdAt: string; courseName: string | null } | null;
+  reanalyses: Array<{ id: string; createdAt: string }>;
+  enrollment: { status: EnrollmentStatus; note: string | null; updatedAt: string | null; updatedByName: string | null; due: boolean };
   entryPeriod: number | null;
   entryPeriodSource: EntryPeriodSource | null;
   entryTerm: string | null;
@@ -125,11 +133,8 @@ export interface AnalysisVM {
   review: { status: "OK" | "REVIEW"; model: string; promptVersion: string; issues: number; createdAt: string } | null;
   extraction: { model: string; promptVersion: string; privacyMode: string; durationMs: number; createdAt: string } | null;
   usage: { totalTokens: number; estimatedCost: number; calls: number };
-  matrix: { id: string; label: string; course: string } | null;
   narrative: ProjectionNarrative | null;
 }
-
-const PROCESSING_STATUSES: AnalysisStatus[] = ["UPLOADED", "PARSING", "AI_EXTRACTION", "NORMALIZING", "CALCULATING", "VALIDATING", "AI_AUDIT"];
 
 export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
   const rules = buildRulesFromRecords(a.ruleSetVersion.rules);
@@ -204,6 +209,19 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
     courseName: a.courseName,
     matrixLabel: a.matrixLabel,
     candidateLabel: a.candidateLabel,
+    studentName: a.studentName,
+    poloCode: a.poloCode,
+    poloName: a.poloName,
+    courseFormat: a.courseFormat,
+    reanalysisOf: a.reanalysisOf ? { id: a.reanalysisOf.id, createdAt: a.reanalysisOf.createdAt.toISOString(), courseName: a.reanalysisOf.courseName } : null,
+    reanalyses: a.reanalyses.map((r) => ({ id: r.id, createdAt: r.createdAt.toISOString() })),
+    enrollment: {
+      status: a.enrollmentStatus,
+      note: a.enrollmentNote,
+      updatedAt: a.enrollmentUpdatedAt?.toISOString() ?? null,
+      updatedByName: a.enrollmentUpdatedBy?.name ?? null,
+      due: a.status === "COMPLETED" && a.enrollmentStatus === "PENDING" && a.followUpDueAt !== null && a.followUpDueAt.getTime() <= Date.now(),
+    },
     entryPeriod,
     entryPeriodSource: a.entryPeriodSource,
     entryTerm: a.entryTerm,
@@ -283,7 +301,6 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
       ? { model: a.extractions[0].model, promptVersion: a.extractions[0].promptVersion, privacyMode: a.extractions[0].privacyMode, durationMs: a.extractions[0].durationMs, createdAt: a.extractions[0].createdAt.toISOString() }
       : null,
     usage: usageTotals,
-    matrix: a.curriculumMatrix ? { id: a.curriculumMatrix.id, label: a.curriculumMatrix.label, course: a.curriculumMatrix.course.name } : null,
     narrative,
   };
 }

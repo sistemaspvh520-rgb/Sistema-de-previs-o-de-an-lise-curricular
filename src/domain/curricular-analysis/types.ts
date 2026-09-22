@@ -70,7 +70,7 @@ export type WarningSeverity = "INFO" | "WARNING" | "CRITICAL";
 export interface AnalysisWarningInput {
   code: string;
   severity: WarningSeverity;
-  source: "PIPELINE" | "VALIDATOR" | "AUDITOR" | "MATRIX" | "EXTRACTION";
+  source: "PIPELINE" | "VALIDATOR" | "AUDITOR" | "EXTRACTION";
   message: string;
   subjectId?: string | null;
   sourcePage?: number | null;

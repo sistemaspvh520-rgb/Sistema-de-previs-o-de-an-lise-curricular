@@ -45,7 +45,7 @@ function getTransporter(): nodemailer.Transporter {
 export interface SendMailInput {
   to: string;
   content: EmailContent;
-  kind: "INVITE" | "RESET" | "TEMPORARY_PASSWORD";
+  kind: "INVITE" | "RESET" | "TEMPORARY_PASSWORD" | "FOLLOW_UP";
   actorUserId?: string | null;
   targetUserId?: string | null;
 }

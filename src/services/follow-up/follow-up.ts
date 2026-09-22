@@ -1,0 +1,68 @@
+import "server-only";
+import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
+import { appUrl, isEmailConfigured, sendMail } from "@/services/email/mailer";
+import { followUpEmail } from "@/services/email/templates";
+import { getSystemSettings } from "@/repositories/settings-repository";
+import { sendPushToUser } from "@/services/push/web-push";
+
+/** Depois do primeiro aviso, lembra de novo a cada 3 dias enquanto não houver retorno. */
+export const FOLLOW_UP_REPEAT_MS = 3 * 24 * 60 * 60_000;
+
+const dueWhere = (now: Date) => ({ status: "COMPLETED" as const, enrollmentStatus: "PENDING" as const, followUpDueAt: { lte: now } });
+
+/** Retornos de matrícula vencidos (para o sino do consultor; ADMIN sem userId vê todos). */
+export async function listDueFollowUps(userId: string | undefined, take = 20) {
+  const now = new Date();
+  return prisma.curricularAnalysis.findMany({
+    where: { ...dueWhere(now), ...(userId ? { createdById: userId } : {}) },
+    orderBy: { followUpDueAt: "asc" },
+    take,
+    select: { id: true, studentName: true, courseName: true, poloName: true, followUpDueAt: true, completedAt: true, createdBy: { select: { id: true, name: true } } },
+  });
+}
+
+export async function countDueFollowUps(userId: string | undefined): Promise<number> {
+  return prisma.curricularAnalysis.count({ where: { ...dueWhere(new Date()), ...(userId ? { createdById: userId } : {}) } });
+}
+
+/**
+ * Cobra os retornos vencidos por e-mail (um por consultor, com a lista) e push (um por consultor).
+ * Roda no cron diário; repete a cada 3 dias enquanto o consultor não responder.
+ */
+export async function notifyDueFollowUps(now = new Date()) {
+  const due = await prisma.curricularAnalysis.findMany({
+    where: {
+      ...dueWhere(now),
+      OR: [{ followUpNotifiedAt: null }, { followUpNotifiedAt: { lte: new Date(now.getTime() - FOLLOW_UP_REPEAT_MS) } }],
+    },
+    orderBy: { followUpDueAt: "asc" },
+    select: { id: true, studentName: true, courseName: true, poloName: true, completedAt: true, createdBy: { select: { id: true, name: true, email: true, isActive: true } } },
+  });
+  const byUser = new Map<string, typeof due>();
+  for (const a of due) {
+    if (!a.createdBy.isActive) continue;
+    byUser.set(a.createdBy.id, [...(byUser.get(a.createdBy.id) ?? []), a]);
+  }
+  const settings = await getSystemSettings();
+  let emails = 0;
+  let pushes = 0;
+  for (const [userId, items] of byUser) {
+    const user = items[0].createdBy;
+    const list = items.map((a) => ({ id: a.id, student: a.studentName ?? "Aluno não identificado", course: a.courseName ?? "Curso não identificado", polo: a.poloName ?? "—", url: appUrl(`/analyses/${a.id}`), completedAt: a.completedAt }));
+    if (isEmailConfigured()) {
+      try {
+        await sendMail({ to: user.email, kind: "FOLLOW_UP", targetUserId: userId, content: followUpEmail({ name: user.name, items: list, listUrl: appUrl("/analyses?followUp=due"), institution: settings.institutionName }) });
+        emails += 1;
+      } catch (err) {
+        logger.warn("follow_up.email_failed", { userId, err: String(err) });
+      }
+    }
+    const title = items.length === 1 ? "O aluno se matriculou?" : `${items.length} retornos de matrícula pendentes`;
+    const body = items.length === 1 ? `${list[0].student} · ${list[0].course}. Informe se houve matrícula.` : `Informe se ${list.map((i) => i.student).slice(0, 3).join(", ")}${items.length > 3 ? " e outros" : ""} se matricularam.`;
+    const result = await sendPushToUser(userId, { title, body, url: items.length === 1 ? `/analyses/${items[0].id}` : "/analyses?followUp=due", tag: "follow-up" });
+    pushes += result.sent;
+    await prisma.curricularAnalysis.updateMany({ where: { id: { in: items.map((a) => a.id) } }, data: { followUpNotifiedAt: now } });
+  }
+  return { analyses: due.length, users: byUser.size, emails, pushes };
+}

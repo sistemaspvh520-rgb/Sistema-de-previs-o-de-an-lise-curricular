@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { isProcessingStatus } from "@/domain/curricular-analysis/status-groups";
 import type { AnalysisStatus, ReliabilityLevel, SubjectStatus, IntegrationStatus } from "@/generated/prisma/enums";
 
 export const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
@@ -10,7 +11,7 @@ export const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
   CALCULATING: "Calculando",
   VALIDATING: "Validando",
   AI_AUDIT: "Auditando com IA",
-  WAITING_REVIEW: "Dados de ingresso pendentes",
+  WAITING_REVIEW: "Ingresso pendente",
   COMPLETED: "Pronta",
   FAILED: "Não concluída",
   AI_ERROR: "Falha de processamento",
@@ -31,7 +32,7 @@ const ANALYSIS_STATUS_CLASS: Record<AnalysisStatus, string> = {
 };
 
 export function AnalysisStatusBadge({ status, className }: { status: AnalysisStatus; className?: string }) {
-  const processing = ["PARSING", "AI_EXTRACTION", "NORMALIZING", "CALCULATING", "VALIDATING", "AI_AUDIT"].includes(status);
+  const processing = status !== "UPLOADED" && isProcessingStatus(status);
   return (
     <Badge variant="outline" className={cn("border-transparent font-medium", ANALYSIS_STATUS_CLASS[status], className)}>
       {processing && <span className="mr-1 inline-block size-1.5 animate-pulse rounded-full bg-current" />}

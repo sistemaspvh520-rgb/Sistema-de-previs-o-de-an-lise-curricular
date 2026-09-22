@@ -35,7 +35,7 @@ Validação de MIME real, tamanho, header; parser extrai páginas e linhas de fi
 
 ## 5. Pipeline
 Fluxo feliz com extractor/auditor mockados; falha da OpenAI → `AI_ERROR` com `localExtraction` preservado; retomada;
-ingresso ausente → `WAITING_REVIEW` + `ENTRY_PERIOD_REQUIRED`; confirmação → recálculo.
+ingresso obrigatório no envio (`USER`); registro legado sem ingresso → `WAITING_REVIEW` + `ENTRY_PERIOD_REQUIRED`; confirmação → recálculo → `COMPLETED`.
 
 ## 6. RBAC
 Matriz de permissões por perfil; middleware redireciona não autenticados; server actions negam perfil insuficiente.

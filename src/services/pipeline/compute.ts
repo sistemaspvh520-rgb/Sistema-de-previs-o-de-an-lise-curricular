@@ -15,7 +15,6 @@ import {
   type CurriculumTotals,
   type AnalysisWarningInput,
   type DocumentClaimInput,
-  compareWithOfficialMatrix,
 } from "@/domain/curricular-analysis";
 import type { ValidationViolation } from "@/domain/curricular-analysis/validators/validate";
 
@@ -54,7 +53,7 @@ export async function loadSubjectRows(analysisId: string): Promise<SubjectRow[]>
 export async function computeAndPersist(analysisId: string, opts?: { resetAuditorWarnings?: boolean }): Promise<ComputeResult> {
   const analysis = await prisma.curricularAnalysis.findUniqueOrThrow({
     where: { id: analysisId },
-    include: { claims: true, curriculumMatrix: { include: { periods: { include: { subjects: true } } } } },
+    include: { claims: true },
   });
   const ruleSet = await getRuleSetById(analysis.ruleSetVersionId);
   const subjects = await loadSubjectRows(analysisId);
@@ -99,12 +98,6 @@ export async function computeAndPersist(analysisId: string, opts?: { resetAudito
   const claimResult = compareDocumentClaims(claims, totals, { entryPeriod, previousBacklogCount });
   warnings.push(...claimResult.warnings);
 
-  // comparação com a matriz oficial vinculada (§57) — só alerta, nunca altera
-  if (analysis.curriculumMatrix) {
-    const official = analysis.curriculumMatrix.periods.flatMap((p) => p.subjects.map((sub) => ({ name: sub.name, workload: sub.workload, period: p.number })));
-    warnings.push(...compareWithOfficialMatrix(subjects, official).warnings);
-  }
-
   const violations = validateAnalysis({ extractedCount: subjects.length, subjects, totals, simulation });
   for (const v of violations) {
     warnings.push({ code: `INVARIANT_${v.code}`, severity: "CRITICAL", source: "VALIDATOR", message: v.message, subjectId: v.subjectId ?? null });
@@ -118,7 +111,7 @@ export async function computeAndPersist(analysisId: string, opts?: { resetAudito
     }
     // warnings determinísticos são recriados a cada cálculo; os do auditor são preservados
     await tx.analysisWarning.deleteMany({
-      where: { analysisId, source: { in: opts?.resetAuditorWarnings ? ["VALIDATOR", "PIPELINE", "MATRIX", "AUDITOR"] : ["VALIDATOR", "PIPELINE", "MATRIX"] } },
+      where: { analysisId, source: { in: opts?.resetAuditorWarnings ? ["VALIDATOR", "PIPELINE", "AUDITOR"] : ["VALIDATOR", "PIPELINE"] } },
     });
     if (warnings.length) {
       await tx.analysisWarning.createMany({
@@ -173,6 +166,9 @@ export async function computeAndPersist(analysisId: string, opts?: { resetAudito
 }
 
 /** Recalcula a confiabilidade e o status final a partir do estado persistido. */
+/** 24h entre a entrega e a cobrança do retorno de matrícula. */
+export const FOLLOW_UP_DELAY_MS = 24 * 60 * 60_000;
+
 export async function finalizeStatus(analysisId: string): Promise<{ reliability: "HIGH" | "REVIEW_RECOMMENDED" | "REVIEW_REQUIRED"; reviewItemsCount: number; status: "COMPLETED" | "WAITING_REVIEW" }> {
   const analysis = await prisma.curricularAnalysis.findUniqueOrThrow({
     where: { id: analysisId },
@@ -205,6 +201,8 @@ export async function finalizeStatus(analysisId: string): Promise<{ reliability:
       reviewItemsCount: status.reviewItemsCount,
       status: finalStatus,
       completedAt: finalStatus === "COMPLETED" ? new Date() : null,
+      // Retorno de matrícula: o consultor é cobrado 24h após a primeira entrega.
+      ...(finalStatus === "COMPLETED" && analysis.followUpDueAt === null ? { followUpDueAt: new Date(Date.now() + FOLLOW_UP_DELAY_MS) } : {}),
     },
   });
   return { ...status, status: finalStatus };

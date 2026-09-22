@@ -34,6 +34,10 @@ const envSchema = z.object({
   EMAIL_SMTP_PORT: z.coerce.number().int().default(465),
   /** URL pública do app (base dos links de e-mail). */
   APP_URL: z.string().url().optional(),
+  /** Web Push (VAPID). Sem as chaves, as notificações no navegador ficam desativadas; e-mail continua. */
+  VAPID_PUBLIC_KEY: z.string().min(20).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(20).optional(),
+  VAPID_SUBJECT: z.string().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_NAME: z.string().optional(),
   ADMIN_PASSWORD: z.string().min(8).optional(),

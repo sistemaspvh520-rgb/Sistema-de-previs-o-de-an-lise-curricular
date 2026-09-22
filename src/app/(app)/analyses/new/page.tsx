@@ -3,6 +3,7 @@ import Image from "next/image";
 import { requirePagePermission } from "@/lib/session";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { UploadDropzone } from "@/features/analyses/upload-dropzone";
+import { zonedDateParts } from "@/lib/time";
 import { suggestStartTerm } from "@/domain/curricular-analysis/simulation/terms";
 
 export const metadata: Metadata = { title: "Nova análise" };
@@ -24,7 +25,7 @@ export default async function NewAnalysisPage() {
         </div>
       </section>
       <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6 lg:p-8">
-        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={settings.defaultStartTerm ?? suggestStartTerm()} />
+        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={settings.defaultStartTerm ?? suggestStartTerm()} currentYear={zonedDateParts().year} />
       </section>
     </div>
   );

@@ -8,12 +8,12 @@ import {
   FilePlus2,
   Files,
   ClipboardCheck,
-  Grid3x3,
   ChartNoAxesCombined,
   Settings,
   ChevronDown,
   PanelLeftClose,
   ChartColumnIncreasing,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { can, type Permission } from "@/lib/rbac";
@@ -28,15 +28,20 @@ const ICONS = {
   new: FilePlus2,
   list: Files,
   review: ClipboardCheck,
-  matrix: Grid3x3,
   management: ChartNoAxesCombined,
   reports: ChartColumnIncreasing,
   settings: Settings,
 } as const;
 
-export function Sidebar({ role, onNavigate }: { role: Role; onNavigate?: () => void }) {
+/**
+ * `rail`: barra lateral do desktop (recolhe para ícones abaixo de xl e pode ser alternada).
+ * `drawer`: conteúdo do menu mobile dentro do Sheet — sempre expandido, sem o botão de recolher.
+ */
+export function Sidebar({ role, onNavigate, onClose, variant = "rail" }: { role: Role; onNavigate?: () => void; onClose?: () => void; variant?: "rail" | "drawer" }) {
   const pathname = usePathname();
-  const [mode, setMode] = useState<"auto" | "expanded" | "collapsed">("auto");
+  const [railMode, setMode] = useState<"auto" | "expanded" | "collapsed">("auto");
+  const drawer = variant === "drawer";
+  const mode = drawer ? "expanded" : railMode;
   const allowed = (p?: Permission) => !p || can(role, p);
   const inSettings = pathname.startsWith("/settings");
   const expanded = mode === "expanded";
@@ -50,7 +55,7 @@ export function Sidebar({ role, onNavigate }: { role: Role; onNavigate?: () => v
   }
 
   return (
-    <aside className={cn("relative z-30 flex h-screen min-h-screen flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-300", mode === "expanded" ? "w-64" : mode === "collapsed" ? "w-16" : "w-16 xl:w-64")}>
+    <aside className={cn("relative z-30 flex flex-col bg-sidebar text-sidebar-foreground", drawer ? "h-full w-full" : "h-screen min-h-screen transition-[width] duration-300", !drawer && (mode === "expanded" ? "w-64" : mode === "collapsed" ? "w-16" : "w-16 xl:w-64"))}>
       <div className={cn("flex items-center pb-4 pt-5 text-white", expanded ? "justify-between px-5" : mode === "collapsed" ? "justify-center px-3" : "justify-center px-3 xl:justify-between xl:px-5")}>
         {mode === "collapsed" ? (
           <button type="button" onClick={toggle} className="rounded-md p-1 text-white transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-sidebar-primary" aria-label="Expandir menu lateral" title="Expandir menu lateral">
@@ -58,15 +63,19 @@ export function Sidebar({ role, onNavigate }: { role: Role; onNavigate?: () => v
           </button>
         ) : (
           <>
-            <span className={mode === "expanded" ? "block" : "hidden xl:block"}><BrandLogo /></span>
+            <span className={cn("min-w-0", mode === "expanded" ? "block" : "hidden xl:block", drawer && "max-w-[180px]")}><BrandLogo /></span>
             <button type="button" onClick={toggle} className={mode === "expanded" ? "hidden" : "block rounded-md p-1 text-white transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-sidebar-primary xl:hidden"} aria-label="Expandir menu lateral" title="Expandir menu lateral"><BrandLogo compact /></button>
           </>
         )}
-        {mode !== "collapsed" && <button type="button" onClick={toggle} className={cn("rounded-md p-1.5 text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-white", mode === "auto" && "absolute -right-11 top-3 z-40 bg-sidebar text-white shadow-md xl:static xl:bg-transparent xl:shadow-none")} aria-label="Expandir ou recolher menu lateral" title="Expandir ou recolher menu lateral">
+        {drawer ? (
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-white/80 transition-colors hover:bg-sidebar-accent hover:text-white" aria-label="Fechar menu">
+            <X className="size-5" />
+          </button>
+        ) : mode !== "collapsed" && <button type="button" onClick={toggle} className={cn("rounded-md p-1.5 text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-white", mode === "auto" && "absolute -right-11 top-3 z-40 bg-sidebar text-white shadow-md xl:static xl:bg-transparent xl:shadow-none")} aria-label="Expandir ou recolher menu lateral" title="Expandir ou recolher menu lateral">
           <PanelLeftClose className="size-4" />
         </button>}
       </div>
-      <nav className="flex-1 space-y-1 px-3" aria-label="Navegação principal">
+      <nav className={cn("flex-1 space-y-1 px-3", drawer && "overflow-y-auto pb-6")} aria-label="Navegação principal">
         {MAIN_NAV.filter((i) => allowed(i.permission)).map((item) => {
           const Icon = ICONS[item.icon];
           const active =

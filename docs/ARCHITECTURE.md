@@ -28,7 +28,7 @@ de React, Prisma ou OpenAI e é 100% testável.
 | 5 | Motor acadêmico | `src/domain/curricular-analysis/engine` + `simulation` | Totais, backlog, capacidade, simulação semestral, previsão |
 | 6 | Validador determinístico | `src/domain/curricular-analysis/validators` | Invariantes (§40), claims, inconsistências |
 | 7 | OpenAI Auditor | `src/services/openai/auditor.ts` | Segunda conferência; só aponta `issues`, nunca altera |
-| 8 | Revisão humana | `src/features/reviews`, `ManualCorrection` | Edição de campos → recálculo automático → histórico imutável |
+| 8 | Revisão humana | `src/features/analyses/review-actions.ts`, `ManualCorrection` | Edição de campos → recálculo automático → histórico imutável |
 | 9 | Resultado final | `CurricularAnalysis` + `SemesterProjection` | Cards, abas, timeline, explicação, resumo WhatsApp |
 
 ## 4. Fluxo de processamento (estados)
@@ -42,12 +42,16 @@ Falhas:  qualquer etapa OpenAI → AI_ERROR (retomável)   |   outras → FAILED
 
 - O upload responde imediatamente com o `analysisId`; o pipeline roda em `after()` (`next/server`) e persiste
   `status` + `processingSteps` a cada passo. A UI faz polling em `GET /api/analyses/[id]/status`.
-- **Período de ingresso**: o valor informado no envio (`USER`) é a fonte oficial. Se não informado, o pipeline usa o cabeçalho
-  do PDF ("Série: N", leitura local) ou a IA (`DOCUMENT`), depois a regra institucional (`RULE`). Divergências entre envio e
-  documento viram `DocumentClaim`/alerta; nunca são corrigidas em silêncio.
-- Se o período de ingresso não puder ser determinado, o pipeline grava as disciplinas e para em
-  `WAITING_REVIEW` com o warning `ENTRY_PERIOD_REQUIRED`. Após confirmação manual, `recalculateAnalysis`
-  executa NORMALIZING(parcial) → CALCULATING → VALIDATING sem novo upload e sem nova chamada à OpenAI.
+- **Período e semestre de ingresso são obrigatórios no envio** (`CreateAnalysisInput`, Zod em `POST /api/analyses/upload`,
+  diálogo de confirmação na UI). O valor informado (`USER`) é a fonte oficial; o cabeçalho do PDF ("Série: N") e a IA
+  só geram `DocumentClaim`/alerta (`ENTRY_PERIOD_MISMATCH`) quando divergem — nunca corrigem em silêncio.
+- `WAITING_REVIEW` ("Ingresso pendente") é apenas rede de segurança para registros legados sem `entryPeriod`: o pipeline
+  grava as disciplinas, emite `ENTRY_PERIOD_REQUIRED` e, após a confirmação no banner, `recalculateAnalysis`
+  executa CALCULATING → VALIDATING → COMPLETED sem novo upload e sem nova chamada à OpenAI. Não existe reabertura manual.
+- **Precisam de atenção** (Gestão, filtro da lista e página Revisões) = `ATTENTION_STATUSES`
+  (`src/domain/curricular-analysis/status-groups.ts`): WAITING_REVIEW, FAILED, AI_ERROR — sempre o mesmo conjunto.
+- **Datas**: armazenadas em `timestamptz`; exibidas sempre em `America/Porto_Velho` (`src/lib/time.ts`), inclusive
+  o "início do mês" dos relatórios e a sugestão de semestre letivo.
 - **Retomada**: `AI_ERROR` preserva `localExtraction`; "Tentar novamente" reinicia a partir da etapa que falhou.
 
 ## 5. Stack
@@ -64,25 +68,26 @@ docs/                         documentos de arquitetura
 prisma/                       schema, migrations, seed
 src/app/                      rotas (App Router) — apenas composição de UI e handlers finos
 src/components/               ui (shadcn), layout, shared
-src/features/<feature>/       server actions + componentes específicos (analyses, curriculum, projections,
-                              reviews, matrices, integrations, settings)
+src/features/<feature>/       server actions + componentes específicos (analyses, account, auth, users,
+                              rules, integrations, settings, maintenance)
 src/domain/curricular-analysis/
   engine/                     classify, totals, backlog, capacity, allocation
   rules/                      tipos de regra, defaults, resolução de RuleSet
   simulation/                 simulateSemester, simulateCurriculum, terms
   validators/                 validateAnalysis, compareDocumentClaims, detectInconsistencies, status
+  status-groups.ts            grupos de status (em processamento / precisam de atenção / finais)
 src/services/
   openai/                     client-factory, credentials, test-connection, extractor, auditor, schemas,
                               prompts, errors, usage, pricing
   pdf/                        parser, table-detector, redaction
   crypto/                     aes-gcm
-  storage/                    StorageService (local-fs)
+  storage/                    StorageService (local-fs ou Supabase Storage, via STORAGE_DRIVER)
   pipeline/                   runner, normalize, recalculate
   audit-log/                  registro de AuditLog
   rate-limit/                 token bucket em memória
 src/repositories/             acesso Prisma por agregado
-src/schemas/                  Zod compartilhados (env, forms, API)
-src/lib/                      auth, prisma, env, logger, rbac, utils
+src/lib/                      auth, prisma, env, logger, rbac, utils, time (fuso America/Porto_Velho)
+src/proxy.ts                  middleware (Next 16): sessão, troca de senha obrigatória, ROUTE_PERMISSIONS
 src/types/                    tipos compartilhados
 tests/                        unit, integration, fixtures
 samples/                      PDFs reais (gitignored)
@@ -107,22 +112,21 @@ Todo dado exibido carrega `source`:
 ## 8. Versionamento por análise
 
 Cada `CurricularAnalysis` grava: `ruleSetVersionId`, `engineVersion`, `extractorPromptVersion`,
-`auditorPromptVersion`, `extractionModel`, `auditModel`, `curriculumMatrixId` e `createdAt`.
+`auditorPromptVersion`, `extractionModel`, `auditModel` e `createdAt`.
 Alterar regras cria uma **nova** `RuleSetVersion`; análises antigas continuam explicáveis com a versão original.
 
 ## 9. Perfis (RBAC)
 
 | Perfil | Permissões |
 |--------|-----------|
-| ADMIN | usuários, OpenAI, regras, matrizes, integrações, auditoria, uso de IA, todas as análises |
-| ANALYST | criar análise, revisar, corrigir, recalcular, concluir, gerar resumo |
+| ADMIN | usuários, OpenAI, regras, integrações, auditoria, uso de IA, gestão, todas as análises |
+| ANALYST | criar análise, revisar, corrigir, recalcular, gerar resumo |
 | VIEWER | consultar análises |
 
-Verificação em três pontos: `middleware.ts` (rota), server action / route handler (`requireRole`) e UI (ocultar ações).
+Verificação em três pontos: `src/proxy.ts` (rota), server action / route handler (`requirePermission`) e UI (ocultar ações).
 
 ## 10. Evoluções previstas
 
 - Fila externa (BullMQ/Redis) substituindo `after()` para ambientes serverless/multi-instância.
 - `StorageService` S3-compatível.
 - Rate limiting distribuído.
-- Comparação automática contra matrizes oficiais (já modelada; comparação implementada, sugestão de matriz futura).

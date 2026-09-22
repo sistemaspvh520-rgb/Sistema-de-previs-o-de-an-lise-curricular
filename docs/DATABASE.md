@@ -38,7 +38,8 @@
 - **CurricularAnalysis**: `status`, `createdById`, `courseName?`, `matrixLabel?`, `entryPeriod?`, `entryPeriodSource?`,
   `startTerm` (`YYYY.S`), `reliability?`, `reviewItemsCount`, `processingSteps` JSONB, `errorCode?`, `errorMessage?`,
   `ruleSetVersionId`, `engineVersion`, `extractorPromptVersion?`, `auditorPromptVersion?`, `extractionModel?`,
-  `auditModel?`, `curriculumMatrixId?`, `completedAt?`, `lastCalculatedAt?`.
+  `auditModel?`, `completedAt?`, `lastCalculatedAt?`. `entryPeriod`/`entryTerm`, `studentName`, `poloCode`/`poloName` e
+  `courseFormat` (EAD_DIGITAL | SEMIPRESENCIAL) são obrigatórios no envio (colunas nullable apenas para registros legados).
 - **UploadedDocument** (1:1 com análise): `originalName`, `storageKey`, `sizeBytes`, `sha256`, `pageCount`, `mimeType`,
   `localExtraction` JSONB (`{pages:[{page, width, height, lines:[{y, x, w, h, text}]}]}`), `deleteAfter?`, `deletedAt?`.
 - **AnalyzedSubject**: `rowHash` (único por análise), `name`, `workload`, `period`, `usedSubject?`, `status`, `readability`,
@@ -48,7 +49,7 @@
 - **ProjectionSubject**: `projectionId`, `subjectId`, `kind`. Único `(projectionId, subjectId)` e único `(analysis, subjectId)`
   garantido pelo validador (nenhuma disciplina programada duas vezes).
 - **DocumentClaim**: `type`, `value?`, `sourcePage`, `rawText?`, `calculatedValue?`, `matches?`.
-- **AnalysisWarning**: `code`, `severity`, `message`, `subjectId?`, `sourcePage?`, `source` (VALIDATOR | AUDITOR | MATRIX | PIPELINE), `resolvedAt?`, `resolvedById?`.
+- **AnalysisWarning**: `code`, `severity`, `message`, `subjectId?`, `sourcePage?`, `source` (VALIDATOR | AUDITOR | PIPELINE | EXTRACTION), `resolvedAt?`, `resolvedById?`.
 - **ManualCorrection** (append-only): `subjectId?`, `userId`, `field`, `previousValue`, `newValue`, `reason?`.
 
 ### IA
@@ -59,13 +60,9 @@
   `keyVersion?`, `apiKeyLastFour?`, `extractionModel`, `auditModel`, `futureExplanationModel?`, `projectLabel?`,
   `serviceAccountLabel?`, `lastTestedAt?`, `lastConnectionStatus?`, `lastErrorCode?`, `createdById?`, `updatedById?`.
 
-### Regras e matrizes
+### Regras
 - **RuleSetVersion**: `version` (único), `isActive`, `effectiveFrom`, `notes?`, `createdById?`.
 - **SystemRule**: `ruleSetVersionId`, `key` (único por versão), `valueType`, `value` JSONB, `status`, `description`.
-- **Course**: `name`, `code?`, `modality?`.
-- **CurriculumMatrix**: `courseId`, `label`, `year`, `version`, `validFrom?`, `validTo?`, `isActive`.
-- **CurriculumPeriod**: `matrixId`, `number`, `label?`.
-- **CurriculumSubject**: `periodId`, `name`, `workload`, `prerequisites` JSONB (lista de nomes; informativa).
 - **SystemSetting**: `key` (único), `value` JSONB — `retentionPolicy`, `aiPrivacyMode`, `institutionName`, `defaultStartTerm`.
 
 ## 4. ERD
@@ -85,13 +82,9 @@ erDiagram
   CurricularAnalysis ||--o{ AIReview : reviewed
   CurricularAnalysis ||--o{ AIUsage : consumes
   CurricularAnalysis }o--|| RuleSetVersion : uses
-  CurricularAnalysis }o--o| CurriculumMatrix : compares
   SemesterProjection ||--o{ ProjectionSubject : schedules
   AnalyzedSubject ||--o{ ProjectionSubject : scheduled_as
   RuleSetVersion ||--o{ SystemRule : defines
-  Course ||--o{ CurriculumMatrix : has
-  CurriculumMatrix ||--o{ CurriculumPeriod : has
-  CurriculumPeriod ||--o{ CurriculumSubject : has
   OpenAIIntegration }o--o| User : updated_by
 ```
 

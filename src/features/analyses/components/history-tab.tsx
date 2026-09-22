@@ -58,7 +58,7 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div>
       <dt className="text-xs text-muted-foreground">{k}</dt>
-      <dd>{v}</dd>
+      <dd className="break-words [overflow-wrap:anywhere]">{v}</dd>
     </div>
   );
 }

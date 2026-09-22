@@ -13,12 +13,11 @@ import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
 import { classifySubject } from "@/domain/curricular-analysis/engine/classify";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
+import { isProcessingStatus } from "@/domain/curricular-analysis/status-groups";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@/generated/prisma/client";
 
 const idSchema = z.string().uuid();
-
-const PROCESSING: string[] = ["UPLOADED", "PARSING", "AI_EXTRACTION", "NORMALIZING", "CALCULATING", "VALIDATING", "AI_AUDIT"];
 
 /** TENTAR NOVAMENTE — retoma o pipeline da etapa que falhou. */
 export async function retryAnalysisAction(analysisId: unknown): Promise<ActionResult> {
@@ -26,7 +25,7 @@ export async function retryAnalysisAction(analysisId: unknown): Promise<ActionRe
     const user = await requirePermission("analysis:create");
     const id = idSchema.parse(analysisId);
     const a = await requireAnalysisAccess(id, user);
-    if (PROCESSING.includes(a.status)) return fail("A análise já está em processamento.");
+    if (isProcessingStatus(a.status)) return fail("A análise já está em processamento.");
     await prisma.curricularAnalysis.update({ where: { id }, data: { status: "PARSING", errorCode: null, errorMessage: null } });
     await recordAudit({ userId: user.id, action: "analysis.retry", entityType: "CurricularAnalysis", entityId: id, metadata: { previousStatus: a.status, errorCode: a.errorCode } });
     after(() => runAnalysisPipeline(id).catch((e) => logger.error("pipeline.unhandled", { analysisId: id, err: String(e) })));
@@ -45,7 +44,7 @@ export async function reauditAnalysisAction(analysisId: unknown): Promise<Action
     const limit = rateLimit(`reaudit:${user.id}`, { capacity: 5, refillPerMinute: 5 });
     if (!limit.allowed) return fail(`Aguarde ${limit.retryAfterSeconds}s para reauditar novamente.`);
     const a = await requireAnalysisAccess(id, user);
-    if (PROCESSING.includes(a.status)) return fail("A análise já está em processamento.");
+    if (isProcessingStatus(a.status)) return fail("A análise já está em processamento.");
     const steps = parseSteps(a.processingSteps);
     for (const s of steps) if (["AUDITING", "VALIDATING", "FINALIZING"].includes(s.key)) s.status = "pending";
     await prisma.curricularAnalysis.update({ where: { id }, data: { status: "AI_AUDIT", processingSteps: steps as unknown as Prisma.InputJsonValue } });
@@ -68,7 +67,7 @@ export async function confirmEntryPeriodAction(input: unknown): Promise<ActionRe
     if (!parsed.success) return fail("Período inválido.");
     const { analysisId, entryPeriod, reason } = parsed.data;
     const a = await requireAnalysisAccess(analysisId, user);
-    if (PROCESSING.includes(a.status)) return fail("Aguarde o processamento terminar.");
+    if (isProcessingStatus(a.status)) return fail("Aguarde o processamento terminar.");
     await prisma.$transaction([
       prisma.curricularAnalysis.update({ where: { id: analysisId }, data: { entryPeriod, entryPeriodSource: "USER" } }),
       prisma.manualCorrection.create({
@@ -93,7 +92,7 @@ export async function updateStartTermAction(input: unknown): Promise<ActionResul
     const parsed = termSchema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Termo inválido.");
     const a = await requireAnalysisAccess(parsed.data.analysisId, user);
-    if (PROCESSING.includes(a.status)) return fail("Aguarde o processamento terminar.");
+    if (isProcessingStatus(a.status)) return fail("Aguarde o processamento terminar.");
     await prisma.$transaction([
       prisma.curricularAnalysis.update({ where: { id: a.id }, data: { startTerm: parsed.data.startTerm, entryTerm: parsed.data.startTerm } }),
       prisma.manualCorrection.create({ data: { analysisId: a.id, userId: user.id, field: "entryTerm", previousValue: a.entryTerm, newValue: parsed.data.startTerm } }),
@@ -125,7 +124,7 @@ export async function updateSubjectAction(input: unknown): Promise<ActionResult>
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Dados inválidos.");
     const d = parsed.data;
     const a = await requireAnalysisAccess(d.analysisId, user);
-    if (PROCESSING.includes(a.status)) return fail("Aguarde o processamento terminar.");
+    if (isProcessingStatus(a.status)) return fail("Aguarde o processamento terminar.");
     const before = await prisma.analyzedSubject.findFirstOrThrow({ where: { id: d.subjectId, analysisId: d.analysisId } });
 
     const name = d.name.toUpperCase();
@@ -197,46 +196,6 @@ export async function resolveWarningAction(input: unknown): Promise<ActionResult
     await recalculateAnalysis(parsed.data.analysisId);
     revalidatePath(`/analyses/${parsed.data.analysisId}`);
     return ok(undefined, "Item marcado como resolvido.");
-  } catch (err) {
-    return toActionError(err);
-  }
-}
-
-/** CONCLUIR — decisão humana de encerrar a análise mesmo com itens de revisão restantes. */
-export async function completeAnalysisAction(input: unknown): Promise<ActionResult> {
-  try {
-    const user = await requirePermission("analysis:complete");
-    const parsed = z.object({ analysisId: idSchema, note: z.string().max(500).optional() }).safeParse(input);
-    if (!parsed.success) return fail("Dados inválidos.");
-    const a = await requireAnalysisAccess(parsed.data.analysisId, user);
-    if (a.status !== "WAITING_REVIEW") return fail("Somente análises aguardando revisão podem ser concluídas manualmente.");
-    if (a.entryPeriod === null) return fail("Confirme o período de ingresso antes de concluir.");
-    await prisma.$transaction([
-      prisma.curricularAnalysis.update({ where: { id: a.id }, data: { status: "COMPLETED", completedAt: new Date() } }),
-      prisma.manualCorrection.create({ data: { analysisId: a.id, userId: user.id, field: "status", previousValue: "WAITING_REVIEW", newValue: "COMPLETED", reason: parsed.data.note || "Concluída após revisão humana." } }),
-    ]);
-    await recordAudit({ userId: user.id, action: "analysis.completed", entityType: "CurricularAnalysis", entityId: a.id });
-    revalidatePath(`/analyses/${a.id}`);
-    return ok(undefined, "Análise concluída.");
-  } catch (err) {
-    return toActionError(err);
-  }
-}
-
-/** Reabre para revisão. */
-export async function reopenAnalysisAction(analysisId: unknown): Promise<ActionResult> {
-  try {
-    const user = await requirePermission("analysis:review");
-    const id = idSchema.parse(analysisId);
-    const a = await requireAnalysisAccess(id, user);
-    if (a.status !== "COMPLETED") return fail("Somente análises concluídas podem ser reabertas.");
-    await prisma.$transaction([
-      prisma.curricularAnalysis.update({ where: { id }, data: { status: "WAITING_REVIEW", completedAt: null } }),
-      prisma.manualCorrection.create({ data: { analysisId: id, userId: user.id, field: "status", previousValue: "COMPLETED", newValue: "WAITING_REVIEW" } }),
-    ]);
-    await recordAudit({ userId: user.id, action: "analysis.reopened", entityType: "CurricularAnalysis", entityId: id });
-    revalidatePath(`/analyses/${id}`);
-    return ok(undefined, "Análise reaberta para revisão.");
   } catch (err) {
     return toActionError(err);
   }
