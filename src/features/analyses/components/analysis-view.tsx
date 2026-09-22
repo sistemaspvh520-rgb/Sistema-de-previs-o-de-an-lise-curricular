@@ -20,7 +20,6 @@ import { HistoryTab } from "@/features/analyses/components/history-tab";
 import { PendingTab } from "@/features/analyses/components/pending-tab";
 import { CandidateSummaryDialog } from "@/features/analyses/components/candidate-summary-dialog";
 import { EntryPeriodBanner, AdditionalRuleBanner } from "@/features/analyses/components/entry-period-banner";
-import { SourceBadge } from "@/features/analyses/components/source-badge";
 import { MatrixLinkSelect, type MatrixOption } from "@/features/analyses/components/matrix-link-select";
 import { DeleteAnalysisButton } from "@/features/analyses/components/delete-analysis-button";
 import { RequestAnalysisDeletionButton } from "@/features/analyses/components/request-analysis-deletion-button";
@@ -159,30 +158,10 @@ export function AnalysisView({ vm, perms, matrices = [], suggestedMatrixId = nul
 function SummaryTab({ vm, onLocate, selectedId, showDiagnostics }: { vm: AnalysisVM; onLocate: (s: SubjectVM) => void; selectedId?: string; showDiagnostics: boolean }) {
   return (
     <div className="space-y-6">
-      {showDiagnostics && <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Regras aplicadas</div>
-          <dl className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between"><dt className="text-muted-foreground">Disciplinas extras / semestre</dt><dd className="font-semibold">+{vm.rules.extraSubjectsAllowed}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted-foreground">Semestre adicional</dt><dd className="font-semibold">{vm.rules.additionalSemesterCapacityRule.type === "UNCONFIGURED" ? "não configurado" : vm.rules.additionalSemesterCapacityRule.type}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted-foreground">Bônus das dispensas</dt><dd className="font-semibold">1 vaga por dispensa</dd></div>
-          </dl>
-          <div className="mt-2"><SourceBadge label={`Regra Acadêmica v${vm.versions.ruleSetVersion}`} /></div>
-        </div>
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Semestre de ingresso</div>
-          <div className="mt-1 text-2xl font-semibold">{vm.startTerm}</div>
-          <div className="text-xs text-muted-foreground">Primeiro semestre da projeção (ingresso no {vm.entryPeriod ? `${vm.entryPeriod}º período` : "período a confirmar"}).</div>
-        </div>
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Leitura</div>
-          <dl className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between"><dt className="text-muted-foreground">Extractor</dt><dd className="font-mono text-xs">{vm.versions.extractionModel ?? "—"}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted-foreground">Auditor</dt><dd className="font-mono text-xs">{vm.versions.auditModel ?? "—"}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted-foreground">Linhas duvidosas</dt><dd className="font-semibold">{vm.subjects.filter((s) => s.readability !== "CLEAR").length}</dd></div>
-          </dl>
-          <div className="mt-2"><SourceBadge label="OpenAI" /></div>
-        </div>
+      {showDiagnostics && <div className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Semestre de ingresso</div>
+        <div className="mt-1 text-2xl font-semibold">{vm.startTerm}</div>
+        <div className="text-xs text-muted-foreground">Primeiro semestre da projeção (ingresso no {vm.entryPeriod ? `${vm.entryPeriod}º período` : "período a confirmar"}).</div>
       </div>}
       <GradeByPeriod subjects={vm.subjects} entryPeriod={vm.entryPeriod} onLocate={onLocate} selectedId={selectedId} />
     </div>

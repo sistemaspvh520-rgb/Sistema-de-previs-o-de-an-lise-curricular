@@ -84,18 +84,18 @@ export function GradeTable({
         </div>
       </div>
 
-      <div className="hidden overflow-hidden rounded-xl border bg-card md:block">
-        <Table>
-          <TableHeader>
+      <div className="hidden min-h-72 max-h-[calc(100dvh-21rem)] overflow-y-auto rounded-xl border bg-card lg:block">
+        <Table className="table-fixed">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
             <TableRow>
               <TableHead className="w-10"></TableHead>
-              <TableHead>Disciplina</TableHead>
+              <TableHead className="w-[40%]">Disciplina</TableHead>
               <TableHead className="w-20">C.H.</TableHead>
               <TableHead className="w-24">Período</TableHead>
-              <TableHead>Disciplina utilizada</TableHead>
-              <TableHead className="w-32">Status</TableHead>
-              <TableHead className="w-32">Fonte</TableHead>
-              <TableHead className="w-24 text-right">Ações</TableHead>
+              <TableHead className="w-[28%] whitespace-normal">Disciplina utilizada</TableHead>
+              <TableHead className="hidden w-32 xl:table-cell">Status</TableHead>
+              <TableHead className="hidden w-32 2xl:table-cell">Fonte</TableHead>
+              <TableHead className="w-14 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -109,8 +109,8 @@ export function GradeTable({
                 onClick={() => onLocate?.(s)}
               >
                 <TableCell><StatusIcon status={s.status} /></TableCell>
-                <TableCell>
-                  <div className="font-medium">
+                <TableCell className="whitespace-normal align-top">
+                  <div className="break-words font-medium">
                     {s.name}
                     {s.code && <span className="ml-2 font-mono text-[11px] font-normal text-muted-foreground">#{s.code}</span>}
                   </div>
@@ -122,11 +122,11 @@ export function GradeTable({
                   )}
                   {s.inRemainingBacklog && <div className="text-[11px] text-status-danger">Sem vaga na previsão atual</div>}
                 </TableCell>
-                <TableCell>{s.workload}h</TableCell>
-                <TableCell>{s.period}º</TableCell>
-                <TableCell className={cn(!s.usedSubject && "text-muted-foreground")}>{s.usedSubject ?? "—"}</TableCell>
-                <TableCell><SubjectStatusBadge status={s.status} /></TableCell>
-                <TableCell>
+                <TableCell className="align-top">{s.workload}h</TableCell>
+                <TableCell className="align-top">{s.period}º</TableCell>
+                <TableCell className={cn("whitespace-normal break-words align-top", !s.usedSubject && "text-muted-foreground")}>{s.usedSubject ?? "—"}</TableCell>
+                <TableCell className="hidden align-top xl:table-cell"><SubjectStatusBadge status={s.status} /></TableCell>
+                <TableCell className="hidden align-top 2xl:table-cell">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -140,7 +140,7 @@ export function GradeTable({
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="align-top text-right">
                   {canEdit && (
                     <Button
                       variant="ghost"
@@ -161,7 +161,7 @@ export function GradeTable({
         </Table>
       </div>
 
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-3 lg:hidden">
         {rows.length === 0 ? (
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Nenhuma disciplina para este filtro.</div>
         ) : rows.map((s) => (
