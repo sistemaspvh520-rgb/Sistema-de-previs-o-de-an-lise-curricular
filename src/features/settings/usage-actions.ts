@@ -30,6 +30,11 @@ const schema = z.object({
   creditUsd: localizedMoney(0.01, 1_000_000),
   usdBrlReferenceRate: localizedMoney(0.01, 100),
 });
+const officialSnapshotSchema = z.object({
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  officialSpendUsd: localizedMoney(0, 1_000_000),
+  officialBalanceUsd: localizedMoney(0, 1_000_000),
+});
 
 export async function addUsageCreditAction(input: unknown): Promise<ActionResult> {
   try {
@@ -49,6 +54,26 @@ export async function addUsageCreditAction(input: unknown): Promise<ActionResult
     revalidatePath("/settings/usage");
     revalidatePath("/management");
     return ok(undefined, "Crédito adicionado e cotação registrada.");
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+/** Salva valores consultados manualmente no painel oficial da OpenAI. */
+export async function saveOfficialUsageSnapshotAction(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("integration:manage");
+    const parsed = officialSnapshotSchema.safeParse(input);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Informe valores válidos.");
+    await recordAudit({
+      userId: user.id,
+      action: "settings.openai_official_snapshot.recorded",
+      entityType: "OpenAIOfficialSnapshot",
+      metadata: parsed.data,
+    });
+    revalidatePath("/settings/usage");
+    revalidatePath("/management");
+    return ok(undefined, "Dados oficiais da OpenAI registrados.");
   } catch (err) {
     return toActionError(err);
   }
