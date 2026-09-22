@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/lib/session";
-import { setSystemSetting } from "@/repositories/settings-repository";
+import { getSystemSettings, setSystemSetting } from "@/repositories/settings-repository";
 import { recordAudit } from "@/services/audit-log/audit-log";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
 
@@ -36,9 +36,21 @@ export async function saveUsageBudgetAction(input: unknown): Promise<ActionResul
     const user = await requirePermission("integration:manage");
     const parsed = schema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Informe valores válidos.");
+    const previous = await getSystemSettings();
     await setSystemSetting("aiMonthlyBudgetUsd", parsed.data.aiMonthlyBudgetUsd);
     await setSystemSetting("usdBrlReferenceRate", parsed.data.usdBrlReferenceRate);
-    await recordAudit({ userId: user.id, action: "settings.usage_budget.update", entityType: "SystemSetting", metadata: parsed.data });
+    await recordAudit({
+      userId: user.id,
+      action: "settings.usage_budget.update",
+      entityType: "SystemSetting",
+      metadata: {
+        current: parsed.data,
+        previous: {
+          aiMonthlyBudgetUsd: previous.aiMonthlyBudgetUsd,
+          usdBrlReferenceRate: previous.usdBrlReferenceRate,
+        },
+      },
+    });
     revalidatePath("/settings/usage");
     revalidatePath("/management");
     return ok(undefined, "Orçamento e cotação de referência atualizados.");

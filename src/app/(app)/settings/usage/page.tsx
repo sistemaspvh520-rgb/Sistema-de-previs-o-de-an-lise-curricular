@@ -38,7 +38,7 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
   const { period, start, end, isCurrent, daysInMonth } = periodBounds((await searchParams).period);
   const where = { createdAt: { gte: start, lt: end } };
 
-  const [settings, selected, all, byModel, byOperation, recent, usageByAnalysis] = await Promise.all([
+  const [settings, selected, all, byModel, byOperation, recent, usageByAnalysis, budgetHistory] = await Promise.all([
     getSystemSettings(),
     prisma.aIUsage.aggregate({ _sum: { estimatedCost: true, totalTokens: true }, _count: true, where }),
     prisma.aIUsage.aggregate({ _sum: { estimatedCost: true, totalTokens: true }, _count: true }),
@@ -46,6 +46,7 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
     prisma.aIUsage.groupBy({ by: ["operation"], _sum: { estimatedCost: true, totalTokens: true }, _count: true, where, orderBy: { _sum: { estimatedCost: "desc" } } }),
     prisma.aIUsage.findMany({ where, orderBy: { createdAt: "desc" }, take: 40, include: { analysis: { select: { id: true, courseName: true } } } }),
     prisma.aIUsage.groupBy({ by: ["analysisId"], where: { ...where, analysisId: { not: null } }, _sum: { estimatedCost: true, totalTokens: true }, _count: true }),
+    prisma.auditLog.findMany({ where: { action: "settings.usage_budget.update" }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, createdAt: true, metadata: true, user: { select: { name: true } } } }),
   ]);
 
   const analysisIds = usageByAnalysis.flatMap((item) => item.analysisId ? [item.analysisId] : []);
@@ -104,6 +105,14 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
       </div>
 
       <Card className="mt-6 overflow-hidden shadow-sm">
+        <CardHeader><CardTitle className="text-base">Histórico de orçamentos e cotações</CardTitle><CardDescription>Todos os valores salvos no sistema, com a pessoa responsável pela alteração.</CardDescription></CardHeader>
+        <CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow><TableHead>Data/hora</TableHead><TableHead>Responsável</TableHead><TableHead>Orçamento mensal</TableHead><TableHead className="text-right">Cotação (R$/US$)</TableHead></TableRow></TableHeader><TableBody>
+          {budgetHistory.length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Nenhum orçamento ou cotação foi salvo ainda.</TableCell></TableRow>}
+          {budgetHistory.map((entry) => { const values = budgetValues(entry.metadata); return <TableRow key={entry.id}><TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell><TableCell>{entry.user?.name ?? "Sistema"}</TableCell><TableCell>{values.budgetUsd === null ? "—" : formatCurrencyUSD(values.budgetUsd)}</TableCell><TableCell className="text-right">{values.brlRate === null ? "—" : formatBRLRate(values.brlRate)}</TableCell></TableRow>; })}
+        </TableBody></Table></CardContent>
+      </Card>
+
+      <Card className="mt-6 overflow-hidden shadow-sm">
         <CardHeader><CardTitle className="text-base">Chamadas recentes</CardTitle><CardDescription>{period}</CardDescription></CardHeader>
         <CardContent className="max-h-[min(48vh,34rem)] overflow-y-auto p-0">
           <Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow><TableHead>Data/hora</TableHead><TableHead>Operação</TableHead><TableHead>Modelo</TableHead><TableHead>Análise</TableHead><TableHead>Tokens</TableHead><TableHead className="text-right">Custo</TableHead></TableRow></TableHeader><TableBody>
@@ -124,4 +133,16 @@ function Stat({ icon: Icon, label, value, hint }: { icon: typeof Cpu; label: str
 
 function UsageBreakdown({ title, headers, rows, empty }: { title: string; headers: string[]; rows: string[][]; empty: string }) {
   return <Card className="overflow-hidden shadow-sm"><CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader><CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow>{headers.map((header, index) => <TableHead key={header} className={index === headers.length - 1 ? "text-right" : undefined}>{header}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.length === 0 ? <TableRow><TableCell colSpan={headers.length} className="py-6 text-center text-sm text-muted-foreground">{empty}</TableCell></TableRow> : rows.map((row, rowIndex) => <TableRow key={`${row[0]}-${rowIndex}`}>{row.map((cell, index) => <TableCell key={index} className={index === row.length - 1 ? "text-right whitespace-nowrap" : undefined}>{cell}</TableCell>)}</TableRow>)}</TableBody></Table></CardContent></Card>;
+}
+
+function budgetValues(metadata: unknown) {
+  const data = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+  // Registros anteriores armazenavam os valores diretamente; os novos ficam em "current".
+  const current = data.current && typeof data.current === "object" ? data.current as Record<string, unknown> : data;
+  const toNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
+  return { budgetUsd: toNumber(current.aiMonthlyBudgetUsd), brlRate: toNumber(current.usdBrlReferenceRate) };
+}
+
+function formatBRLRate(value: number) {
+  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(value);
 }
