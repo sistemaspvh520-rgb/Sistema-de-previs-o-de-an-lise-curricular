@@ -3,7 +3,9 @@ import { requireUser } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChangePasswordForm } from "@/features/account/change-password-form";
+import { NotificationPreferences } from "@/features/account/notification-preferences";
 import { ROLE_LABELS } from "@/lib/rbac";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = { title: "Minha conta" };
 export const dynamic = "force-dynamic";
@@ -12,6 +14,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/settings
   const user = await requireUser();
   const params = await searchParams;
   const first = params.first === "1" || user.mustChangePassword;
+  const preferences = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { followUpEmailEnabled: true, followUpPushEnabled: true, followUpRepeatBusinessDays: true, followUpMaxReminders: true } });
   return (
     <>
       <PageHeader eyebrow="Configurações" title="Minha conta" description={`${user.name} · ${user.email} · ${ROLE_LABELS[user.role]}`} />
@@ -21,7 +24,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/settings
           Defina agora a sua senha definitiva. Até isso acontecer, o restante do sistema fica bloqueado e a senha temporária permanece visível ao administrador.
         </div>
       )}
-      <Card className="shadow-sm">
+      <div className="grid gap-6 lg:grid-cols-2"><Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Alterar senha</CardTitle>
           <CardDescription>A alteração é registrada na auditoria. Sessões ativas continuam válidas até expirarem.</CardDescription>
@@ -30,6 +33,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/settings
           <ChangePasswordForm />
         </CardContent>
       </Card>
+      <Card className="shadow-sm"><CardHeader><CardTitle className="text-base">Notificações de matrícula</CardTitle><CardDescription>Preferências pessoais; a configuração geral define o horário dos avisos.</CardDescription></CardHeader><CardContent><NotificationPreferences initialEmail={preferences.followUpEmailEnabled} initialPush={preferences.followUpPushEnabled} initialRepeatDays={preferences.followUpRepeatBusinessDays} initialMaxReminders={preferences.followUpMaxReminders} /></CardContent></Card></div>
     </>
   );
 }

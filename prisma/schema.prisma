@@ -151,6 +151,11 @@ model User {
   passwordHash String
   role         Role      @default(ANALYST)
   isActive     Boolean   @default(true)
+  /** Canais individuais para lembretes de retorno de matrícula. Pelo menos um permanece ativo. */
+  followUpEmailEnabled Boolean @default(true)
+  followUpPushEnabled  Boolean @default(true)
+  followUpRepeatBusinessDays Int @default(1)
+  followUpMaxReminders Int @default(5)
   lastLoginAt  DateTime? @db.Timestamptz(6)
   /** Última atividade com sessão válida (atualizada com throttle pelo callback de sessão). */
   lastActiveAt DateTime? @db.Timestamptz(6)
@@ -260,6 +265,7 @@ model CurricularAnalysis {
   enrollmentNote         String?
   followUpDueAt          DateTime?          @db.Timestamptz(6)
   followUpNotifiedAt     DateTime?          @db.Timestamptz(6)
+  followUpNotificationCount Int              @default(0)
   entryPeriod            Int?
   entryPeriodSource      EntryPeriodSource?
   entryTerm              String?

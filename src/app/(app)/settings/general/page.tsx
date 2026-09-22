@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
-import { Clock3, GraduationCap, MapPin } from "lucide-react";
+import { BellRing, Clock3, ShieldCheck } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GeneralSettingsForm } from "@/features/settings/general-form";
-import { POLOS } from "@/domain/polos";
-import { COURSE_FORMATS } from "@/domain/course-formats";
 import { APP_TIME_ZONE } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Configurações gerais" };
@@ -31,12 +29,12 @@ export default async function GeneralSettingsPage() {
         </Card>
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base">Escopo do atendimento</CardTitle>
-            <CardDescription>Informações mantidas pela equipe técnica e usadas no envio das análises.</CardDescription>
+            <CardTitle className="text-base">Como as configurações funcionam</CardTitle>
+            <CardDescription>Os ajustes desta página valem para novos atendimentos e lembretes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <div className="flex gap-3"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">{POLOS.length} polos disponíveis</p><p className="text-xs text-muted-foreground">Selecione o polo ao iniciar uma análise.</p></div></div>
-            <div className="flex gap-3"><GraduationCap className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">Formatos de curso</p><div className="mt-1 flex flex-wrap gap-1.5">{COURSE_FORMATS.map((format) => <span key={format.code} className="rounded-full bg-muted px-2 py-0.5 text-xs">{format.label}</span>)}</div></div></div>
+            <div className="flex gap-3"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">Escopo editável</p><p className="text-xs text-muted-foreground">Inclua, ajuste ou remova polos e escolha os formatos disponíveis no envio.</p></div></div>
+            <div className="flex gap-3"><BellRing className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">Lembretes</p><p className="text-xs text-muted-foreground">O horário e o intervalo padrão ficam aqui; cada usuário ajusta seus canais e limite na própria conta.</p></div></div>
             <div className="flex gap-3"><Clock3 className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" /><div><p className="font-medium">Fuso do sistema</p><p className="text-xs text-muted-foreground">{APP_TIME_ZONE}</p></div></div>
           </CardContent>
         </Card>

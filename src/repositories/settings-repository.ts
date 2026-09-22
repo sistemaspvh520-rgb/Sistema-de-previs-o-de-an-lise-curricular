@@ -2,6 +2,9 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AIPrivacyMode, RetentionPolicy } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
+import type { CourseFormat } from "@/generated/prisma/enums";
+import { POLOS, type Polo } from "@/domain/polos";
+import { COURSE_FORMATS } from "@/domain/course-formats";
 
 export interface SystemSettings {
   retentionPolicy: RetentionPolicy;
@@ -12,6 +15,11 @@ export interface SystemSettings {
   defaultStartTerm: string | null;
   aiMonthlyBudgetUsd: number;
   usdBrlReferenceRate: number;
+  polos: Polo[];
+  courseFormats: CourseFormat[];
+  followUpBusinessStartHour: number;
+  followUpBusinessEndHour: number;
+  followUpRepeatBusinessDays: number;
 }
 
 const DEFAULTS: SystemSettings = {
@@ -23,7 +31,25 @@ const DEFAULTS: SystemSettings = {
   defaultStartTerm: "2027.1",
   aiMonthlyBudgetUsd: 0,
   usdBrlReferenceRate: 5.5,
+  polos: [...POLOS],
+  courseFormats: COURSE_FORMATS.map((format) => format.code),
+  followUpBusinessStartHour: 8,
+  followUpBusinessEndHour: 18,
+  followUpRepeatBusinessDays: 1,
 };
+
+function validPolos(value: unknown): Polo[] {
+  if (!Array.isArray(value)) return DEFAULTS.polos;
+  const polos = value.filter((item): item is Polo => Boolean(item) && typeof item === "object" && typeof (item as Polo).code === "string" && /^\d{3,12}$/.test((item as Polo).code) && typeof (item as Polo).name === "string" && (item as Polo).name.trim().length >= 2);
+  return polos.length ? polos : DEFAULTS.polos;
+}
+
+function validCourseFormats(value: unknown): CourseFormat[] {
+  if (!Array.isArray(value)) return DEFAULTS.courseFormats;
+  const allowed = new Set(COURSE_FORMATS.map((format) => format.code));
+  const formats = value.filter((item): item is CourseFormat => typeof item === "string" && allowed.has(item as CourseFormat));
+  return formats.length ? formats : DEFAULTS.courseFormats;
+}
 
 export async function getSystemSettings(): Promise<SystemSettings> {
   const rows = await prisma.systemSetting.findMany();
@@ -37,6 +63,11 @@ export async function getSystemSettings(): Promise<SystemSettings> {
     defaultStartTerm: typeof map.defaultStartTerm === "string" ? map.defaultStartTerm : DEFAULTS.defaultStartTerm,
     aiMonthlyBudgetUsd: Number(map.aiMonthlyBudgetUsd ?? DEFAULTS.aiMonthlyBudgetUsd),
     usdBrlReferenceRate: Number(map.usdBrlReferenceRate ?? DEFAULTS.usdBrlReferenceRate),
+    polos: validPolos(map.polos),
+    courseFormats: validCourseFormats(map.courseFormats),
+    followUpBusinessStartHour: Number(map.followUpBusinessStartHour ?? DEFAULTS.followUpBusinessStartHour),
+    followUpBusinessEndHour: Number(map.followUpBusinessEndHour ?? DEFAULTS.followUpBusinessEndHour),
+    followUpRepeatBusinessDays: Number(map.followUpRepeatBusinessDays ?? DEFAULTS.followUpRepeatBusinessDays),
   };
 }
 

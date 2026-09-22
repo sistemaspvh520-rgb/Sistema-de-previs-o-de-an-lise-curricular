@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, Trash2, Users } from "lucide-react";
+import { CheckCircle2, CircleAlert, FileText, Trash2, Users } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,7 +17,7 @@ export default async function ManagementPage() {
   await requirePagePermission("audit:read");
   const monthStart = startOfCurrentMonth();
 
-  const [activeUsers, users, totalsByUser, completedByUser, monthByUser, deletedByUser, byPolo] = await Promise.all([
+  const [activeUsers, users, totalsByUser, completedByUser, monthByUser, deletedByUser, byPolo, totalAnalyses, monthAnalyses, enrolled, returned] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
     prisma.user.findMany({ where: { isActive: true }, orderBy: [{ lastActiveAt: { sort: "desc", nulls: "last" } }, { name: "asc" }], take: 20, select: { id: true, name: true, role: true, lastActiveAt: true, analyses: { select: { courseName: true, studentName: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 } } }),
     prisma.curricularAnalysis.groupBy({ by: ["createdById"], _count: { _all: true } }),
@@ -25,6 +25,10 @@ export default async function ManagementPage() {
     prisma.curricularAnalysis.groupBy({ by: ["createdById"], where: { createdAt: { gte: monthStart } }, _count: { _all: true } }),
     prisma.auditLog.groupBy({ by: ["userId"], where: { action: { in: ["analysis.delete.tracked", "analysis.deletion_approved.tracked"] } }, _count: { _all: true } }),
     countAnalysesByPolo({ monthStart }),
+    prisma.curricularAnalysis.count(),
+    prisma.curricularAnalysis.count({ where: { createdAt: { gte: monthStart } } }),
+    prisma.curricularAnalysis.count({ where: { enrollmentStatus: "ENROLLED" } }),
+    prisma.curricularAnalysis.count({ where: { enrollmentStatus: { in: ["ENROLLED", "NOT_ENROLLED"] } } }),
   ]);
 
   const totalByUser = new Map(totalsByUser.map((item) => [item.createdById, item._count._all]));
@@ -33,15 +37,17 @@ export default async function ManagementPage() {
   const deletedCountByUser = new Map(deletedByUser.flatMap((item) => (item.userId ? [[item.userId, item._count._all] as const] : [])));
   const deletedSinceTracking = deletedByUser.reduce((total, item) => total + item._count._all, 0);
   const cards = [
+    { label: "Análises no mês", value: monthAnalyses, icon: FileText, tone: "text-brand-cyan-700", hint: `${totalAnalyses} no histórico`, href: "/analyses" },
     { label: "Usuários ativos", value: activeUsers, icon: Users, tone: "text-brand-navy", hint: "Com acesso ao sistema", href: "#atividade-por-usuario" },
     { label: "Exclusões registradas", value: deletedSinceTracking, icon: Trash2, tone: "text-status-danger", hint: "Desde a ativação do rastreamento", href: "#atividade-por-usuario" },
     { label: "Entregas da equipe", value: Array.from(deliveredByUser.values()).reduce((total, count) => total + count, 0), icon: CheckCircle2, tone: "text-status-success", hint: "Análises concluídas por consultor", href: "#atividade-por-usuario" },
+    { label: "Conversão confirmada", value: returned ? `${Math.round((enrolled / returned) * 100)}%` : "—", icon: CircleAlert, tone: "text-status-warning", hint: returned ? `${enrolled} matrículas em ${returned} retornos` : "Aguardando confirmações", href: "/analyses?followUp=due" },
   ];
 
   return (
     <>
       <PageHeader eyebrow="Gestão" title="Equipe e relatórios" description="Acompanhe a atividade dos consultores e os relatórios por polo. A fila e o status das análises ficam na aba Análises." />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => {
           const Icon = card.icon;
           return (

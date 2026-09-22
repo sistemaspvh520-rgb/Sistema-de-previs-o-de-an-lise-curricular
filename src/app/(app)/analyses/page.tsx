@@ -14,7 +14,7 @@ import { AnalysisStatusBadge, ReliabilityBadge, ANALYSIS_STATUS_LABELS } from "@
 import { formatDateTime, ordinal, pluralize } from "@/lib/utils";
 import type { AnalysisStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
-import { POLOS, isPoloCode } from "@/domain/polos";
+import { getSystemSettings } from "@/repositories/settings-repository";
 import { formatCourseFormat } from "@/domain/course-formats";
 import { countDueFollowUps } from "@/services/follow-up/follow-up";
 
@@ -37,7 +37,8 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
   const status = (typeof params.status === "string" ? params.status : "ALL") as AnalysisStatus | "ALL";
   const statusGroup = params.filter === "PROCESSING" || params.filter === "ATTENTION" ? params.filter : undefined;
   const q = typeof params.q === "string" ? params.q : "";
-  const poloCode = typeof params.polo === "string" && isPoloCode(params.polo) ? params.polo : undefined;
+  const settings = await getSystemSettings();
+  const poloCode = typeof params.polo === "string" && settings.polos.some((polo) => polo.code === params.polo) ? params.polo : undefined;
   const followUpDue = params.followUp === "due";
   // Gestor pode filtrar por responsável; demais perfis só veem as próprias análises.
   const isAdmin = user.role === "ADMIN";
@@ -91,7 +92,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
           <div className="relative w-full sm:w-64">
             <select name="polo" defaultValue={poloCode ?? ""} aria-label="Filtrar por polo" className="h-10 w-full appearance-none rounded-lg border border-input bg-card py-2 pr-10 pl-3 text-sm shadow-xs outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/50">
               <option value="">Todos os polos</option>
-              {POLOS.map((p) => <option key={p.code} value={p.code}>{p.code} · {p.name}</option>)}
+              {settings.polos.map((p) => <option key={p.code} value={p.code}>{p.code} · {p.name}</option>)}
             </select>
             <ChevronDown aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
           </div>

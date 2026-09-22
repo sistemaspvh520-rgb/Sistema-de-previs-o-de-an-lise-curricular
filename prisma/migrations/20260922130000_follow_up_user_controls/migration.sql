@@ -1,0 +1,4 @@
+ALTER TABLE "User" ADD COLUMN "followUpRepeatBusinessDays" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN "followUpMaxReminders" INTEGER NOT NULL DEFAULT 5;
+
+ALTER TABLE "CurricularAnalysis" ADD COLUMN "followUpNotificationCount" INTEGER NOT NULL DEFAULT 0;

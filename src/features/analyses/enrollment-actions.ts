@@ -30,7 +30,7 @@ export async function updateEnrollmentAction(input: unknown): Promise<ActionResu
         enrollmentUpdatedAt: new Date(),
         enrollmentUpdatedById: user.id,
         // Voltar para "sem retorno" reabre a cobrança em 24h.
-        ...(parsed.data.status === "PENDING" ? { followUpDueAt: new Date(Date.now() + 24 * 60 * 60_000), followUpNotifiedAt: null } : {}),
+        ...(parsed.data.status === "PENDING" ? { followUpDueAt: new Date(Date.now() + 24 * 60 * 60_000), followUpNotifiedAt: null, followUpNotificationCount: 0 } : {}),
       },
     });
     await recordAudit({ userId: user.id, action: "analysis.enrollment_updated", entityType: "CurricularAnalysis", entityId: a.id, metadata: { status: parsed.data.status, note: parsed.data.note ?? null } });

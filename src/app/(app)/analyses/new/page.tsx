@@ -25,7 +25,7 @@ export default async function NewAnalysisPage() {
         </div>
       </section>
       <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6 lg:p-8">
-        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={settings.defaultStartTerm ?? suggestStartTerm()} currentYear={zonedDateParts().year} />
+        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={settings.defaultStartTerm ?? suggestStartTerm()} currentYear={zonedDateParts().year} polos={settings.polos} courseFormats={settings.courseFormats} />
       </section>
     </div>
   );

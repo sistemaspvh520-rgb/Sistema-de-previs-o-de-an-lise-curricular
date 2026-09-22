@@ -25,11 +25,11 @@ export function zonedDateParts(now: Date = new Date()): { year: number; month: n
 }
 
 /** Segunda a sexta, das 08:00 às 17:59, no horário de Rondônia. */
-export function isBusinessHours(now: Date = new Date()): boolean {
+export function isBusinessHours(now: Date = new Date(), startHour = 8, endHour = 18): boolean {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: APP_TIME_ZONE, weekday: "short", hourCycle: "h23", hour: "numeric" }).formatToParts(now);
   const weekday = parts.find((part) => part.type === "weekday")?.value;
   const hour = Number(parts.find((part) => part.type === "hour")?.value);
-  return weekday !== "Sat" && weekday !== "Sun" && hour >= 8 && hour < 18;
+  return weekday !== "Sat" && weekday !== "Sun" && hour >= startHour && hour < endHour;
 }
 
 /** Quantidade de dias úteis transcorridos entre dois instantes, no fuso da aplicação. */

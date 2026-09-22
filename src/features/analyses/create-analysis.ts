@@ -9,9 +9,7 @@ import { getSystemSettings } from "@/repositories/settings-repository";
 import { getActiveRuleSet } from "@/repositories/rules-repository";
 import { ENGINE_VERSION } from "@/domain/curricular-analysis/version";
 import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
-import { findPolo } from "@/domain/polos";
 import { cleanStudentName, normalizeStudentName } from "@/domain/student-name";
-import { isCourseFormat } from "@/domain/course-formats";
 import type { CourseFormat } from "@/generated/prisma/enums";
 import { initialSteps } from "@/services/pipeline/steps";
 import { recordAudit } from "@/services/audit-log/audit-log";
@@ -91,9 +89,9 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
   if (!isValidTerm(input.entryTerm)) throw new Error("Semestre de ingresso inválido.");
   const studentName = cleanStudentName(input.studentName);
   if (studentName.length < 3) throw new Error("Informe o nome do aluno.");
-  const polo = findPolo(input.poloCode);
+  const polo = settings.polos.find((item) => item.code === input.poloCode);
   if (!polo) throw new Error("Polo inválido.");
-  if (!isCourseFormat(input.courseFormat)) throw new Error("Formato do curso inválido.");
+  if (!settings.courseFormats.includes(input.courseFormat)) throw new Error("Formato do curso indisponível.");
 
   const ruleSet = await getActiveRuleSet();
   const sha256 = createHash("sha256").update(input.bytes).digest("hex");

@@ -9,14 +9,13 @@ import { getSystemSettings } from "@/repositories/settings-repository";
 import { logger } from "@/lib/logger";
 import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
 import { z } from "zod";
-import { isPoloCode } from "@/domain/polos";
 
 /** Dados de ingresso: obrigatórios e confirmados pelo usuário antes de iniciar a análise. */
 const entrySchema = z.object({
   entryPeriod: z.coerce.number().int().min(1).max(20),
   entryTerm: z.string().refine(isValidTerm, "Use o formato AAAA.1 ou AAAA.2."),
   studentName: z.string().trim().min(3).max(120),
-  poloCode: z.string().refine(isPoloCode, "Polo inválido."),
+  poloCode: z.string().trim().min(1).max(12),
   courseFormat: z.enum(["EAD_DIGITAL", "SEMIPRESENCIAL"]),
   reanalysisOf: z.string().uuid().optional(),
 });
@@ -61,6 +60,9 @@ export async function POST(req: Request) {
   const entry = entrySchema.safeParse({ entryPeriod: form.get("entryPeriod"), entryTerm: form.get("entryTerm"), studentName: form.get("studentName"), poloCode: form.get("poloCode"), courseFormat: form.get("courseFormat"), reanalysisOf: form.get("reanalysisOf") || undefined });
   if (!entry.success) return NextResponse.json({ error: "Informe nome do aluno, polo, formato do curso, período e semestre de ingresso válidos." }, { status: 400 });
   const { entryPeriod, entryTerm, studentName, poloCode, courseFormat, reanalysisOf } = entry.data;
+  if (!settings.polos.some((polo) => polo.code === poloCode) || !settings.courseFormats.includes(courseFormat)) {
+    return NextResponse.json({ error: "Polo ou formato de curso indisponível nas configurações atuais." }, { status: 400 });
+  }
 
   try {
     const bytes = Buffer.from(await file.arrayBuffer());

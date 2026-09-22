@@ -19,8 +19,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { POLOS, findPolo } from "@/domain/polos";
-import { COURSE_FORMATS, formatCourseFormat, isCourseFormat } from "@/domain/course-formats";
+import { formatCourseFormat } from "@/domain/course-formats";
+import type { Polo } from "@/domain/polos";
+import type { CourseFormat } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { lookupStudentAction, type StudentMatch } from "@/features/analyses/lookup-actions";
 import { normalizeStudentName } from "@/domain/student-name";
@@ -29,7 +30,7 @@ function describeTerm(term: string): string {
   return term.endsWith(".1") ? `${term} (1º semestre de ${term.slice(0, 4)})` : `${term} (2º semestre de ${term.slice(0, 4)})`;
 }
 
-export function UploadDropzone({ maxMb, defaultStartTerm, currentYear }: { maxMb: number; defaultStartTerm: string; currentYear: number }) {
+export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, courseFormats }: { maxMb: number; defaultStartTerm: string; currentYear: number; polos: Polo[]; courseFormats: CourseFormat[] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -42,7 +43,7 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear }: { maxMb
   const [studentName, setStudentName] = useState("");
   const [poloCode, setPoloCode] = useState("");
   const [courseFormat, setCourseFormat] = useState("");
-  const formatReady = isCourseFormat(courseFormat);
+  const formatReady = courseFormats.includes(courseFormat as CourseFormat);
   // Consulta análises anteriores do aluno enquanto o nome é digitado; se existir, exige declarar reanálise.
   const [matches, setMatches] = useState<StudentMatch[]>([]);
   const [looking, setLooking] = useState(false);
@@ -72,7 +73,8 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear }: { maxMb
   const reanalysisReady = !hasPrevious || (reanalysis === "yes" && Boolean(reanalysisOf));
   const termReady = /^\d{4}\.[12]$/.test(entryTerm);
   const nameReady = studentName.trim().length >= 3;
-  const poloReady = Boolean(findPolo(poloCode));
+  const selectedPolo = polos.find((polo) => polo.code === poloCode);
+  const poloReady = Boolean(selectedPolo);
   const entryReady = Boolean(entryPeriod) && termReady && nameReady && poloReady && formatReady && reanalysisReady;
 
   const pick = useCallback(
@@ -261,7 +263,7 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear }: { maxMb
             <Label htmlFor="poloCode">Polo <span className="text-status-danger">*</span></Label>
             <Select value={poloCode} onValueChange={setPoloCode}>
               <SelectTrigger id="poloCode" className={cn("w-full", !poloReady && "border-status-warning/50")}><SelectValue placeholder="Selecionar polo" /></SelectTrigger>
-              <SelectContent>{POLOS.map((polo) => <SelectItem key={polo.code} value={polo.code}>{polo.code} · {polo.name}</SelectItem>)}</SelectContent>
+              <SelectContent>{polos.map((polo) => <SelectItem key={polo.code} value={polo.code}>{polo.code} · {polo.name}</SelectItem>)}</SelectContent>
             </Select>
             {poloReady ? <p className="text-xs text-muted-foreground">Polo de atendimento do candidato.</p> : <p className="text-xs font-medium text-status-warning">Obrigatório: selecione o polo.</p>}
           </div>
@@ -269,7 +271,7 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear }: { maxMb
             <Label htmlFor="courseFormat">Formato do curso <span className="text-status-danger">*</span></Label>
             <Select value={courseFormat} onValueChange={setCourseFormat}>
               <SelectTrigger id="courseFormat" className={cn("w-full", !formatReady && "border-status-warning/50")}><SelectValue placeholder="Selecionar formato" /></SelectTrigger>
-              <SelectContent>{COURSE_FORMATS.map((f) => <SelectItem key={f.code} value={f.code}>{f.label}</SelectItem>)}</SelectContent>
+              <SelectContent>{courseFormats.map((code) => <SelectItem key={code} value={code}>{formatCourseFormat(code)}</SelectItem>)}</SelectContent>
             </Select>
             {formatReady ? <p className="text-xs text-muted-foreground">EAD Digital ou Semipresencial.</p> : <p className="text-xs font-medium text-status-warning">Obrigatório: selecione o formato do curso.</p>}
           </div>
@@ -308,9 +310,9 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear }: { maxMb
           <dl className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Arquivo</dt><dd className="break-all font-medium">{file?.name}</dd></div>
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Aluno</dt><dd className="break-words font-medium">{studentName.trim() || "—"}</dd></div>
-            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Polo</dt><dd className="break-words font-medium">{poloReady ? `${poloCode} · ${findPolo(poloCode)?.name}` : "—"}</dd></div>
+            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Polo</dt><dd className="break-words font-medium">{poloReady ? `${poloCode} · ${selectedPolo?.name}` : "—"}</dd></div>
             {hasPrevious && reanalysis === "yes" && <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Reanálise</dt><dd className="font-medium text-status-warning">Sim — vinculada à análise anterior</dd></div>}
-            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Formato</dt><dd className="font-medium">{formatReady ? formatCourseFormat(courseFormat) : "—"}</dd></div>
+            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Formato</dt><dd className="font-medium">{formatReady ? formatCourseFormat(courseFormat as CourseFormat) : "—"}</dd></div>
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Ingresso</dt><dd className="font-medium">{entryPeriod ? `${entryPeriod}º período` : "—"}</dd></div>
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Semestre</dt><dd className="font-medium">{termReady ? describeTerm(entryTerm) : "—"}</dd></div>
           </dl>
