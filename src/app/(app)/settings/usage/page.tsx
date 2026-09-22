@@ -79,7 +79,7 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={CircleDollarSign} label="Custo estimado" value={formatCurrencyUSD(costUsd)} hint={`${formatCurrencyBRL(costBrl)} · cotação R$ ${settings.usdBrlReferenceRate.toFixed(2)}`} />
-        <Stat icon={Banknote} label="Orçamento disponível" value={remainingUsd === null ? "Não definido" : formatCurrencyUSD(remainingUsd)} hint={remainingUsd === null ? "Defina um orçamento abaixo" : `${formatCurrencyBRL(remainingUsd * settings.usdBrlReferenceRate)} restantes`} />
+        <Stat icon={Banknote} label="Orçamento mensal definido" value={remainingUsd === null ? "Não definido" : formatCurrencyUSD(settings.aiMonthlyBudgetUsd)} hint={remainingUsd === null ? "Defina um orçamento abaixo" : `Disponível: ${formatCurrencyUSD(remainingUsd)} · ${formatCurrencyBRL(remainingUsd * settings.usdBrlReferenceRate)}`} />
         <Stat icon={ChartNoAxesCombined} label="Projeção do mês" value={projectedUsd === null ? "—" : formatCurrencyUSD(projectedUsd)} hint={projectedUsd === null ? "Disponível apenas no mês atual" : `${formatCurrencyBRL(projectedUsd * settings.usdBrlReferenceRate)} se o ritmo continuar`} />
         <Stat icon={Cpu} label="Consumo" value={formatNumber(selected._sum.totalTokens ?? 0)} hint={pluralize(selected._count, "chamada")} />
       </div>
