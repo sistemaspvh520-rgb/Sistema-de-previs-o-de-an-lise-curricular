@@ -46,7 +46,7 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
     prisma.aIUsage.groupBy({ by: ["operation"], _sum: { estimatedCost: true, totalTokens: true }, _count: true, where, orderBy: { _sum: { estimatedCost: "desc" } } }),
     prisma.aIUsage.findMany({ where, orderBy: { createdAt: "desc" }, take: 40, include: { analysis: { select: { id: true, courseName: true } } } }),
     prisma.aIUsage.groupBy({ by: ["analysisId"], where: { ...where, analysisId: { not: null } }, _sum: { estimatedCost: true, totalTokens: true }, _count: true }),
-    prisma.auditLog.findMany({ where: { action: "settings.usage_budget.update" }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, createdAt: true, metadata: true, user: { select: { name: true } } } }),
+    prisma.auditLog.findMany({ where: { action: "settings.usage_budget.update", createdAt: { gte: start, lt: end } }, orderBy: { createdAt: "desc" }, take: 5000, select: { id: true, createdAt: true, metadata: true, user: { select: { name: true } } } }),
   ]);
 
   const analysisIds = usageByAnalysis.flatMap((item) => item.analysisId ? [item.analysisId] : []);
@@ -69,6 +69,9 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
   const costBrl = costUsd * settings.usdBrlReferenceRate;
   const remainingUsd = settings.aiMonthlyBudgetUsd > 0 ? Math.max(0, settings.aiMonthlyBudgetUsd - costUsd) : null;
   const projectedUsd = isCurrent && new Date().getDate() > 0 ? (costUsd / new Date().getDate()) * daysInMonth : null;
+  const budgetHistoryWithValues = budgetHistory.map((entry) => ({ ...entry, values: budgetValues(entry.metadata) }));
+  const addedBudgetUsd = budgetHistoryWithValues.reduce((total, entry) => total + (entry.values.budgetUsd ?? 0), 0);
+  const addedBudgetBrl = budgetHistoryWithValues.reduce((total, entry) => total + (entry.values.budgetUsd !== null && entry.values.brlRate !== null ? entry.values.budgetUsd * entry.values.brlRate : 0), 0);
 
   return (
     <>
@@ -105,10 +108,15 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
       </div>
 
       <Card className="mt-6 overflow-hidden shadow-sm">
-        <CardHeader><CardTitle className="text-base">Histórico de orçamentos e cotações</CardTitle><CardDescription>Todos os valores salvos no sistema, com a pessoa responsável pela alteração.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">Histórico de orçamentos e cotações</CardTitle><CardDescription>Valores salvos em {period}; altere o mês no filtro acima para consultar outro período.</CardDescription></CardHeader>
+        <CardContent className="grid gap-3 border-y bg-muted/30 py-4 sm:grid-cols-3">
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total adicionado no mês</p><p className="mt-1 text-xl font-semibold">{formatCurrencyUSD(addedBudgetUsd)}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equivalente em reais</p><p className="mt-1 text-xl font-semibold">{formatCurrencyBRL(addedBudgetBrl)}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lançamentos</p><p className="mt-1 text-xl font-semibold">{pluralize(budgetHistoryWithValues.length, "registro")}</p></div>
+        </CardContent>
         <CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow><TableHead>Data/hora</TableHead><TableHead>Responsável</TableHead><TableHead>Orçamento mensal</TableHead><TableHead className="text-right">Cotação (R$/US$)</TableHead></TableRow></TableHeader><TableBody>
           {budgetHistory.length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Nenhum orçamento ou cotação foi salvo ainda.</TableCell></TableRow>}
-          {budgetHistory.map((entry) => { const values = budgetValues(entry.metadata); return <TableRow key={entry.id}><TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell><TableCell>{entry.user?.name ?? "Sistema"}</TableCell><TableCell>{values.budgetUsd === null ? "—" : formatCurrencyUSD(values.budgetUsd)}</TableCell><TableCell className="text-right">{values.brlRate === null ? "—" : formatBRLRate(values.brlRate)}</TableCell></TableRow>; })}
+          {budgetHistoryWithValues.map((entry) => <TableRow key={entry.id}><TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell><TableCell>{entry.user?.name ?? "Sistema"}</TableCell><TableCell>{entry.values.budgetUsd === null ? "—" : formatCurrencyUSD(entry.values.budgetUsd)}</TableCell><TableCell className="text-right">{entry.values.brlRate === null ? "—" : formatBRLRate(entry.values.brlRate)}</TableCell></TableRow>)}
         </TableBody></Table></CardContent>
       </Card>
 
