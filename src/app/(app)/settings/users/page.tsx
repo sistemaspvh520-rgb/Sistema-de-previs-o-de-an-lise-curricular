@@ -11,10 +11,21 @@ import { UserFormDialog } from "@/features/users/user-form-dialog";
 import { UserRowActions } from "@/features/users/user-row-actions";
 import { isEmailConfigured } from "@/services/email/mailer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MailWarning } from "lucide-react";
 
 export const metadata: Metadata = { title: "Usuários" };
 export const dynamic = "force-dynamic";
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
 
 export default async function UsersPage() {
   const admin = await requirePagePermission("users:manage");
@@ -38,7 +49,7 @@ export default async function UsersPage() {
       )}
       <Card className="users-table-shell overflow-hidden shadow-sm">
         <div className="users-desktop-table">
-        <Table>
+        <Table className="min-w-[1050px]">
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
@@ -53,7 +64,12 @@ export default async function UsersPage() {
           <TableBody>
             {users.map((u) => (
               <TableRow key={u.id}>
-                <TableCell className="font-medium">{u.name}</TableCell>
+                <TableCell>
+                  <div className="flex min-w-44 items-center gap-2.5">
+                    <Avatar size="sm"><AvatarFallback className="bg-brand-cyan-50 font-medium text-brand-navy">{initials(u.name)}</AvatarFallback></Avatar>
+                    <span className="font-medium">{u.name}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-muted-foreground">{u.email}</TableCell>
                 <TableCell><Badge variant="secondary">{ROLE_LABELS[u.role]}</Badge></TableCell>
                 <TableCell>
@@ -84,7 +100,7 @@ export default async function UsersPage() {
         </div>
         <div className="users-mobile-list divide-y">
           {users.map((u) => (
-            <article key={u.id} className="space-y-3 p-4">
+          <article key={u.id} className="space-y-2.5 p-4">
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate font-medium">{u.name}</h2>

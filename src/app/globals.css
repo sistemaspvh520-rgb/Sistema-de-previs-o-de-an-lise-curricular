@@ -150,10 +150,10 @@
   }
 }
 
-/* A tabela de usuários só aparece quando a área útil comporta suas ações.
-   Assim, o menu lateral aberto não força os ícones a quebrarem verticalmente. */
+/* A tabela é a visualização principal em desktop. Em telas menores, os cartões
+   preservam legibilidade sem comprimir ou quebrar as ações em várias linhas. */
 .users-table-shell {
-  container-type: inline-size;
+  min-width: 0;
 }
 
 .users-desktop-table {
@@ -164,7 +164,7 @@
   display: block;
 }
 
-@container (min-width: 1700px) {
+@media (min-width: 1280px) {
   .users-desktop-table {
     display: block;
   }
