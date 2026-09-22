@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { formatCurrencyBRL, formatCurrencyUSD, formatDateTime, formatNumber, pluralize } from "@/lib/utils";
 import { UsagePeriodFilter } from "@/features/settings/usage-period-filter";
-import { UsageOfficialSnapshotForm } from "@/features/settings/usage-official-snapshot-form";
+import { UsageBudgetForm } from "@/features/settings/usage-budget-form";
 
 export const metadata: Metadata = { title: "Uso de IA" };
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
   const { period, start, end } = periodBounds((await searchParams).period);
   const where = { createdAt: { gte: start, lt: end } };
 
-  const [settings, selected, all, byModel, byOperation, recent, usageByAnalysis, officialSnapshots] = await Promise.all([
+  const [settings, selected, all, byModel, byOperation, recent, usageByAnalysis, creditHistory, allCreditHistory] = await Promise.all([
     getSystemSettings(),
     prisma.aIUsage.aggregate({ _sum: { estimatedCost: true, totalTokens: true }, _count: true, where }),
     prisma.aIUsage.aggregate({ _sum: { estimatedCost: true, totalTokens: true }, _count: true }),
@@ -46,7 +46,8 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
     prisma.aIUsage.groupBy({ by: ["operation"], _sum: { estimatedCost: true, totalTokens: true }, _count: true, where, orderBy: { _sum: { estimatedCost: "desc" } } }),
     prisma.aIUsage.findMany({ where, orderBy: { createdAt: "desc" }, take: 40, include: { analysis: { select: { id: true, courseName: true } } } }),
     prisma.aIUsage.groupBy({ by: ["analysisId"], where: { ...where, analysisId: { not: null } }, _sum: { estimatedCost: true, totalTokens: true }, _count: true }),
-    prisma.auditLog.findMany({ where: { action: "settings.openai_official_snapshot.recorded" }, orderBy: { createdAt: "desc" }, take: 5000, select: { id: true, createdAt: true, metadata: true, user: { select: { name: true } } } }),
+    prisma.auditLog.findMany({ where: { action: "settings.usage_credit.added", createdAt: { gte: start, lt: end } }, orderBy: { createdAt: "desc" }, take: 5000, select: { id: true, createdAt: true, metadata: true, user: { select: { name: true } } } }),
+    prisma.auditLog.findMany({ where: { action: "settings.usage_credit.added" }, orderBy: { createdAt: "desc" }, take: 5000, select: { metadata: true } }),
   ]);
 
   const analysisIds = usageByAnalysis.flatMap((item) => item.analysisId ? [item.analysisId] : []);
@@ -67,12 +68,11 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
   const topConsumers = [...consumers.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5);
   const costUsd = Number(selected._sum.estimatedCost ?? 0);
   const costBrl = costUsd * settings.usdBrlReferenceRate;
-  const officialHistory = officialSnapshots.map((entry) => ({ ...entry, values: officialValues(entry.metadata) }));
-  const selectedOfficialHistory = officialHistory.filter((entry) => entry.values.period === period);
-  const latestOfficial = selectedOfficialHistory[0] ?? null;
-  const officialSpendUsd = latestOfficial?.values.spendUsd ?? null;
-  const officialBalanceUsd = latestOfficial?.values.balanceUsd ?? null;
-  const untrackedUsd = officialSpendUsd === null ? null : officialSpendUsd - costUsd;
+  const creditHistoryWithValues = creditHistory.map((entry) => ({ ...entry, values: creditValues(entry.metadata) }));
+  const totalAddedUsd = allCreditHistory.reduce((total, entry) => total + (creditValues(entry.metadata).creditUsd ?? 0), 0);
+  const totalAddedBrl = allCreditHistory.reduce((total, entry) => total + (creditValues(entry.metadata).creditBrl ?? 0), 0);
+  const addedUsd = creditHistoryWithValues.reduce((total, entry) => total + (entry.values.creditUsd ?? 0), 0);
+  const addedBrl = creditHistoryWithValues.reduce((total, entry) => total + (entry.values.creditBrl ?? 0), 0);
 
   return (
     <>
@@ -83,10 +83,10 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={CircleDollarSign} label="Consumo rastreado pelo sistema" value={formatCurrencyUSD(costUsd)} hint={`${formatCurrencyBRL(costBrl)} · somente esta aplicação`} />
-        <Stat icon={Banknote} label="Gasto oficial informado" value={officialSpendUsd === null ? "Não informado" : formatCurrencyUSD(officialSpendUsd)} hint={officialSpendUsd === null ? "Registre a partir do painel OpenAI" : `${formatCurrencyBRL(officialSpendUsd * settings.usdBrlReferenceRate)} · ${period}`} />
-        <Stat icon={ChartNoAxesCombined} label="Saldo oficial informado" value={officialBalanceUsd === null ? "Não informado" : formatCurrencyUSD(officialBalanceUsd)} hint={latestOfficial ? `${formatCurrencyBRL(officialBalanceUsd! * settings.usdBrlReferenceRate)} · atualizado ${formatDateTime(latestOfficial.createdAt)}` : "Registre a partir do painel OpenAI"} />
-        <Stat icon={ChartNoAxesCombined} label="Diferença não rastreada" value={untrackedUsd === null ? "—" : formatCurrencyUSD(untrackedUsd)} hint={untrackedUsd === null ? "Gasto oficial menos consumo local" : "Uso fora desta aplicação ou anterior ao rastreio"} />
+        <Stat icon={Banknote} label="Total adicionado na OpenAI" value={formatCurrencyUSD(totalAddedUsd)} hint={`${formatCurrencyBRL(totalAddedBrl)} pagos em reais`} />
+        <Stat icon={CircleDollarSign} label="Adicionado no período" value={formatCurrencyUSD(addedUsd)} hint={`${formatCurrencyBRL(addedBrl)} · ${pluralize(creditHistoryWithValues.length, "recarga")}`} />
+        <Stat icon={ChartNoAxesCombined} label="Consumo rastreado pelo sistema" value={formatCurrencyUSD(costUsd)} hint={`${formatCurrencyBRL(costBrl)} · somente esta aplicação`} />
+        <Stat icon={Cpu} label="Tokens no período" value={formatNumber(selected._sum.totalTokens ?? 0)} hint={pluralize(selected._count, "chamada")} />
         <Stat icon={Cpu} label="Consumo" value={formatNumber(selected._sum.totalTokens ?? 0)} hint={pluralize(selected._count, "chamada")} />
       </div>
 
@@ -96,10 +96,10 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
           <CardContent>{topConsumers.length === 0 ? <p className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">Ainda não há consumo atribuído a usuários neste período.</p> : <ol className="space-y-3">{topConsumers.map((consumer, index) => <li key={consumer.name} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><span className="flex size-7 items-center justify-center rounded-full bg-brand-cyan-50 text-xs font-semibold text-brand-navy">{index + 1}</span><div className="min-w-0"><p className="truncate font-medium">{consumer.name}</p><p className="text-xs text-muted-foreground">{pluralize(consumer.calls, "chamada")} · {formatNumber(consumer.tokens)} tokens</p></div><div className="text-right"><p className="font-medium">{formatCurrencyUSD(consumer.cost)}</p><p className="text-xs text-muted-foreground">{formatCurrencyBRL(consumer.cost * settings.usdBrlReferenceRate)}</p></div></li>)}</ol>}</CardContent>
         </Card>
         <Card className="shadow-sm xl:col-span-2">
-          <CardHeader><CardTitle className="text-base">Dados oficiais da OpenAI</CardTitle><CardDescription>Transcreva os valores do painel oficial. Eles ficam separados das estimativas desta aplicação.</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">Registrar recarga na OpenAI</CardTitle><CardDescription>Informe o crédito que entrou na plataforma e o valor efetivamente pago em reais.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            <UsageOfficialSnapshotForm period={period} spendUsd={officialSpendUsd} balanceUsd={officialBalanceUsd} />
-            <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">O saldo e o gasto oficiais não são expostos por uma chave de projeto. Consulte o painel para conferir créditos e cobranças.<Link href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" className="mt-2 inline-flex items-center gap-1 font-medium text-brand-cyan-700 hover:underline">Abrir faturamento da OpenAI <ExternalLink className="size-3.5" /></Link></div>
+            <UsageBudgetForm />
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">Cada registro é somado aos totais em dólar e real. Consulte o painel oficial para confirmar créditos e cobranças.<Link href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" className="mt-2 inline-flex items-center gap-1 font-medium text-brand-cyan-700 hover:underline">Abrir faturamento da OpenAI <ExternalLink className="size-3.5" /></Link></div>
           </CardContent>
         </Card>
       </div>
@@ -110,15 +110,15 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
       </div>
 
       <Card className="mt-6 overflow-hidden shadow-sm">
-        <CardHeader><CardTitle className="text-base">Histórico de dados oficiais</CardTitle><CardDescription>Registros do período {period}; altere o mês no filtro acima para consultar outro período.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">Histórico de recargas</CardTitle><CardDescription>Recargas lançadas em {period}; altere o mês no filtro acima para consultar outro período.</CardDescription></CardHeader>
         <CardContent className="grid gap-3 border-y bg-muted/30 py-4 sm:grid-cols-3">
-          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Último gasto oficial</p><p className="mt-1 text-xl font-semibold">{officialSpendUsd === null ? "—" : formatCurrencyUSD(officialSpendUsd)}</p></div>
-          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Último saldo oficial</p><p className="mt-1 text-xl font-semibold">{officialBalanceUsd === null ? "—" : formatCurrencyUSD(officialBalanceUsd)}</p></div>
-          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Atualizações</p><p className="mt-1 text-xl font-semibold">{pluralize(selectedOfficialHistory.length, "registro")}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total em dólar</p><p className="mt-1 text-xl font-semibold">{formatCurrencyUSD(addedUsd)}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total pago em reais</p><p className="mt-1 text-xl font-semibold">{formatCurrencyBRL(addedBrl)}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recargas</p><p className="mt-1 text-xl font-semibold">{pluralize(creditHistoryWithValues.length, "registro")}</p></div>
         </CardContent>
-        <CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow><TableHead>Data/hora</TableHead><TableHead>Responsável</TableHead><TableHead>Gasto oficial</TableHead><TableHead className="text-right">Saldo oficial</TableHead></TableRow></TableHeader><TableBody>
-          {selectedOfficialHistory.length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Nenhum dado oficial foi registrado neste período.</TableCell></TableRow>}
-          {selectedOfficialHistory.map((entry) => <TableRow key={entry.id}><TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell><TableCell>{entry.user?.name ?? "Sistema"}</TableCell><TableCell>{entry.values.spendUsd === null ? "—" : formatCurrencyUSD(entry.values.spendUsd)}</TableCell><TableCell className="text-right">{entry.values.balanceUsd === null ? "—" : formatCurrencyUSD(entry.values.balanceUsd)}</TableCell></TableRow>)}
+        <CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow><TableHead>Data/hora</TableHead><TableHead>Responsável</TableHead><TableHead>Crédito adicionado</TableHead><TableHead className="text-right">Valor pago</TableHead></TableRow></TableHeader><TableBody>
+          {creditHistory.length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Nenhuma recarga foi registrada neste período.</TableCell></TableRow>}
+          {creditHistoryWithValues.map((entry) => <TableRow key={entry.id}><TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell><TableCell>{entry.user?.name ?? "Sistema"}</TableCell><TableCell>{entry.values.creditUsd === null ? "—" : formatCurrencyUSD(entry.values.creditUsd)}</TableCell><TableCell className="text-right">{entry.values.creditBrl === null ? "—" : formatCurrencyBRL(entry.values.creditBrl)}</TableCell></TableRow>)}
         </TableBody></Table></CardContent>
       </Card>
 
@@ -145,8 +145,12 @@ function UsageBreakdown({ title, headers, rows, empty }: { title: string; header
   return <Card className="overflow-hidden shadow-sm"><CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader><CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow>{headers.map((header, index) => <TableHead key={header} className={index === headers.length - 1 ? "text-right" : undefined}>{header}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.length === 0 ? <TableRow><TableCell colSpan={headers.length} className="py-6 text-center text-sm text-muted-foreground">{empty}</TableCell></TableRow> : rows.map((row, rowIndex) => <TableRow key={`${row[0]}-${rowIndex}`}>{row.map((cell, index) => <TableCell key={index} className={index === row.length - 1 ? "text-right whitespace-nowrap" : undefined}>{cell}</TableCell>)}</TableRow>)}</TableBody></Table></CardContent></Card>;
 }
 
-function officialValues(metadata: unknown) {
+function creditValues(metadata: unknown) {
   const data = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
   const toNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
-  return { period: typeof data.period === "string" ? data.period : null, spendUsd: toNumber(data.officialSpendUsd), balanceUsd: toNumber(data.officialBalanceUsd) };
+  const creditUsd = toNumber(data.creditUsd);
+  const creditBrl = toNumber(data.creditBrl);
+  // Mantém os registros feitos antes do campo “valor pago”, que tinham apenas a cotação.
+  const legacyRate = toNumber(data.usdBrlReferenceRate);
+  return { creditUsd, creditBrl: creditBrl ?? (creditUsd !== null && legacyRate !== null ? creditUsd * legacyRate : null) };
 }

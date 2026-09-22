@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/lib/session";
-import { setSystemSetting } from "@/repositories/settings-repository";
 import { recordAudit } from "@/services/audit-log/audit-log";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
 
@@ -28,7 +27,7 @@ const localizedMoney = (min: number, max: number) =>
   z.preprocess(parseLocalizedNumber, z.number().finite().min(min).max(max));
 const schema = z.object({
   creditUsd: localizedMoney(0.01, 1_000_000),
-  usdBrlReferenceRate: localizedMoney(0.01, 100),
+  creditBrl: localizedMoney(0.01, 10_000_000),
 });
 const officialSnapshotSchema = z.object({
   period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
@@ -41,19 +40,18 @@ export async function addUsageCreditAction(input: unknown): Promise<ActionResult
     const user = await requirePermission("integration:manage");
     const parsed = schema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Informe valores válidos.");
-    await setSystemSetting("usdBrlReferenceRate", parsed.data.usdBrlReferenceRate);
     await recordAudit({
       userId: user.id,
       action: "settings.usage_credit.added",
       entityType: "AIAccountCredit",
       metadata: {
         creditUsd: parsed.data.creditUsd,
-        usdBrlReferenceRate: parsed.data.usdBrlReferenceRate,
+        creditBrl: parsed.data.creditBrl,
       },
     });
     revalidatePath("/settings/usage");
     revalidatePath("/management");
-    return ok(undefined, "Crédito adicionado e cotação registrada.");
+    return ok(undefined, "Recarga da OpenAI registrada.");
   } catch (err) {
     return toActionError(err);
   }
