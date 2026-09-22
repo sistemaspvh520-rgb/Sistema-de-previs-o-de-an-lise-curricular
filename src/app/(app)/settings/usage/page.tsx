@@ -22,6 +22,7 @@ const OP_LABEL: Record<string, string> = {
   FINAL_EXPLANATION: "Explicação",
   CONNECTION_TEST: "Teste de conexão",
 };
+const CREDIT_ACTIONS = ["settings.usage_budget.update", "settings.usage_credit.added"];
 
 function periodBounds(raw: string | string[] | undefined) {
   const now = new Date();
@@ -30,15 +31,15 @@ function periodBounds(raw: string | string[] | undefined) {
   const [year, month] = candidate.split("-").map(Number);
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 1);
-  return { period: candidate, start, end, isCurrent: candidate === fallback, daysInMonth: end.getDate() };
+  return { period: candidate, start, end };
 }
 
 export default async function UsagePage({ searchParams }: PageProps<"/settings/usage">) {
   await requirePagePermission("usage:read");
-  const { period, start, end, isCurrent, daysInMonth } = periodBounds((await searchParams).period);
+  const { period, start, end } = periodBounds((await searchParams).period);
   const where = { createdAt: { gte: start, lt: end } };
 
-  const [settings, selected, all, byModel, byOperation, recent, usageByAnalysis, budgetHistory] = await Promise.all([
+  const [settings, selected, all, byModel, byOperation, recent, usageByAnalysis, creditHistory, allCreditHistory] = await Promise.all([
     getSystemSettings(),
     prisma.aIUsage.aggregate({ _sum: { estimatedCost: true, totalTokens: true }, _count: true, where }),
     prisma.aIUsage.aggregate({ _sum: { estimatedCost: true, totalTokens: true }, _count: true }),
@@ -46,7 +47,8 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
     prisma.aIUsage.groupBy({ by: ["operation"], _sum: { estimatedCost: true, totalTokens: true }, _count: true, where, orderBy: { _sum: { estimatedCost: "desc" } } }),
     prisma.aIUsage.findMany({ where, orderBy: { createdAt: "desc" }, take: 40, include: { analysis: { select: { id: true, courseName: true } } } }),
     prisma.aIUsage.groupBy({ by: ["analysisId"], where: { ...where, analysisId: { not: null } }, _sum: { estimatedCost: true, totalTokens: true }, _count: true }),
-    prisma.auditLog.findMany({ where: { action: "settings.usage_budget.update", createdAt: { gte: start, lt: end } }, orderBy: { createdAt: "desc" }, take: 5000, select: { id: true, createdAt: true, metadata: true, user: { select: { name: true } } } }),
+    prisma.auditLog.findMany({ where: { action: { in: CREDIT_ACTIONS }, createdAt: { gte: start, lt: end } }, orderBy: { createdAt: "desc" }, take: 5000, select: { id: true, createdAt: true, metadata: true, user: { select: { name: true } } } }),
+    prisma.auditLog.findMany({ where: { action: { in: CREDIT_ACTIONS } }, orderBy: { createdAt: "desc" }, take: 5000, select: { metadata: true } }),
   ]);
 
   const analysisIds = usageByAnalysis.flatMap((item) => item.analysisId ? [item.analysisId] : []);
@@ -67,11 +69,12 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
   const topConsumers = [...consumers.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5);
   const costUsd = Number(selected._sum.estimatedCost ?? 0);
   const costBrl = costUsd * settings.usdBrlReferenceRate;
-  const remainingUsd = settings.aiMonthlyBudgetUsd > 0 ? Math.max(0, settings.aiMonthlyBudgetUsd - costUsd) : null;
-  const projectedUsd = isCurrent && new Date().getDate() > 0 ? (costUsd / new Date().getDate()) * daysInMonth : null;
-  const budgetHistoryWithValues = budgetHistory.map((entry) => ({ ...entry, values: budgetValues(entry.metadata) }));
-  const addedBudgetUsd = budgetHistoryWithValues.reduce((total, entry) => total + (entry.values.budgetUsd ?? 0), 0);
-  const addedBudgetBrl = budgetHistoryWithValues.reduce((total, entry) => total + (entry.values.budgetUsd !== null && entry.values.brlRate !== null ? entry.values.budgetUsd * entry.values.brlRate : 0), 0);
+  const creditHistoryWithValues = creditHistory.map((entry) => ({ ...entry, values: creditValues(entry.metadata) }));
+  const totalAddedUsd = allCreditHistory.reduce((total, entry) => total + (creditValues(entry.metadata).creditUsd ?? 0), 0);
+  const totalSpentUsd = Number(all._sum.estimatedCost ?? 0);
+  const availableCreditUsd = totalAddedUsd - totalSpentUsd;
+  const addedCreditUsd = creditHistoryWithValues.reduce((total, entry) => total + (entry.values.creditUsd ?? 0), 0);
+  const addedCreditBrl = creditHistoryWithValues.reduce((total, entry) => total + (entry.values.creditUsd !== null && entry.values.brlRate !== null ? entry.values.creditUsd * entry.values.brlRate : 0), 0);
 
   return (
     <>
@@ -82,9 +85,9 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={CircleDollarSign} label="Custo estimado" value={formatCurrencyUSD(costUsd)} hint={`${formatCurrencyBRL(costBrl)} · cotação R$ ${settings.usdBrlReferenceRate.toFixed(2)}`} />
-        <Stat icon={Banknote} label="Orçamento mensal definido" value={remainingUsd === null ? "Não definido" : formatCurrencyUSD(settings.aiMonthlyBudgetUsd)} hint={remainingUsd === null ? "Defina um orçamento abaixo" : `Disponível: ${formatCurrencyUSD(remainingUsd)} · ${formatCurrencyBRL(remainingUsd * settings.usdBrlReferenceRate)}`} />
-        <Stat icon={ChartNoAxesCombined} label="Projeção do mês" value={projectedUsd === null ? "—" : formatCurrencyUSD(projectedUsd)} hint={projectedUsd === null ? "Disponível apenas no mês atual" : `${formatCurrencyBRL(projectedUsd * settings.usdBrlReferenceRate)} se o ritmo continuar`} />
+        <Stat icon={CircleDollarSign} label="Consumo estimado no período" value={formatCurrencyUSD(costUsd)} hint={`${formatCurrencyBRL(costBrl)} · cotação atual R$ ${settings.usdBrlReferenceRate.toFixed(2)}`} />
+        <Stat icon={Banknote} label="Créditos adicionados no período" value={formatCurrencyUSD(addedCreditUsd)} hint={`${formatCurrencyBRL(addedCreditBrl)} · ${pluralize(creditHistoryWithValues.length, "lançamento")}`} />
+        <Stat icon={ChartNoAxesCombined} label="Saldo estimado de créditos" value={formatCurrencyUSD(availableCreditUsd)} hint={`${formatCurrencyBRL(availableCreditUsd * settings.usdBrlReferenceRate)} · total adicionado: ${formatCurrencyUSD(totalAddedUsd)}`} />
         <Stat icon={Cpu} label="Consumo" value={formatNumber(selected._sum.totalTokens ?? 0)} hint={pluralize(selected._count, "chamada")} />
       </div>
 
@@ -94,9 +97,9 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
           <CardContent>{topConsumers.length === 0 ? <p className="rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">Ainda não há consumo atribuído a usuários neste período.</p> : <ol className="space-y-3">{topConsumers.map((consumer, index) => <li key={consumer.name} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><span className="flex size-7 items-center justify-center rounded-full bg-brand-cyan-50 text-xs font-semibold text-brand-navy">{index + 1}</span><div className="min-w-0"><p className="truncate font-medium">{consumer.name}</p><p className="text-xs text-muted-foreground">{pluralize(consumer.calls, "chamada")} · {formatNumber(consumer.tokens)} tokens</p></div><div className="text-right"><p className="font-medium">{formatCurrencyUSD(consumer.cost)}</p><p className="text-xs text-muted-foreground">{formatCurrencyBRL(consumer.cost * settings.usdBrlReferenceRate)}</p></div></li>)}</ol>}</CardContent>
         </Card>
         <Card className="shadow-sm xl:col-span-2">
-          <CardHeader><CardTitle className="text-base">Orçamento e saldo</CardTitle><CardDescription>Controle interno; não substitui a fatura da OpenAI.</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">Adicionar créditos</CardTitle><CardDescription>Registro interno de valores adicionados; não substitui a fatura da OpenAI.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            <UsageBudgetForm budgetUsd={settings.aiMonthlyBudgetUsd} brlRate={settings.usdBrlReferenceRate} />
+            <UsageBudgetForm brlRate={settings.usdBrlReferenceRate} />
             <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">O saldo de créditos da conta não é exposto à aplicação pela chave de projeto. Consulte o faturamento oficial para conferir créditos e cobranças.<Link href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" className="mt-2 inline-flex items-center gap-1 font-medium text-brand-cyan-700 hover:underline">Abrir faturamento da OpenAI <ExternalLink className="size-3.5" /></Link></div>
           </CardContent>
         </Card>
@@ -108,15 +111,15 @@ export default async function UsagePage({ searchParams }: PageProps<"/settings/u
       </div>
 
       <Card className="mt-6 overflow-hidden shadow-sm">
-        <CardHeader><CardTitle className="text-base">Histórico de orçamentos e cotações</CardTitle><CardDescription>Valores salvos em {period}; altere o mês no filtro acima para consultar outro período.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">Histórico de créditos adicionados</CardTitle><CardDescription>Lançamentos em {period}; altere o mês no filtro acima para consultar outro período.</CardDescription></CardHeader>
         <CardContent className="grid gap-3 border-y bg-muted/30 py-4 sm:grid-cols-3">
-          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total adicionado no mês</p><p className="mt-1 text-xl font-semibold">{formatCurrencyUSD(addedBudgetUsd)}</p></div>
-          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equivalente em reais</p><p className="mt-1 text-xl font-semibold">{formatCurrencyBRL(addedBudgetBrl)}</p></div>
-          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lançamentos</p><p className="mt-1 text-xl font-semibold">{pluralize(budgetHistoryWithValues.length, "registro")}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total adicionado no período</p><p className="mt-1 text-xl font-semibold">{formatCurrencyUSD(addedCreditUsd)}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equivalente em reais</p><p className="mt-1 text-xl font-semibold">{formatCurrencyBRL(addedCreditBrl)}</p></div>
+          <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lançamentos</p><p className="mt-1 text-xl font-semibold">{pluralize(creditHistoryWithValues.length, "registro")}</p></div>
         </CardContent>
-        <CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow><TableHead>Data/hora</TableHead><TableHead>Responsável</TableHead><TableHead>Orçamento mensal</TableHead><TableHead className="text-right">Cotação (R$/US$)</TableHead></TableRow></TableHeader><TableBody>
-          {budgetHistory.length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Nenhum orçamento ou cotação foi salvo ainda.</TableCell></TableRow>}
-          {budgetHistoryWithValues.map((entry) => <TableRow key={entry.id}><TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell><TableCell>{entry.user?.name ?? "Sistema"}</TableCell><TableCell>{entry.values.budgetUsd === null ? "—" : formatCurrencyUSD(entry.values.budgetUsd)}</TableCell><TableCell className="text-right">{entry.values.brlRate === null ? "—" : formatBRLRate(entry.values.brlRate)}</TableCell></TableRow>)}
+        <CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow><TableHead>Data/hora</TableHead><TableHead>Responsável</TableHead><TableHead>Crédito adicionado</TableHead><TableHead className="text-right">Cotação (R$/US$)</TableHead></TableRow></TableHeader><TableBody>
+          {creditHistory.length === 0 && <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Nenhum crédito foi adicionado neste período.</TableCell></TableRow>}
+          {creditHistoryWithValues.map((entry) => <TableRow key={entry.id}><TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(entry.createdAt)}</TableCell><TableCell>{entry.user?.name ?? "Sistema"}</TableCell><TableCell>{entry.values.creditUsd === null ? "—" : formatCurrencyUSD(entry.values.creditUsd)}</TableCell><TableCell className="text-right">{entry.values.brlRate === null ? "—" : formatBRLRate(entry.values.brlRate)}</TableCell></TableRow>)}
         </TableBody></Table></CardContent>
       </Card>
 
@@ -143,12 +146,12 @@ function UsageBreakdown({ title, headers, rows, empty }: { title: string; header
   return <Card className="overflow-hidden shadow-sm"><CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader><CardContent className="max-h-72 overflow-y-auto p-0"><Table><TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]"><TableRow>{headers.map((header, index) => <TableHead key={header} className={index === headers.length - 1 ? "text-right" : undefined}>{header}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.length === 0 ? <TableRow><TableCell colSpan={headers.length} className="py-6 text-center text-sm text-muted-foreground">{empty}</TableCell></TableRow> : rows.map((row, rowIndex) => <TableRow key={`${row[0]}-${rowIndex}`}>{row.map((cell, index) => <TableCell key={index} className={index === row.length - 1 ? "text-right whitespace-nowrap" : undefined}>{cell}</TableCell>)}</TableRow>)}</TableBody></Table></CardContent></Card>;
 }
 
-function budgetValues(metadata: unknown) {
+function creditValues(metadata: unknown) {
   const data = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
   // Registros anteriores armazenavam os valores diretamente; os novos ficam em "current".
   const current = data.current && typeof data.current === "object" ? data.current as Record<string, unknown> : data;
   const toNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
-  return { budgetUsd: toNumber(current.aiMonthlyBudgetUsd), brlRate: toNumber(current.usdBrlReferenceRate) };
+  return { creditUsd: toNumber(current.creditUsd ?? current.aiMonthlyBudgetUsd), brlRate: toNumber(current.usdBrlReferenceRate) };
 }
 
 function formatBRLRate(value: number) {
