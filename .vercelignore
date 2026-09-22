@@ -1,0 +1,6 @@
+# Configurações locais nunca devem participar do build de produção.
+# A Vercel injeta as variáveis do ambiente Production no deploy.
+.env
+.env.local
+.env.development
+.env.test
