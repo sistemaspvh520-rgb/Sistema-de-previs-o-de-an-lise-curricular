@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ROLE_LABELS } from "@/lib/rbac";
@@ -35,12 +34,11 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState<Role>(user.role);
-  const [isActive, setIsActive] = useState(user.isActive);
   const [pending, start] = useTransition();
 
   function saveEdit() {
     start(async () => {
-      const res = await updateUserAction({ id: user.id, name, email, role, isActive });
+      const res = await updateUserAction({ id: user.id, name, email, role, isActive: user.isActive });
       if (res.ok) {
         toast.success(res.message);
         setEditOpen(false);
@@ -143,13 +141,6 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <div className="text-sm font-medium">Acesso ativo</div>
-                <div className="text-xs text-muted-foreground">Usuários inativos perdem a sessão em até 5 minutos.</div>
-              </div>
-              <Switch checked={isActive} onCheckedChange={setIsActive} disabled={isSelf} />
             </div>
           </div>
           <DialogFooter>
