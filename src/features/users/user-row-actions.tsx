@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Eye, KeyRound, Loader2, LogIn, MailPlus, Pencil, Send, Trash2 } from "lucide-react";
+import { Eye, KeyRound, Loader2, LogIn, MailPlus, MoreHorizontal, Pencil, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { deleteUserAction, impersonateUserAction, resendInviteAction, resetPasswordAction, revealInitialPasswordAction, sendResetLinkAction, updateUserAction } from "@/features/users/actions";
 import { TemporaryPasswordDialog } from "@/features/users/temporary-password-dialog";
@@ -94,71 +94,28 @@ export function UserRowActions({ user, isSelf, emailEnabled }: { user: UserRow; 
   }
 
   return (
-    <div className="flex min-w-max flex-nowrap justify-end gap-1">
-      {user.mustChangePassword && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Ver senha temporária" onClick={reveal} disabled={pending}>
-              <Eye className="size-4 text-status-warning" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Ver senha temporária (ainda não fez o primeiro acesso)</TooltipContent>
-        </Tooltip>
-      )}
-      {user.mustChangePassword && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Reenviar convite" onClick={resendInvite} disabled={pending || !emailEnabled}>
-              <MailPlus className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{emailEnabled ? "Reenviar convite por e-mail (link para definir a senha)" : "Envio de e-mail não configurado"}</TooltipContent>
-        </Tooltip>
-      )}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Enviar link de redefinição" onClick={sendResetLink} disabled={pending || !emailEnabled || isSelf}>
-            <Send className="size-4" />
+    <div className="flex items-center justify-end gap-1">
+      <Button variant="ghost" size="icon" aria-label={`Editar ${user.name}`} onClick={() => setEditOpen(true)}>
+        <Pencil className="size-4" />
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label={`Mais ações para ${user.name}`} disabled={pending}>
+            <MoreHorizontal className="size-4" />
           </Button>
-        </TooltipTrigger>
-        <TooltipContent>{emailEnabled ? "Enviar link de redefinição de senha por e-mail" : "Envio de e-mail não configurado"}</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => setEditOpen(true)}>
-            <Pencil className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Editar nome, e-mail, perfil e acesso</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Gerar senha temporária" onClick={() => setResetOpen(true)} disabled={isSelf}>
-            <KeyRound className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Gerar nova senha temporária</TooltipContent>
-      </Tooltip>
-      {!isSelf && user.isActive && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Acessar como" onClick={impersonate} disabled={pending}>
-              <LogIn className="size-4 text-brand-navy" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Acessar como este usuário (modo de suporte)</TooltipContent>
-        </Tooltip>
-      )}
-      {!isSelf && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Excluir conta" onClick={() => { setDeleteConfirm(""); setDeleteOpen(true); }} disabled={pending}>
-              <Trash2 className="size-4 text-status-danger" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Excluir conta definitivamente</TooltipContent>
-        </Tooltip>
-      )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          {user.mustChangePassword && <DropdownMenuItem onSelect={reveal} disabled={pending}><Eye className="text-status-warning" /> Ver senha temporária</DropdownMenuItem>}
+          {user.mustChangePassword && <DropdownMenuItem onSelect={resendInvite} disabled={pending || !emailEnabled}><MailPlus /> Reenviar convite</DropdownMenuItem>}
+          <DropdownMenuItem onSelect={sendResetLink} disabled={pending || !emailEnabled || isSelf}><Send /> Enviar redefinição de senha</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setResetOpen(true)} disabled={isSelf}><KeyRound /> Gerar senha temporária</DropdownMenuItem>
+          {!isSelf && user.isActive && <DropdownMenuItem onSelect={impersonate} disabled={pending}><LogIn className="text-brand-navy" /> Acessar como usuário</DropdownMenuItem>}
+          {!isSelf && <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => { setDeleteConfirm(""); setDeleteOpen(true); }} disabled={pending}><Trash2 /> Excluir conta</DropdownMenuItem>
+          </>}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>

@@ -49,8 +49,8 @@ export default async function UsersPage() {
       )}
       <Card className="users-table-shell overflow-hidden shadow-sm">
         <div className="users-desktop-table">
-        <Table className="min-w-[1050px]">
-          <TableHeader>
+        <Table className="min-w-[900px]">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
             <TableRow>
               <TableHead>Nome</TableHead>
               <TableHead>E-mail</TableHead>
@@ -79,12 +79,9 @@ export default async function UsersPage() {
                     <Badge variant="outline" className="border-transparent bg-status-neutral-bg text-status-neutral">Inativo</Badge>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell title={u.mustChangePassword ? (u.inviteSentAt ? `Convite enviado em ${formatDateTime(u.inviteSentAt)}` : "Convite não enviado") : undefined}>
                   {u.mustChangePassword ? (
-                    <div>
-                      <Badge variant="outline" className="border-transparent bg-status-warning-bg text-status-warning">Temporária · aguardando 1º acesso</Badge>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">{u.inviteSentAt ? `Convite enviado em ${formatDateTime(u.inviteSentAt)}` : "Convite não enviado"}</div>
-                    </div>
+                    <Badge variant="outline" className="border-transparent bg-status-warning-bg text-status-warning">Senha temporária</Badge>
                   ) : (
                     <Badge variant="outline" className="border-transparent bg-status-success-bg text-status-success">Definida pelo usuário</Badge>
                   )}

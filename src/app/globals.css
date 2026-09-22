@@ -167,6 +167,8 @@
 @media (min-width: 1280px) {
   .users-desktop-table {
     display: block;
+    max-height: calc(100dvh - 20rem);
+    overflow-y: auto;
   }
 
   .users-mobile-list {
