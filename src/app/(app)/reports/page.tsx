@@ -276,156 +276,150 @@ export default async function ReportsPage({
           </span>
         </Link>
       )}
-      <section className="relative isolate mt-6 overflow-hidden rounded-[28px] border border-brand-navy/30 bg-[radial-gradient(circle_at_8%_0%,rgba(14,165,233,0.32),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(16,185,129,0.24),transparent_26%),linear-gradient(135deg,#00284d,#071426_60%,#041b36)] p-3 shadow-[0_18px_50px_rgba(2,40,77,0.18)] sm:p-5">
-        <div className="pointer-events-none absolute -left-24 bottom-0 size-64 rounded-full bg-cyan-400/15 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 top-1/3 size-56 rounded-full bg-emerald-400/10 blur-3xl" />
-        <div className="relative grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="overflow-hidden border border-white/15 bg-white/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]">
-            <CardHeader className="border-b border-white/10 bg-white/[0.05] px-5 py-4">
-              <CardTitle className="text-base text-white">
-                Últimas análises
-              </CardTitle>
-              <p className="text-xs text-slate-200">
-                Acesse rapidamente os atendimentos mais recentes.
-              </p>
-            </CardHeader>
-            <CardContent className="p-0">
-              {recent.length === 0 ? (
-                <p className="px-6 pb-6 text-sm text-muted-foreground">
-                  Você ainda não iniciou nenhuma análise.
-                </p>
-              ) : (
-                <ul className="divide-y divide-white/10">
-                  {recent.map((analysis) => (
-                    <li key={analysis.id}>
-                      <Link
-                        href={`/analyses/${analysis.id}`}
-                        className="group flex items-center gap-3 border-l-4 border-transparent px-5 py-3.5 transition-all hover:border-brand-cyan hover:bg-white/[0.08]"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold text-white">
-                            {analysis.studentName ?? "Aluno não identificado"}
-                          </div>
-                          <div className="truncate text-xs text-slate-300">
-                            {analysis.courseName ?? "Curso não identificado"}
-                            {analysis.poloCode
-                              ? ` · Polo ${analysis.poloCode}`
-                              : ""}{" "}
-                            · {formatDateTime(analysis.createdAt)}
-                          </div>
-                        </div>
-                        <AnalysisStatusBadge status={analysis.status} />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        <Card className="overflow-hidden border border-emerald-300/20 bg-emerald-400/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]">
-            <CardHeader className="border-b border-white/10 bg-emerald-400/[0.12] px-5 py-4">
-              <CardTitle className="text-base text-white">
-                Conversão por curso
-              </CardTitle>
-              <p className="text-xs text-white/80">
-                Matrículas confirmadas entre as análises concluídas no período.
-              </p>
-            </CardHeader>
-            <CardContent className="p-4">
-              {conversionByCourse.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Ainda não há resultados de matrícula suficientes para comparar
-                  cursos.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {conversionByCourse.map((course) => {
-                    const rate = Math.round(
-                      (course.enrolled / course.completed) * 100,
-                    );
-                    return (
-                      <div
-                        key={course.name}
-                        className="rounded-xl border border-white/10 bg-white/[0.07] p-3"
-                      >
-                        <div className="flex justify-between gap-3 text-sm">
-                          <span className="truncate font-semibold text-white">
-                            {course.name}
-                          </span>
-                          <span className="shrink-0 rounded-full bg-emerald-300/15 px-2 py-0.5 text-xs font-semibold text-emerald-100">
-                            {course.enrolled}/{course.completed} · {rate}%
-                          </span>
-                        </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-[linear-gradient(90deg,#0b9b60,#38d69a)] transition-all duration-700 motion-reduce:transition-none"
-                            style={{ width: `${rate}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-        <Card className="relative mt-4 overflow-hidden border border-amber-300/25 bg-amber-200/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]">
-          <CardHeader className="border-b border-amber-200/15 bg-amber-200/[0.08]">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UserRoundX className="size-4 text-status-warning" />{" "}
-              Oportunidades de follow-up
+      <div className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card className="overflow-hidden border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,45,75,0.08)] [--card-spacing:0px]">
+          <CardHeader className="border-b border-sky-100 bg-[linear-gradient(120deg,#003b71,#075a9c_58%,#0a8fd4)] px-5 py-4">
+            <CardTitle className="text-base text-white">
+              Últimas análises
             </CardTitle>
-            <p className="text-xs text-amber-50/80">
-              Análises marcadas como não matriculadas para novo contato
-              comercial.
+            <p className="text-xs text-cyan-100">
+              Acesse rapidamente os atendimentos mais recentes.
             </p>
           </CardHeader>
           <CardContent className="p-0">
-            {followUps.length === 0 ? (
-              <p className="px-6 pb-6 text-sm text-muted-foreground">
-                Nenhuma oportunidade de follow-up no período selecionado.
+            {recent.length === 0 ? (
+              <p className="px-6 py-6 text-sm text-muted-foreground">
+                Você ainda não iniciou nenhuma análise.
               </p>
             ) : (
-              <div className="divide-y divide-amber-100/15">
-                {followUps.map((analysis) => (
-                  <Link
-                    key={analysis.id}
-                    href={`/analyses/${analysis.id}`}
-                    className="grid gap-1 border-l-4 border-transparent px-5 py-3.5 text-sm transition-all hover:border-status-warning hover:bg-amber-100/[0.08] sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-4"
-                  >
-                    <div className="font-medium text-white">
-                      {analysis.studentName ?? "Aluno não identificado"}
-                    </div>
-                    <div className="text-slate-200">
-                      {analysis.courseName ?? "Curso não identificado"}
-                      {analysis.poloName ? ` · ${analysis.poloName}` : ""}
-                    </div>
-                    <div className="text-xs text-slate-300">
-                      {analysis.enrollmentUpdatedAt
-                        ? formatDateTime(analysis.enrollmentUpdatedAt)
-                        : "Sem data"}
-                    </div>
-                    {analysis.enrollmentNote && (
-                      <div className="sm:col-span-3 text-xs text-amber-100/75">
-                        {analysis.enrollmentNote}
+              <ul className="divide-y divide-slate-100">
+                {recent.map((analysis) => (
+                  <li key={analysis.id}>
+                    <Link
+                      href={`/analyses/${analysis.id}`}
+                      className="group flex items-center gap-3 border-l-4 border-transparent px-5 py-3.5 transition-all hover:border-brand-cyan hover:bg-sky-50/75"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-slate-800">
+                          {analysis.studentName ?? "Aluno não identificado"}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {analysis.courseName ?? "Curso não identificado"}
+                          {analysis.poloCode
+                            ? ` · Polo ${analysis.poloCode}`
+                            : ""}{" "}
+                          · {formatDateTime(analysis.createdAt)}
+                        </div>
                       </div>
-                    )}
-                  </Link>
+                      <AnalysisStatusBadge status={analysis.status} />
+                    </Link>
+                  </li>
                 ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden border-emerald-200 bg-white shadow-[0_10px_30px_rgba(15,75,55,0.08)] [--card-spacing:0px]">
+          <CardHeader className="border-b border-emerald-100 bg-[linear-gradient(120deg,#087c4b,#13a56b_62%,#25bb87)] px-5 py-4">
+            <CardTitle className="text-base text-white">
+              Conversão por curso
+            </CardTitle>
+            <p className="text-xs text-white/80">
+              Matrículas confirmadas entre as análises concluídas no período.
+            </p>
+          </CardHeader>
+          <CardContent className="p-4">
+            {conversionByCourse.length === 0 ? (
+              <p className="p-5 text-sm text-muted-foreground">
+                Ainda não há resultados de matrícula suficientes para comparar
+                cursos.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {conversionByCourse.map((course) => {
+                  const rate = Math.round(
+                    (course.enrolled / course.completed) * 100,
+                  );
+                  return (
+                    <div
+                      key={course.name}
+                      className="rounded-xl border border-emerald-100 bg-emerald-50/55 p-3"
+                    >
+                      <div className="flex justify-between gap-3 text-sm">
+                        <span className="truncate font-semibold text-slate-800">
+                          {course.name}
+                        </span>
+                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-emerald-700 shadow-sm">
+                          {course.enrolled}/{course.completed} · {rate}%
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-100">
+                        <div
+                          className="h-full rounded-full bg-[linear-gradient(90deg,#0b9b60,#38d69a)] transition-all duration-700 motion-reduce:transition-none"
+                          style={{ width: `${rate}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
-        <PoloReportCard
-          className="relative mt-4"
-          variant="glass"
-          title="Minhas análises por polo"
-          description="Clique no polo para abrir a lista ou exporte o relatório em CSV."
-          rows={byPolo}
-          exportQuery={`${typeof params.from === "string" ? `?from=${encodeURIComponent(params.from)}` : ""}${typeof params.to === "string" ? `${typeof params.from === "string" ? "&" : "?"}to=${encodeURIComponent(params.to)}` : ""}`}
-        />
-      </section>
+      </div>
+      <Card className="mt-5 overflow-hidden border-amber-200 bg-white shadow-[0_10px_30px_rgba(120,75,10,0.07)] [--card-spacing:0px]">
+        <CardHeader className="border-b border-amber-100 bg-[linear-gradient(110deg,#fff4d8,#fffdf8)] px-5 py-4">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <UserRoundX className="size-4 text-status-warning" /> Oportunidades
+            de follow-up
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Análises marcadas como não matriculadas para novo contato comercial.
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          {followUps.length === 0 ? (
+            <p className="px-6 py-6 text-sm text-muted-foreground">
+              Nenhuma oportunidade de follow-up no período selecionado.
+            </p>
+          ) : (
+            <div className="divide-y divide-amber-100">
+              {followUps.map((analysis) => (
+                <Link
+                  key={analysis.id}
+                  href={`/analyses/${analysis.id}`}
+                  className="grid gap-1 border-l-4 border-transparent px-5 py-3.5 text-sm transition-all hover:border-status-warning hover:bg-amber-50/70 sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-4"
+                >
+                  <div className="font-medium text-slate-800">
+                    {analysis.studentName ?? "Aluno não identificado"}
+                  </div>
+                  <div className="text-muted-foreground">
+                    {analysis.courseName ?? "Curso não identificado"}
+                    {analysis.poloName ? ` · ${analysis.poloName}` : ""}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {analysis.enrollmentUpdatedAt
+                      ? formatDateTime(analysis.enrollmentUpdatedAt)
+                      : "Sem data"}
+                  </div>
+                  {analysis.enrollmentNote && (
+                    <div className="sm:col-span-3 text-xs text-muted-foreground">
+                      {analysis.enrollmentNote}
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <PoloReportCard
+        className="mt-5 overflow-hidden border-sky-200 bg-white shadow-[0_10px_30px_rgba(15,45,75,0.07)]"
+        title="Minhas análises por polo"
+        description="Clique no polo para abrir a lista ou exporte o relatório em CSV."
+        rows={byPolo}
+        exportQuery={`${typeof params.from === "string" ? `?from=${encodeURIComponent(params.from)}` : ""}${typeof params.to === "string" ? `${typeof params.from === "string" ? "&" : "?"}to=${encodeURIComponent(params.to)}` : ""}`}
+      />
     </>
   );
 }
