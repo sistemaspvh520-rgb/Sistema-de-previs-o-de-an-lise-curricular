@@ -153,10 +153,10 @@ export default async function ManagementPage({
               detail={`${enrolled} matrícula(s) em ${completed} análises concluídas`}
             />
             <Link
-              href="/reports"
+              href="/analyses?enrollment=ENROLLED"
               className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/20"
             >
-              Ver meus relatórios
+              Ver matrículas
             </Link>
           </div>
         </div>

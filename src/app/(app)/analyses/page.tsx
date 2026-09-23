@@ -40,9 +40,16 @@ const STATUS_FILTERS: Array<{
   id: string;
   value: AnalysisStatus | "ALL";
   group?: "ATTENTION";
+  enrollment?: EnrollmentStatus;
   label: string;
 }> = [
   { id: "all", value: "ALL", label: "Todas" },
+  {
+    id: "enrolled",
+    value: "ALL",
+    enrollment: "ENROLLED",
+    label: "Matriculadas",
+  },
   { id: "reanalysis", value: "ALL", label: "Em reanálise" },
   { id: "completed", value: "COMPLETED", label: "Concluídas" },
   {
@@ -71,8 +78,8 @@ export default async function AnalysesPage({
   const followUpDue = params.followUp === "due";
   const reanalysisInProgress = params.reanalysis === "active";
   const enrollmentStatus =
-    params.enrollment === "NOT_ENROLLED"
-      ? ("NOT_ENROLLED" as EnrollmentStatus)
+    params.enrollment === "ENROLLED" || params.enrollment === "NOT_ENROLLED"
+      ? (params.enrollment as EnrollmentStatus)
       : undefined;
   // Gestor pode filtrar por responsável; demais perfis só veem as próprias análises.
   const isAdmin = user.role === "ADMIN";
@@ -160,6 +167,8 @@ export default async function AnalysesPage({
                   ...(userFilter ? { user: userFilter } : {}),
                   ...(f.id === "reanalysis"
                     ? { reanalysis: "active" }
+                    : f.enrollment
+                      ? { enrollment: f.enrollment }
                     : f.group
                       ? { filter: f.group }
                       : f.value !== "ALL"
@@ -173,7 +182,9 @@ export default async function AnalysesPage({
                   !reanalysisInProgress &&
                   (f.group
                     ? statusGroup === f.group
-                    : !statusGroup && status === f.value)
+                    : f.enrollment
+                      ? enrollmentStatus === f.enrollment
+                      : !statusGroup && !enrollmentStatus && status === f.value)
                   ? "border-brand-navy bg-brand-navy text-white"
                   : "bg-card hover:bg-muted",
               )}
@@ -185,6 +196,8 @@ export default async function AnalysesPage({
         <form className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {reanalysisInProgress ? (
             <input type="hidden" name="reanalysis" value="active" />
+          ) : enrollmentStatus ? (
+            <input type="hidden" name="enrollment" value={enrollmentStatus} />
           ) : statusGroup ? (
             <input type="hidden" name="filter" value={statusGroup} />
           ) : (
@@ -414,6 +427,10 @@ export default async function AnalysesPage({
                         ...(userFilter ? { user: userFilter } : {}),
                         ...(followUpDue
                           ? { followUp: "due" }
+                          : reanalysisInProgress
+                            ? { reanalysis: "active" }
+                            : enrollmentStatus
+                              ? { enrollment: enrollmentStatus }
                           : statusGroup
                             ? { filter: statusGroup }
                             : status !== "ALL"
@@ -438,6 +455,10 @@ export default async function AnalysesPage({
                         ...(userFilter ? { user: userFilter } : {}),
                         ...(followUpDue
                           ? { followUp: "due" }
+                          : reanalysisInProgress
+                            ? { reanalysis: "active" }
+                            : enrollmentStatus
+                              ? { enrollment: enrollmentStatus }
                           : statusGroup
                             ? { filter: statusGroup }
                             : status !== "ALL"
