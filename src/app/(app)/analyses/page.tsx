@@ -32,6 +32,7 @@ import { getSystemSettings } from "@/repositories/settings-repository";
 import { formatCourseFormat } from "@/domain/course-formats";
 import { countDueFollowUps } from "@/services/follow-up/follow-up";
 import { AnalysisTableRowLink } from "@/features/analyses/components/analysis-table-row-link";
+import { DeleteAnalysisButton } from "@/features/analyses/components/delete-analysis-button";
 
 export const metadata: Metadata = { title: "Análises" };
 export const dynamic = "force-dynamic";
@@ -115,6 +116,7 @@ export default async function AnalysesPage({
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const showDiagnostics = can(user.role, "audit:read");
   const showOwner = user.role === "ADMIN";
+  const showDelete = can(user.role, "analysis:delete");
 
   return (
     <>
@@ -169,11 +171,11 @@ export default async function AnalysesPage({
                     ? { reanalysis: "active" }
                     : f.enrollment
                       ? { enrollment: f.enrollment }
-                    : f.group
-                      ? { filter: f.group }
-                      : f.value !== "ALL"
-                        ? { status: f.value }
-                        : {}),
+                      : f.group
+                        ? { filter: f.group }
+                        : f.value !== "ALL"
+                          ? { status: f.value }
+                          : {}),
                 },
               }}
               className={cn(
@@ -281,13 +283,22 @@ export default async function AnalysesPage({
                 </TableHead>
               )}
               <TableHead className="hidden sm:table-cell">Data</TableHead>
+              {showDelete && (
+                <TableHead className="hidden text-right lg:table-cell">
+                  Ações
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={(showDiagnostics ? 6 : 5) + (showOwner ? 1 : 0)}
+                  colSpan={
+                    (showDiagnostics ? 6 : 5) +
+                    (showOwner ? 1 : 0) +
+                    (showDelete ? 1 : 0)
+                  }
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   Nenhuma análise encontrada
@@ -406,6 +417,11 @@ export default async function AnalysesPage({
                 <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
                   {formatDateTime(a.createdAt)}
                 </TableCell>
+                {showDelete && (
+                  <TableCell className="hidden text-right lg:table-cell">
+                    <DeleteAnalysisButton analysisId={a.id} compact />
+                  </TableCell>
+                )}
               </AnalysisTableRowLink>
             ))}
           </TableBody>
@@ -431,11 +447,11 @@ export default async function AnalysesPage({
                             ? { reanalysis: "active" }
                             : enrollmentStatus
                               ? { enrollment: enrollmentStatus }
-                          : statusGroup
-                            ? { filter: statusGroup }
-                            : status !== "ALL"
-                              ? { status }
-                              : {}),
+                              : statusGroup
+                                ? { filter: statusGroup }
+                                : status !== "ALL"
+                                  ? { status }
+                                  : {}),
                         page: page - 1,
                       },
                     }}
@@ -459,11 +475,11 @@ export default async function AnalysesPage({
                             ? { reanalysis: "active" }
                             : enrollmentStatus
                               ? { enrollment: enrollmentStatus }
-                          : statusGroup
-                            ? { filter: statusGroup }
-                            : status !== "ALL"
-                              ? { status }
-                              : {}),
+                              : statusGroup
+                                ? { filter: statusGroup }
+                                : status !== "ALL"
+                                  ? { status }
+                                  : {}),
                         page: page + 1,
                       },
                     }}
