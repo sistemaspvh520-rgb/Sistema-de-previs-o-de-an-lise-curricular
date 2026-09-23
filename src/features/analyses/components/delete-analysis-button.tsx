@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +27,6 @@ export function DeleteAnalysisButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState("");
   const [pending, start] = useTransition();
   function run() {
     start(async () => {
@@ -50,7 +48,6 @@ export function DeleteAnalysisButton({
         title="Excluir análise"
         onClick={(event) => {
           event.stopPropagation();
-          setConfirm("");
           setOpen(true);
         }}
       >
@@ -63,16 +60,10 @@ export function DeleteAnalysisButton({
             <AlertDialogTitle>Excluir esta análise?</AlertDialogTitle>
             <AlertDialogDescription>
               Remove definitivamente a análise, disciplinas, previsão,
-              correções, alertas, dados da IA e o PDF. Para confirmar, digite{" "}
-              <strong>EXCLUIR</strong>.
+              correções, alertas, dados da IA e o PDF. Esta ação não pode ser
+              desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Input
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            placeholder="EXCLUIR"
-            autoComplete="off"
-          />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
@@ -80,7 +71,7 @@ export function DeleteAnalysisButton({
                 e.preventDefault();
                 run();
               }}
-              disabled={pending || confirm !== "EXCLUIR"}
+              disabled={pending}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
               {pending && <Loader2 className="size-4 animate-spin" />} Excluir
