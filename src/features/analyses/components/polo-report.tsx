@@ -35,7 +35,7 @@ export function PoloReportCard({
       className={cn(
         className,
         variant === "glass" &&
-          "border border-white/15 bg-white/[0.08] text-white shadow-none backdrop-blur-xl",
+          "border border-white/15 bg-white/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]",
       )}
     >
       <CardHeader

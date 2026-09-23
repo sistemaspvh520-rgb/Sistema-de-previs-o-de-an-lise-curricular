@@ -280,7 +280,7 @@ export default async function ReportsPage({
         <div className="pointer-events-none absolute -left-24 bottom-0 size-64 rounded-full bg-cyan-400/15 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 top-1/3 size-56 rounded-full bg-emerald-400/10 blur-3xl" />
         <div className="relative grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-          <Card className="overflow-hidden border border-white/15 bg-white/[0.08] text-white shadow-none backdrop-blur-xl">
+        <Card className="overflow-hidden border border-white/15 bg-white/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]">
             <CardHeader className="border-b border-white/10 bg-white/[0.05] px-5 py-4">
               <CardTitle className="text-base text-white">
                 Últimas análises
@@ -322,7 +322,7 @@ export default async function ReportsPage({
               )}
             </CardContent>
           </Card>
-          <Card className="overflow-hidden border border-emerald-300/20 bg-emerald-400/[0.08] text-white shadow-none backdrop-blur-xl">
+        <Card className="overflow-hidden border border-emerald-300/20 bg-emerald-400/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]">
             <CardHeader className="border-b border-white/10 bg-emerald-400/[0.12] px-5 py-4">
               <CardTitle className="text-base text-white">
                 Conversão por curso
@@ -370,7 +370,7 @@ export default async function ReportsPage({
             </CardContent>
           </Card>
         </div>
-        <Card className="relative mt-4 overflow-hidden border border-amber-300/25 bg-amber-200/[0.08] text-white shadow-none backdrop-blur-xl">
+        <Card className="relative mt-4 overflow-hidden border border-amber-300/25 bg-amber-200/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]">
           <CardHeader className="border-b border-amber-200/15 bg-amber-200/[0.08]">
             <CardTitle className="flex items-center gap-2 text-base">
               <UserRoundX className="size-4 text-status-warning" />{" "}
