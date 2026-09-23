@@ -39,16 +39,11 @@ export const dynamic = "force-dynamic";
 const STATUS_FILTERS: Array<{
   id: string;
   value: AnalysisStatus | "ALL";
-  group?: "PROCESSING" | "ATTENTION";
+  group?: "ATTENTION";
   label: string;
 }> = [
   { id: "all", value: "ALL", label: "Todas" },
-  {
-    id: "processing",
-    value: "ALL",
-    group: "PROCESSING",
-    label: "Em processamento",
-  },
+  { id: "reanalysis", value: "ALL", label: "Em reanálise" },
   { id: "completed", value: "COMPLETED", label: "Concluídas" },
   {
     id: "attention",
@@ -65,10 +60,7 @@ export default async function AnalysesPage({
   const params = await searchParams;
   const status = (typeof params.status === "string" ? params.status : "ALL") as
     AnalysisStatus | "ALL";
-  const statusGroup =
-    params.filter === "PROCESSING" || params.filter === "ATTENTION"
-      ? params.filter
-      : undefined;
+  const statusGroup = params.filter === "ATTENTION" ? params.filter : undefined;
   const q = typeof params.q === "string" ? params.q : "";
   const settings = await getSystemSettings();
   const poloCode =
@@ -77,6 +69,7 @@ export default async function AnalysesPage({
       ? params.polo
       : undefined;
   const followUpDue = params.followUp === "due";
+  const reanalysisInProgress = params.reanalysis === "active";
   const enrollmentStatus =
     params.enrollment === "NOT_ENROLLED"
       ? ("NOT_ENROLLED" as EnrollmentStatus)
@@ -105,6 +98,7 @@ export default async function AnalysesPage({
       page,
       poloCode,
       followUpDue,
+      reanalysisInProgress,
       enrollmentStatus,
       createdById: isAdmin ? userFilter : user.id,
     }),
@@ -164,16 +158,19 @@ export default async function AnalysesPage({
                   ...(q ? { q } : {}),
                   ...(poloCode ? { polo: poloCode } : {}),
                   ...(userFilter ? { user: userFilter } : {}),
-                  ...(f.group
-                    ? { filter: f.group }
-                    : f.value !== "ALL"
-                      ? { status: f.value }
-                      : {}),
+                  ...(f.id === "reanalysis"
+                    ? { reanalysis: "active" }
+                    : f.group
+                      ? { filter: f.group }
+                      : f.value !== "ALL"
+                        ? { status: f.value }
+                        : {}),
                 },
               }}
               className={cn(
                 "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium leading-none transition-colors",
                 !followUpDue &&
+                  !reanalysisInProgress &&
                   (f.group
                     ? statusGroup === f.group
                     : !statusGroup && status === f.value)
@@ -186,7 +183,9 @@ export default async function AnalysesPage({
           ))}
         </div>
         <form className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {statusGroup ? (
+          {reanalysisInProgress ? (
+            <input type="hidden" name="reanalysis" value="active" />
+          ) : statusGroup ? (
             <input type="hidden" name="filter" value={statusGroup} />
           ) : (
             status !== "ALL" && (
