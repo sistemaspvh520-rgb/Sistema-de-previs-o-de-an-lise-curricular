@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/time";
-import { startOfCurrentMonth, zonedDateParts } from "@/lib/time";
+import { startOfCurrentMonth } from "@/lib/time";
 import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
@@ -49,10 +49,6 @@ export default async function ManagementPage({
     ? { createdAt }
     : { createdAt: { gte: monthStart } };
 
-  const today = zonedDateParts();
-  const overdueLimit = new Date(
-    Date.UTC(today.year, today.month - 1, today.day - 2, 4),
-  );
   const [
     activeUsers,
     users,
@@ -294,19 +290,19 @@ export default async function ManagementPage({
           </div>
         </Link>
         <Link
-          href="/settings/users"
+          href="#atividade-equipe"
           className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md"
         >
           <div className="flex items-start gap-3">
             <Users className="mt-0.5 size-5 text-brand-cyan-700" />
             <div>
-              <p className="text-sm font-semibold">Adoção da equipe</p>
+              <p className="text-sm font-semibold">Equipe a acompanhar</p>
               <p className="mt-1 text-2xl font-semibold">
-                {notificationSetupPending} configuração(ões) pendente(s)
+                {activeUsers} usuário(s) ativos
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Configure lembretes, gerencie contas e use “Acessar como
-                usuário” para suporte — sem precisar da senha da pessoa.
+                Identifique por responsável as entradas, conclusões e último
+                acesso. Use a lista abaixo para abrir a fila de cada pessoa.
               </p>
             </div>
             <ArrowUpRight className="ml-auto size-4" />

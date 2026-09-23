@@ -20,7 +20,6 @@ import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
 import { countDueFollowUps } from "@/services/follow-up/follow-up";
 import { countStaleEnrollmentCases } from "@/services/follow-up/management-alerts";
-import { DashboardRing } from "@/components/dashboard/dashboard-ring";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Meus relatórios" };
@@ -182,26 +181,22 @@ export default async function ReportsPage({
         title="Meus relatórios"
         description="Acompanhe volume, conversão e oportunidades de retorno em um único lugar."
       />
-      <section className="relative mt-4 overflow-hidden rounded-2xl border border-brand-cyan/30 bg-[radial-gradient(circle_at_18%_0%,rgba(6,147,227,0.42),transparent_43%),linear-gradient(135deg,#00284d,#071426)] px-6 py-7 text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <div className="pointer-events-none absolute -right-20 top-0 size-56 rounded-full bg-brand-cyan/15 blur-3xl" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+      <section className="relative mt-4 overflow-hidden rounded-2xl border border-brand-cyan/30 bg-[linear-gradient(110deg,#00284d,#071426)] px-5 py-4 text-white shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="relative flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-200">
               Painel pessoal
             </p>
             <h2 className="mt-2 text-2xl font-bold tracking-tight">
-              Seu ritmo de entregas
+              Carteira comercial do período
             </h2>
             <p className="mt-1 text-sm text-slate-200">
-              Acompanhe o que foi concluído e aja nos retornos pendentes.
+              Entradas, matrículas, reanálises e casos que precisam de ação.
             </p>
           </div>
-          <DashboardRing
-            value={completed}
-            total={inPeriod}
-            label="entregues"
-            detail={`${completed} de ${inPeriod} análises concluídas`}
-          />
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
+            {inPeriod} entrada(s)
+          </span>
         </div>
       </section>
       <DateRangeFilter />
