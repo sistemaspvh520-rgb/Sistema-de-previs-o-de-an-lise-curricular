@@ -209,136 +209,43 @@ export default async function ManagementPage({
         <DateRangeFilter />
       </div>
 
-      <section className="mt-5 grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(18rem,1.15fr)]">
-        <JourneyCard
-          title="Em aberto"
-          value={notEnrolled}
-          detail="Confirmadas como não matriculadas"
-          icon={FileText}
-          href="/analyses?enrollment=NOT_ENROLLED"
-          tone="sky"
-        />
-        <JourneyCard
-          title="Concluídas"
-          value={completed}
-          detail={`${completionRate}% do volume recebido`}
-          icon={CheckCircle2}
-          href="/analyses?status=COMPLETED"
+      <section
+        className="mt-5 grid gap-3 rounded-2xl bg-brand-navy p-3 shadow-xl md:grid-cols-2 xl:grid-cols-4"
+        aria-label="Resumo operacional"
+      >
+        <ManagementMetric
+          label="Entradas"
+          value={total}
+          detail="Recebidas no período"
+          href="/analyses"
           tone="cyan"
         />
-        <JourneyCard
-          title="Matriculadas"
-          value={enrolled}
-          detail={`${conversion}% das análises concluídas`}
-          icon={GraduationCap}
+        <ManagementMetric
+          label="Matrículas"
+          value={`${enrolled} · ${conversion}%`}
+          detail="Conversão das entradas"
           href="/analyses"
-          tone="emerald"
+          tone="success"
         />
-        <Card className="border-0 bg-slate-50 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CircleAlert className="size-4 text-brand-navy" /> Funil
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {funnel.map((stage, index) => {
-              const percent = total
-                ? Math.round((stage.value / total) * 100)
-                : 0;
-              return (
-                <Link key={stage.label} href={stage.href} className="block">
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span className="font-medium">{stage.label}</span>
-                    <span>
-                      {stage.value} {index > 0 && `(${percent}%)`}
-                    </span>
-                  </div>
-                  <div className="h-8 overflow-hidden rounded-sm bg-slate-200">
-                    <div
-                      className={`flex h-full items-center justify-end px-2 text-xs font-semibold text-white ${stage.color} transition-all duration-700 motion-reduce:transition-none`}
-                      style={{
-                        width: `${Math.max(stage.value ? 12 : 0, percent)}%`,
-                      }}
-                    >
-                      {stage.value > 0 && `${percent}%`}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="mt-5 grid gap-4 lg:grid-cols-2">
-        <Link
-          href="/analyses?followUp=due"
-          className="rounded-xl border border-status-warning/30 bg-status-warning-bg p-5 transition-shadow hover:shadow-md"
-        >
-          <div className="flex items-start gap-3">
-            <BellRing className="mt-0.5 size-5 text-status-warning" />
-            <div>
-              <p className="text-sm font-semibold">Prioridade de hoje</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {overdueFollowUps} caso(s) há mais de 2 dias úteis
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Sem matrícula, inclusive em reanálise. Abra a fila e investigue.
-              </p>
-            </div>
-            <ArrowUpRight className="ml-auto size-4" />
-          </div>
-        </Link>
-        <Link
-          href="#atividade-equipe"
-          className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md"
-        >
-          <div className="flex items-start gap-3">
-            <Users className="mt-0.5 size-5 text-brand-cyan-700" />
-            <div>
-              <p className="text-sm font-semibold">Equipe a acompanhar</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {activeUsers} usuário(s) ativos
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Identifique por responsável as entradas, conclusões e último
-                acesso. Use a lista abaixo para abrir a fila de cada pessoa.
-              </p>
-            </div>
-            <ArrowUpRight className="ml-auto size-4" />
-          </div>
-        </Link>
-      </section>
-
-      <section className="mt-5 grid gap-4 lg:grid-cols-3">
-        <KpiStrip
-          title="Em reanálise"
+        <ManagementMetric
+          label="Em reanálise"
           value={reanalysesInProgress}
-          label="Aguardando nova confirmação"
-          color="border-sky-500"
+          detail="Aguardando novo resultado"
+          href="/analyses?reanalysis=active"
+          tone="gold"
+        />
+        <ManagementMetric
+          label="Críticas +2 dias úteis"
+          value={overdueFollowUps}
+          detail="Sem matrícula, inclusive reanálise"
           href="/analyses?followUp=due"
-        />
-        <KpiStrip
-          title="Equipe ativa"
-          value={activeUsers}
-          label="Usuários com acesso liberado"
-          color="border-cyan-500"
-          href="#atividade-equipe"
-        />
-        <KpiStrip
-          title="Conversão concluída → matrícula"
-          value={`${conversion}%`}
-          label={`${enrolled} matrícula(s) de ${completed} concluídas`}
-          color="border-emerald-500"
-          href="/analyses?status=COMPLETED"
+          tone="danger"
+          alert={overdueFollowUps > 0}
         />
       </section>
 
-      <section
-        id="atividade-equipe"
-        className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"
-      >
-        <Card className="shadow-sm">
+      <section id="atividade-equipe" className="mt-6">
+        <Card className="overflow-hidden border-brand-cyan/25 bg-brand-cyan-50/35 shadow-md">
           <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -392,46 +299,6 @@ export default async function ManagementPage({
             })}
           </CardContent>
         </Card>
-        <Card className="bg-brand-navy text-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Índices da operação</CardTitle>
-            <p className="text-xs text-cyan-100">
-              Leitura calculada para o período selecionado.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <Index
-              label="Conclusão"
-              value={`${completionRate}%`}
-              note={`${completed} de ${total} recebidas`}
-              percent={completionRate}
-            />
-            <Index
-              label="Conversão em matrícula"
-              value={`${conversion}%`}
-              note={`${enrolled} de ${completed} concluídas`}
-              percent={conversion}
-            />
-            <Index
-              label="Retornos informados"
-              value={`${responseRate}%`}
-              note={`${returned} de ${completed} concluídas`}
-              percent={responseRate}
-            />
-            <Index
-              label="Em acompanhamento"
-              value={pending}
-              note="Aguardando retorno de matrícula"
-              percent={completed ? Math.round((pending / completed) * 100) : 0}
-            />
-            <Link
-              href="/analyses?followUp=due"
-              className="flex items-center justify-between rounded-lg bg-white px-3 py-2.5 font-medium text-brand-navy transition-transform hover:-translate-y-0.5"
-            >
-              Tratar retornos pendentes <ArrowUpRight className="size-4" />
-            </Link>
-          </CardContent>
-        </Card>
       </section>
       <PoloReportCard
         className="mt-6 shadow-sm"
@@ -440,6 +307,52 @@ export default async function ManagementPage({
         exportQuery={exportQuery}
       />
     </>
+  );
+}
+
+function ManagementMetric({
+  label,
+  value,
+  detail,
+  href,
+  tone,
+  alert = false,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  href: string;
+  tone: "cyan" | "success" | "gold" | "danger";
+  alert?: boolean;
+}) {
+  const tones = {
+    cyan: "border-t-brand-cyan text-brand-cyan",
+    success: "border-t-status-success text-status-success",
+    gold: "border-t-brand-gold text-brand-gold",
+    danger: "border-t-status-danger text-status-danger",
+  };
+  return (
+    <Link
+      href={href}
+      className="group rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
+    >
+      <Card
+        className={`h-full border border-white/10 border-t-4 ${tones[tone]} bg-white/7 text-white shadow-lg transition-all duration-300 group-hover:-translate-y-0.5 group-hover:bg-white/12`}
+      >
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-semibold text-cyan-100">
+            {label}
+          </CardTitle>
+          {alert && (
+            <BellRing className="size-4 animate-pulse text-status-danger motion-reduce:animate-none" />
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-white">{value}</div>
+          <p className="mt-1 text-xs text-slate-300">{detail}</p>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
