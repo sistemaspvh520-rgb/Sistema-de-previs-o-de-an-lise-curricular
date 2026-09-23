@@ -39,7 +39,7 @@ export interface LocalExtraction {
   headerFields?: Record<string, string>;
 }
 
-export const PARSER_VERSION = "pdfjs-table-1.1";
+export const PARSER_VERSION = "pdfjs-table-1.2";
 
 const Y_TOLERANCE = 3.5;
 
@@ -172,7 +172,7 @@ export async function parsePdf(bytes: Buffer, opts?: { maxPages?: number }): Pro
       page.cleanup();
     }
     const table = detectTables(pages);
-    const headerFields = extractHeaderFields(Object.values(table.freeText).flat());
+    const headerFields = { ...extractHeaderFields(Object.values(table.freeText).flat()), ...extractUnifiedEnrollmentHeader(pages) };
     return { pageCount, pages, textByPage, parserVersion: PARSER_VERSION, table, headerFields };
   } finally {
     await task.destroy().catch((e: unknown) => logger.debug("pdf.destroy", { err: String(e) }));
@@ -197,6 +197,39 @@ export function extractHeaderFields(lines: string[]): Record<string, string> {
       }
     }
   }
+  return out;
+}
+
+/** O resultado de matrícula unificada usa rótulos em uma linha e valores alinhados
+ * logo abaixo, sem os dois-pontos presentes no SIAA antigo. */
+function extractUnifiedEnrollmentHeader(pages: ParsedPage[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  const first = pages[0];
+  if (!first) return out;
+  const labels = first.lines.find((line) => {
+    const normalized = line.text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return normalized.includes("campus / unidade") && normalized.includes("curso") && normalized.includes("semestre de entrada");
+  });
+  if (!labels) return out;
+  const campusX = labels.parts.find((part) => /campus\s*\/\s*unidade/i.test(part.text))?.x;
+  const courseX = labels.parts.find((part) => /^curso$/i.test(part.text.trim()))?.x;
+  const entryX = labels.parts.find((part) => /semestre\s+de\s+entrada/i.test(part.text))?.x;
+  if (campusX === undefined || courseX === undefined || entryX === undefined) return out;
+  // Inclui a quebra de linha do nome do curso, mas não os próximos rótulos
+  // "DATA DA ANÁLISE" e "SITUAÇÃO DE INGRESSO".
+  const values = first.lines.filter((line) => line.y < labels.y - 2 && line.y > labels.y - 35);
+  const readColumn = (from: number, to: number) => values
+    .flatMap((line) => line.parts.filter((part) => part.x >= from - 4 && part.x < to - 4).map((part) => ({ y: line.y, text: part.text.trim() })))
+    .sort((a, b) => b.y - a.y)
+    .map((part) => part.text)
+    .filter(Boolean)
+    .join(" ");
+  const campus = readColumn(campusX, courseX);
+  const course = readColumn(courseX, entryX);
+  const entry = readColumn(entryX, Number.POSITIVE_INFINITY);
+  if (campus) out.campus = campus;
+  if (course) out.curso = course;
+  if (entry) out["semestre de entrada"] = entry;
   return out;
 }
 

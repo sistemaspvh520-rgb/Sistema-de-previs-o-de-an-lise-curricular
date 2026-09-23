@@ -84,7 +84,7 @@ export async function computeAndPersist(analysisId: string, opts?: { resetAudito
       code: "ENTRY_PERIOD_REQUIRED",
       severity: "CRITICAL",
       source: "PIPELINE",
-      message: "O período de ingresso não pôde ser determinado. Confirme para calcular a previsão.",
+      message: "O período de ingresso não pôde ser determinado pelo PDF. Use um cenário manual apenas se precisar comparar projeções.",
     });
   }
 

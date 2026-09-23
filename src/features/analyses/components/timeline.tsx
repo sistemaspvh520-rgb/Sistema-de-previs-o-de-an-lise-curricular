@@ -13,7 +13,7 @@ export function Timeline({ vm, showDetails = true }: { vm: AnalysisVM; showDetai
   const byId = new Map(vm.subjects.map((s) => [s.id, s]));
 
   if (vm.entryPeriod === null) {
-    return <p className="text-sm text-muted-foreground">Confirme o período de ingresso para gerar a previsão.</p>;
+    return <p className="text-sm text-muted-foreground">O PDF não informou o período de ingresso. Use “Simular outro período” apenas se quiser comparar cenários.</p>;
   }
   if (vm.projections.length === 0) {
     return <p className="text-sm text-muted-foreground">Nenhuma disciplina a cursar: todas as disciplinas estão dispensadas.</p>;

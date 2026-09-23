@@ -10,9 +10,9 @@ import { logger } from "@/lib/logger";
 import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
 import { z } from "zod";
 
-/** Dados de ingresso: obrigatórios e confirmados pelo usuário antes de iniciar a análise. */
+/** O período acadêmico vem do PDF; o semestre-calendário define o início da previsão. */
 const entrySchema = z.object({
-  entryPeriod: z.coerce.number().int().min(1).max(20),
+  entryPeriod: z.coerce.number().int().min(1).max(20).optional(),
   entryTerm: z.string().refine(isValidTerm, "Use o formato AAAA.1 ou AAAA.2."),
   studentName: z.string().trim().min(3).max(120),
   poloCode: z.string().trim().min(1).max(12),
@@ -57,8 +57,8 @@ export async function POST(req: Request) {
   }
   const file = form.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "Selecione um arquivo PDF." }, { status: 400 });
-  const entry = entrySchema.safeParse({ entryPeriod: form.get("entryPeriod"), entryTerm: form.get("entryTerm"), studentName: form.get("studentName"), poloCode: form.get("poloCode"), courseFormat: form.get("courseFormat"), reanalysisOf: form.get("reanalysisOf") || undefined });
-  if (!entry.success) return NextResponse.json({ error: "Informe nome do aluno, polo, formato do curso, período e semestre de ingresso válidos." }, { status: 400 });
+  const entry = entrySchema.safeParse({ entryPeriod: form.get("entryPeriod") || undefined, entryTerm: form.get("entryTerm"), studentName: form.get("studentName"), poloCode: form.get("poloCode"), courseFormat: form.get("courseFormat"), reanalysisOf: form.get("reanalysisOf") || undefined });
+  if (!entry.success) return NextResponse.json({ error: "Informe nome do aluno, polo, formato do curso e semestre inicial da previsão válidos." }, { status: 400 });
   const { entryPeriod, entryTerm, studentName, poloCode, courseFormat, reanalysisOf } = entry.data;
   if (!settings.polos.some((polo) => polo.code === poloCode) || !settings.courseFormats.includes(courseFormat)) {
     return NextResponse.json({ error: "Polo ou formato de curso indisponível nas configurações atuais." }, { status: 400 });
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    const { id } = await createAnalysisFromUpload({ userId: user.id, bytes, originalName: file.name, entryPeriod, entryTerm, startTerm: entryTerm, studentName, poloCode, courseFormat, reanalysisOfId: reanalysisOf ?? null });
+    const { id } = await createAnalysisFromUpload({ userId: user.id, bytes, originalName: file.name, entryPeriod: entryPeriod ?? null, entryTerm, startTerm: entryTerm, studentName, poloCode, courseFormat, reanalysisOfId: reanalysisOf ?? null });
     after(async () => {
       try {
         await runAnalysisPipeline(id);

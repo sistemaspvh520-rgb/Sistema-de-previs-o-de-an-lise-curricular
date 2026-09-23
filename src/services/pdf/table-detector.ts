@@ -130,7 +130,120 @@ function isEmptyMarker(t: string): boolean {
   return n === "" || /^[\-–—]+$/.test(n);
 }
 
+/**
+ * Layout introduzido pelo novo resultado de matrícula unificada. Ao contrário da
+ * impressão antiga, ele não traz uma única grade com "Disciplina utilizada":
+ * há uma lista de dispensadas e outra de componentes a cursar. Reconstituímos
+ * ambas em uma única lista para o restante do motor continuar agnóstico ao PDF.
+ */
+function detectUnifiedEnrollmentTables(pages: ParsedPage[]): DetectedTable | null {
+  const hasLayout = pages.some((page) => page.lines.some((line) => NORMALIZE(line.text).includes("disciplinas dispensadas")));
+  if (!hasLayout) return null;
+
+  const rows: DetectedRow[] = [];
+  const headers: Record<number, ColumnLayout> = {};
+  const freeText: Record<number, string[]> = {};
+  let section: "EXEMPTED" | "PENDING" | null = null;
+  let pendingLayout: ColumnLayout | null = null;
+  const entryLine = pages.flatMap((page) => page.lines).find((line) => /^\d+\s*[ºª]\s*semestre$/i.test(line.text.trim()));
+  const exemptedFallbackPeriod = entryLine ? Number(entryLine.text.replace(/\D/g, "")) || 1 : 1;
+
+  for (const page of pages) {
+    freeText[page.page] = [];
+    const visual = [...page.lines].sort((a, b) => b.y - a.y);
+    let rowIndex = 0;
+    for (let i = 0; i < visual.length; i++) {
+      const line = visual[i];
+      const normalized = NORMALIZE(line.text);
+      if (normalized.includes("disciplinas dispensadas")) {
+        section = "EXEMPTED";
+        const n = line.text.match(/(\d+)\s*$/)?.[1];
+        if (n) freeText[page.page].push(`Total de disciplinas dispensadas: ${n}`);
+        continue;
+      }
+      if (normalized.includes("disciplinas a cursar")) {
+        section = "PENDING";
+        const n = line.text.match(/(\d+)\s*$/)?.[1];
+        if (n) freeText[page.page].push(`Total de disciplinas a cursar: ${n}`);
+        continue;
+      }
+
+      const parts = splitParts(line);
+      const hasCH = parts.some((p) => /^(c\.?h\.?|ch)$/i.test(p.text.trim()));
+      const hasSituation = parts.some((p) => NORMALIZE(p.text).includes("situacao"));
+      if (hasCH && hasSituation && normalized.includes("usada")) {
+        section = "EXEMPTED";
+        continue;
+      }
+      if (hasCH && hasSituation && parts.some((p) => NORMALIZE(p.text).startsWith("serie"))) {
+        section = "PENDING";
+        const name = parts.find((p) => NORMALIZE(p.text) === "disciplina");
+        const workload = parts.find((p) => /^(c\.?h\.?|ch)$/i.test(p.text.trim()));
+        const period = parts.find((p) => NORMALIZE(p.text).startsWith("serie"));
+        const situation = parts.find((p) => NORMALIZE(p.text).includes("situacao"));
+        if (name && workload && period) {
+          pendingLayout = { code: null, name: name.x, workload: workload.x, period: period.x, used: situation?.x ?? period.x + 60, headerY: line.y };
+          headers[page.page] = pendingLayout;
+        }
+        continue;
+      }
+
+      if (!section) {
+        freeText[page.page].push(line.text);
+        continue;
+      }
+
+      if (section === "PENDING" && pendingLayout) {
+        const periodPart = parts.find((p) => /^\d+\s*[ºª]?$/.test(p.text.trim()));
+        const workloadPart = parts.find((p) => /^\d+\s*h$/i.test(p.text.trim()));
+        if (!periodPart || !workloadPart) continue;
+        const name = parts.filter((p) => p.x < pendingLayout!.period - 12).map((p) => p.text.trim()).filter(Boolean).join(" ");
+        if (!name) continue;
+        rowIndex++;
+        const period = Number(periodPart.text.replace(/\D/g, ""));
+        const workload = Number(workloadPart.text.replace(/\D/g, ""));
+        rows.push({
+          page: page.page, rowIndex, code: null, name, workload, period,
+          usedSubject: null,
+          bbox: { x: line.x, y: line.y - 2, w: line.w, h: line.h + 4 },
+          pageBreakDuplicate: false,
+        });
+        continue;
+      }
+
+      if (section === "EXEMPTED") {
+        const workloadPart = parts.find((p) => /^\d+\s*h$/i.test(p.text.trim()));
+        if (!workloadPart) continue;
+        const near = visual.slice(Math.max(0, i - 1), Math.min(visual.length, i + 2));
+        const group = near.filter((candidate) => Math.abs(candidate.y - line.y) <= 8);
+        const groupParts = group.flatMap(splitParts);
+        const name = groupParts.filter((p) => p.x < workloadPart.x - 10).map((p) => p.text.trim()).filter(Boolean).join(" ");
+        const used = groupParts.filter((p) => p.x > workloadPart.x + 10 && p.x < 470).map((p) => p.text.trim()).filter(Boolean).join(" ");
+        if (!name) continue;
+        rowIndex++;
+        rows.push({
+          page: page.page, rowIndex, code: null, name, workload: Number(workloadPart.text.replace(/\D/g, "")),
+          // A lista de dispensadas não informa a série de cada componente. O valor
+          // de entrada mantém o registro válido no modelo; como ele é dispensado,
+          // não altera a previsão de disciplinas a cursar.
+          period: exemptedFallbackPeriod,
+          usedSubject: used || "DISPENSADA",
+          bbox: {
+            x: Math.min(...group.map((g) => g.x)), y: Math.min(...group.map((g) => g.y)) - 2,
+            w: Math.max(...group.map((g) => g.x + g.w)) - Math.min(...group.map((g) => g.x)),
+            h: Math.max(...group.map((g) => g.y + g.h)) - Math.min(...group.map((g) => g.y)) + 4,
+          },
+          pageBreakDuplicate: false,
+        });
+      }
+    }
+  }
+  return { rows, headers, freeText };
+}
+
 export function detectTables(pages: ParsedPage[]): DetectedTable {
+  const unified = detectUnifiedEnrollmentTables(pages);
+  if (unified) return unified;
   const rows: DetectedRow[] = [];
   const headers: Record<number, ColumnLayout> = {};
   const freeText: Record<number, string[]> = {};

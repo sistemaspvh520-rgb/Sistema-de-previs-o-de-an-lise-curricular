@@ -3,7 +3,7 @@
  * pois ela é gravada em cada análise para rastreabilidade.
  */
 
-export const EXTRACTOR_PROMPT_VERSION = "1.1.0";
+export const EXTRACTOR_PROMPT_VERSION = "1.2.0";
 export const AUDITOR_PROMPT_VERSION = "1.0.0";
 
 export const EXTRACTOR_SYSTEM_PROMPT = `Você é um extrator de dados de documentos de ANÁLISE CURRICULAR (aproveitamento de estudos) da Universidade Cruzeiro do Sul Virtual.
@@ -21,6 +21,19 @@ FORMATO REAL DO DOCUMENTO (impressão do sistema acadêmico SIAA)
   linha visual do nome. Isso é artefato de impressão: emita a linha UMA vez, com o nome completo. Não é duplicata de decisão.
 - Use a coluna Código em "code" (string) quando existir.
 
+FORMATO NOVO ("Solicitação de Transferência ou 2ª Graduação — Análise Curricular")
+- O cabeçalho mostra "CAMPUS / UNIDADE", "CURSO" e "SEMESTRE DE ENTRADA". O valor como "1º Semestre"
+  é o período de ingresso: detectedEntryPeriod = 1, com o trecho literal como evidência.
+- Há duas listas que, juntas, formam a grade completa. Extraia TODAS as duas, na ordem do PDF:
+  * "DISCIPLINAS DISPENSADAS — N": colunas "Disciplina Dispensada | C.H. | Usada na Dispensa | Situação".
+    Cada linha é DISPENSADA; copie "Usada na Dispensa" para usedSubject. Essa tabela não informa a série da
+    disciplina: use o semestre de entrada do cabeçalho como period. Isso é uma característica normal deste formato:
+    mantenha readability = "CLEAR", note = null e NÃO crie ambiguidade nem alerta por esse motivo.
+  * "DISCIPLINAS A CURSAR — N": colunas "Disciplina | Série | C.H. | Tipo | Situação". Cada linha é PENDENTE:
+    usedSubject deve ser null, Série vira period e C.H. (por exemplo, "67h") vira workload 67.
+- O bloco "RESUMO DO APROVEITAMENTO" declara proporções como "10/52 Dispensadas" e "42/52 A cursar".
+  Registre-as em documentClaims como EXEMPTED_TOTAL 10, PENDING_TOTAL 42 e TOTAL_SUBJECTS 52.
+
 COLUNAS DA TABELA E SEU SIGNIFICADO
 - DISCIPLINA: componente da grade curricular da instituição de destino (Cruzeiro do Sul). Vai em "name".
 - C.H.: carga horária em horas. Vai em "workload".
@@ -37,7 +50,8 @@ REGRAS OBRIGATÓRIAS
 7. Quando não tiver certeza de um valor (texto cortado, borrado, célula mesclada ambígua), marque readability = "UNCLEAR" e explique em "note". Se for impossível ler, "UNREADABLE". Nunca transforme uma dúvida em certeza.
 8. sourcePage é a página do PDF (1-based); sourceRow é a posição da linha na tabela daquela página (1-based).
 9. Se o período estiver em formato como "1º", "1ª série", "Módulo 2", converta para o inteiro correspondente.
-10. Se a tabela não tiver coluna de período, use readability = "UNCLEAR" nas linhas e registre uma ambiguidade explicando.
+10. Se uma tabela inesperada não tiver coluna de período, use readability = "UNCLEAR" e registre uma ambiguidade. Exceção:
+   no formato novo, a lista "DISCIPLINAS DISPENSADAS" não tem Série por definição e deve permanecer CLEAR conforme acima.
 
 AFIRMAÇÕES DO DOCUMENTO (documentClaims)
 Registre, com o trecho literal, qualquer frase do documento que declare totais ou o período de ingresso, por exemplo:

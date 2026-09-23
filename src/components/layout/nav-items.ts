@@ -3,7 +3,7 @@ import type { Permission } from "@/lib/rbac";
 export interface NavItem {
   href: string;
   label: string;
-  icon: "dashboard" | "new" | "list" | "review" | "settings" | "management" | "reports";
+  icon: "dashboard" | "new" | "list" | "review" | "settings" | "management" | "reports" | "grades";
   permission?: Permission;
 }
 
@@ -13,6 +13,7 @@ export const MAIN_NAV: NavItem[] = [
   { href: "/reviews", label: "Revisões", icon: "review", permission: "analysis:review" },
   { href: "/reports", label: "Meus relatórios", icon: "reports" },
   { href: "/management", label: "Gestão", icon: "management", permission: "audit:read" },
+  { href: "/commercial-grades", label: "Grades comerciais", icon: "grades" },
 ];
 
 export interface SettingsNavItem {

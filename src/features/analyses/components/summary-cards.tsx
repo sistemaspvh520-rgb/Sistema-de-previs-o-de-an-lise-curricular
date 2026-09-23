@@ -16,9 +16,9 @@ export function SummaryCards({ vm, showSources = true }: { vm: AnalysisVM; showS
   const cards: Array<{ label: string; value: React.ReactNode; source?: { label: string; detail?: string }; tone?: string; hint?: string }> = [
     { label: "Curso", value: vm.courseName ?? "Não identificado", source: { label: "PDF", detail: "Identificado a partir do documento" } },
     {
-      label: "Período de ingresso",
-      value: vm.entryPeriod ? ordinal(vm.entryPeriod) : "A confirmar",
-      source: vm.entryPeriodSource ? { label: ENTRY_SOURCE[vm.entryPeriodSource] } : { label: "Pendente" },
+      label: vm.entryPeriodSource === "USER" ? "Cenário de ingresso" : "Período no PDF",
+      value: vm.entryPeriod ? ordinal(vm.entryPeriod) : "Não identificado",
+      source: vm.entryPeriodSource ? { label: vm.entryPeriodSource === "USER" ? "Simulação" : ENTRY_SOURCE[vm.entryPeriodSource] } : { label: "PDF" },
       tone: vm.entryPeriod ? undefined : "text-status-warning",
     },
     { label: "Total da grade", value: vm.totals.total, source: { label: "PDF", detail: "Linhas da tabela DISCIPLINA" } },
@@ -32,8 +32,8 @@ export function SummaryCards({ vm, showSources = true }: { vm: AnalysisVM; showS
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-      {cards.map((c) => (
-        <Card key={c.label} className={cn("shadow-sm", c.label === "Curso" && "col-span-2 md:col-span-1")}>
+      {cards.map((c, index) => (
+        <Card key={c.label} className={cn("animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500 shadow-sm", c.label === "Curso" && "col-span-2 md:col-span-1")} style={{ animationDelay: `${index * 45}ms` }}>
           <CardContent className="space-y-1.5">
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{c.label}</div>
             <div className={`min-w-0 break-words text-xl font-semibold tracking-tight ${c.tone ?? ""}`} title={typeof c.value === "string" ? c.value : undefined}>

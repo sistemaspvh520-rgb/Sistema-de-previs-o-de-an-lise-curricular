@@ -156,6 +156,9 @@ model User {
   followUpPushEnabled  Boolean @default(true)
   followUpRepeatBusinessDays Int @default(1)
   followUpMaxReminders Int @default(5)
+  /** Janela individual para receber lembretes; nula = usar o padrão da instituição. */
+  followUpBusinessStartHour Int?
+  followUpBusinessEndHour   Int?
   lastLoginAt  DateTime? @db.Timestamptz(6)
   /** Última atividade com sessão válida (atualizada com throttle pelo callback de sessão). */
   lastActiveAt DateTime? @db.Timestamptz(6)
@@ -187,6 +190,7 @@ model User {
   deletionRequestsReviewed AnalysisDeletionRequest[] @relation("DeletionReviewedBy")
   enrollmentUpdates       CurricularAnalysis[] @relation("EnrollmentUpdatedBy")
   pushSubscriptions       PushSubscription[]
+  commercialGrades        CommercialGrade[]
 }
 
 /// Token de uso único para definir (convite) ou redefinir a senha por link de e-mail. Só o hash é armazenado.
@@ -601,4 +605,45 @@ model SystemSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
+/** Grade curricular em PDF disponibilizada ao time comercial. */
+model CommercialGrade {
+  id             String   @id @default(uuid()) @db.Uuid
+  courseName     String
+  modality       String?
+  curriculumTerm String?
+  /** Grau acadêmico principal identificado na matriz (ex.: Bacharelado, Licenciatura ou Área básica). */
+  degree         String?
+  /** Área de conhecimento identificada para facilitar a busca comercial. */
+  knowledgeArea  String?
+  /** Duração total da matriz em semestres. */
+  durationSemesters Int?
+  /** Trilhas/formações possíveis dentro da mesma matriz, incluindo o período de escolha quando explícito. */
+  courseTracks   Json?
+  /** SHA-256 do PDF: evita que o mesmo arquivo seja publicado mais de uma vez. */
+  contentHash    String?  @unique @db.Char(64)
+  /** Assinatura do curso/modalidade/vigência: evita duplicar a mesma matriz por engano. */
+  catalogKey     String?  @unique @db.Char(64)
+  internshipInfo String?
+  hasTcc         Boolean  @default(false)
+  totalInternshipHours Int?
+  totalCourseHours     Int?
+  /** Texto pronto para o comercial copiar e enviar ao candidato no WhatsApp. */
+  whatsappSummary      String?
+  originalName   String
+  storageKey     String   @unique
+  sizeBytes      Int
+  uploadedById   String   @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  uploadedBy User @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([uploadedById])
+  @@index([courseName])
+  @@index([degree])
+  @@index([knowledgeArea])
+  @@index([durationSemesters])
+  @@index([createdAt(sort: Desc)])
 }

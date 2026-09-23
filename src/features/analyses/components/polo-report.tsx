@@ -13,7 +13,7 @@ export interface PoloReportRow {
 }
 
 /** Relatório "Análises por polo": contagens + atalhos para a lista filtrada e exportação CSV. */
-export function PoloReportCard({ rows, title = "Análises por polo", description, className }: { rows: PoloReportRow[]; title?: string; description?: string; className?: string }) {
+export function PoloReportCard({ rows, title = "Análises por polo", description, className, exportQuery = "" }: { rows: PoloReportRow[]; title?: string; description?: string; className?: string; exportQuery?: string }) {
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   return (
     <Card className={className}>
@@ -23,7 +23,7 @@ export function PoloReportCard({ rows, title = "Análises por polo", description
           {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
         </div>
         <Button asChild variant="outline" size="sm">
-          <a href="/api/reports/analyses" download><Download className="size-4" /> Exportar CSV</a>
+          <a href={`/api/reports/analyses${exportQuery}`} download><Download className="size-4" /> Exportar CSV</a>
         </Button>
       </CardHeader>
       <CardContent className="p-0">
@@ -45,7 +45,7 @@ export function PoloReportCard({ rows, title = "Análises por polo", description
                   <span className="sm:text-right"><span className="sm:hidden">No mês: </span>{row.month}</span>
                   <span className="text-status-success sm:text-right"><span className="sm:hidden">Prontas: </span>{row.completed}</span>
                 </div>
-                <a href={`/api/reports/analyses?polo=${row.code}`} download className="text-xs text-brand-cyan-700 underline sm:text-right">Exportar</a>
+                <a href={`/api/reports/analyses?polo=${row.code}${exportQuery ? `&${exportQuery.slice(1)}` : ""}`} download className="text-xs text-brand-cyan-700 underline sm:text-right">Exportar</a>
               </div>
             ))}
             <div className="px-6 py-3 text-xs text-muted-foreground">{pluralize(total, "análise com polo informado", "análises com polo informado")} · {rows.length} {rows.length === 1 ? "polo" : "polos"}.</div>

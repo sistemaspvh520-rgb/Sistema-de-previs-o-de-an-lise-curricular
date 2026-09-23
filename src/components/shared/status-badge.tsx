@@ -11,7 +11,7 @@ export const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
   CALCULATING: "Calculando",
   VALIDATING: "Validando",
   AI_AUDIT: "Auditando com IA",
-  WAITING_REVIEW: "Ingresso pendente",
+  WAITING_REVIEW: "Revisão necessária",
   COMPLETED: "Pronta",
   FAILED: "Não concluída",
   AI_ERROR: "Falha de processamento",

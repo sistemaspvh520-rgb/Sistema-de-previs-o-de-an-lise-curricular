@@ -1,108 +1,84 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, CircleAlert, FileText, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowUpRight, CheckCircle2, CircleAlert, FileText, GraduationCap, Users } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateTime } from "@/lib/utils";
-import { formatRelativeTime, daysSince, startOfCurrentMonth } from "@/lib/time";
+import { formatDateTime } from "@/lib/time";
+import { startOfCurrentMonth } from "@/lib/time";
 import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
+import { DateRangeFilter } from "@/components/shared/date-range-filter";
+import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Gestão" };
 export const dynamic = "force-dynamic";
 
-export default async function ManagementPage() {
+export default async function ManagementPage({ searchParams }: PageProps<"/management">) {
   await requirePagePermission("audit:read");
+  const params = await searchParams;
   const monthStart = startOfCurrentMonth();
+  const fromParam = typeof params.from === "string" ? params.from : undefined;
+  const toParam = typeof params.to === "string" ? params.to : undefined;
+  const from = fromParam && !Number.isNaN(Date.parse(fromParam)) ? new Date(`${fromParam}T00:00:00-04:00`) : undefined;
+  const to = toParam && !Number.isNaN(Date.parse(toParam)) ? new Date(`${toParam}T23:59:59.999-04:00`) : undefined;
+  const createdAt: Prisma.DateTimeFilter | undefined = from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : undefined;
+  const periodWhere: Prisma.CurricularAnalysisWhereInput = createdAt ? { createdAt } : { createdAt: { gte: monthStart } };
 
-  const [activeUsers, users, totalsByUser, completedByUser, monthByUser, deletedByUser, byPolo, totalAnalyses, monthAnalyses, enrolled, returned] = await Promise.all([
+  const [activeUsers, users, totalByUserRows, periodByUserRows, completedByUserRows, byPolo, total, completed, enrolled, returned, pending, notEnrolled] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
-    prisma.user.findMany({ where: { isActive: true }, orderBy: [{ lastActiveAt: { sort: "desc", nulls: "last" } }, { name: "asc" }], take: 20, select: { id: true, name: true, role: true, lastActiveAt: true, analyses: { select: { courseName: true, studentName: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 } } }),
+    prisma.user.findMany({ where: { isActive: true }, orderBy: [{ lastActiveAt: { sort: "desc", nulls: "last" } }, { name: "asc" }], take: 12, select: { id: true, name: true, role: true, lastActiveAt: true, analyses: { select: { courseName: true, studentName: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 } } }),
     prisma.curricularAnalysis.groupBy({ by: ["createdById"], _count: { _all: true } }),
-    prisma.curricularAnalysis.groupBy({ by: ["createdById"], where: { status: "COMPLETED" }, _count: { _all: true } }),
-    prisma.curricularAnalysis.groupBy({ by: ["createdById"], where: { createdAt: { gte: monthStart } }, _count: { _all: true } }),
-    prisma.auditLog.groupBy({ by: ["userId"], where: { action: { in: ["analysis.delete.tracked", "analysis.deletion_approved.tracked"] } }, _count: { _all: true } }),
+    prisma.curricularAnalysis.groupBy({ by: ["createdById"], where: periodWhere, _count: { _all: true } }),
+    prisma.curricularAnalysis.groupBy({ by: ["createdById"], where: { ...periodWhere, status: "COMPLETED" }, _count: { _all: true } }),
     countAnalysesByPolo({ monthStart }),
-    prisma.curricularAnalysis.count(),
-    prisma.curricularAnalysis.count({ where: { createdAt: { gte: monthStart } } }),
-    prisma.curricularAnalysis.count({ where: { enrollmentStatus: "ENROLLED" } }),
-    prisma.curricularAnalysis.count({ where: { enrollmentStatus: { in: ["ENROLLED", "NOT_ENROLLED"] } } }),
+    prisma.curricularAnalysis.count({ where: periodWhere }),
+    prisma.curricularAnalysis.count({ where: { ...periodWhere, status: "COMPLETED" } }),
+    prisma.curricularAnalysis.count({ where: { ...periodWhere, enrollmentStatus: "ENROLLED" } }),
+    prisma.curricularAnalysis.count({ where: { ...periodWhere, enrollmentStatus: { in: ["ENROLLED", "NOT_ENROLLED"] } } }),
+    prisma.curricularAnalysis.count({ where: { ...periodWhere, enrollmentStatus: "PENDING", status: "COMPLETED" } }),
+    prisma.curricularAnalysis.count({ where: { ...periodWhere, enrollmentStatus: "NOT_ENROLLED" } }),
   ]);
+  const totalByUser = new Map(totalByUserRows.map((item) => [item.createdById, item._count._all]));
+  const periodByUser = new Map(periodByUserRows.map((item) => [item.createdById, item._count._all]));
+  const completedByUser = new Map(completedByUserRows.map((item) => [item.createdById, item._count._all]));
+  /** Conversão comercial: das análises efetivamente concluídas, quantas viraram matrícula. */
+  const conversion = completed ? Math.round((enrolled / completed) * 100) : 0;
+  const completionRate = total ? Math.round((completed / total) * 100) : 0;
+  const responseRate = completed ? Math.round((returned / completed) * 100) : 0;
+  const funnel = [{ label: "Concluídas", value: completed, color: "bg-cyan-500", href: "/analyses?status=COMPLETED" }, { label: "Matriculadas", value: enrolled, color: "bg-emerald-500", href: "/analyses" }, { label: "Em aberto", value: notEnrolled, color: "bg-amber-500", href: "/analyses?enrollment=NOT_ENROLLED" }];
+  const exportQuery = `${fromParam ? `?from=${encodeURIComponent(fromParam)}` : ""}${toParam ? `${fromParam ? "&" : "?"}to=${encodeURIComponent(toParam)}` : ""}`;
 
-  const totalByUser = new Map(totalsByUser.map((item) => [item.createdById, item._count._all]));
-  const deliveredByUser = new Map(completedByUser.map((item) => [item.createdById, item._count._all]));
-  const monthlyByUser = new Map(monthByUser.map((item) => [item.createdById, item._count._all]));
-  const deletedCountByUser = new Map(deletedByUser.flatMap((item) => (item.userId ? [[item.userId, item._count._all] as const] : [])));
-  const deletedSinceTracking = deletedByUser.reduce((total, item) => total + item._count._all, 0);
-  const cards = [
-    { label: "Análises no mês", value: monthAnalyses, icon: FileText, tone: "text-brand-cyan-700", hint: `${totalAnalyses} no histórico`, href: "/analyses" },
-    { label: "Usuários ativos", value: activeUsers, icon: Users, tone: "text-brand-navy", hint: "Com acesso ao sistema", href: "#atividade-por-usuario" },
-    { label: "Exclusões registradas", value: deletedSinceTracking, icon: Trash2, tone: "text-status-danger", hint: "Desde a ativação do rastreamento", href: "#atividade-por-usuario" },
-    { label: "Entregas da equipe", value: Array.from(deliveredByUser.values()).reduce((total, count) => total + count, 0), icon: CheckCircle2, tone: "text-status-success", hint: "Análises concluídas por consultor", href: "#atividade-por-usuario" },
-    { label: "Conversão confirmada", value: returned ? `${Math.round((enrolled / returned) * 100)}%` : "—", icon: CircleAlert, tone: "text-status-warning", hint: returned ? `${enrolled} matrículas em ${returned} retornos` : "Aguardando confirmações", href: "/analyses?followUp=due" },
-  ];
+  return <>
+    <PageHeader eyebrow="Gestão" title="Gestão à vista" description="Acompanhe o funil de análises e a produtividade da operação em tempo real." />
+    <section className="overflow-hidden rounded-xl bg-brand-navy text-white shadow-sm">
+      <div className="flex flex-col gap-5 px-6 py-6 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Painel executivo</p><h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Funil de análises curriculares</h2><p className="mt-1 text-sm text-slate-200">Recebimento, conclusão e conversão de matrícula em uma leitura.</p></div><div className="flex w-full max-w-md gap-2 rounded-lg bg-white/10 p-1"><span className="flex-1 rounded-md bg-white px-3 py-2 text-center text-sm font-semibold text-brand-navy">Gestão à vista</span><Link href="/reports" className="flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-white/10">Meus relatórios</Link></div></div>
+    </section>
+    <div className="mt-4"><DateRangeFilter /></div>
 
-  return (
-    <>
-      <PageHeader eyebrow="Gestão" title="Equipe e relatórios" description="Acompanhe a atividade dos consultores e os relatórios por polo. A fila e o status das análises ficam na aba Análises." />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link key={card.label} href={card.href} className="group rounded-xl focus:outline-none focus:ring-2 focus:ring-ring">
-              <Card className="h-full shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">{card.label}</CardTitle><Icon className={`size-4 ${card.tone}`} /></CardHeader>
-                <CardContent><div className="text-2xl font-semibold">{card.value}</div><p className="mt-1 text-xs text-muted-foreground">{card.hint}</p></CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-      <div className="mt-6">
-        <Card id="atividade-por-usuario" className="overflow-hidden shadow-sm">
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Users className="size-4 text-brand-cyan-700" /> Atividade por usuário</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y">
-              {users.map((user) => {
-                const latest = user.analyses[0];
-                return (
-                  <div key={user.id} className="grid gap-3 px-4 py-4 text-sm sm:grid-cols-[minmax(150px,1.2fr)_auto_auto] sm:items-center sm:px-6 lg:grid-cols-[minmax(150px,1.2fr)_auto_auto_auto_auto_minmax(170px,1fr)]">
-                    <div className="min-w-0">
-                      <Link href={`/analyses?user=${user.id}`} className="block truncate font-medium hover:underline">{user.name}</Link>
-                      <div className="text-xs text-muted-foreground">{user.role === "ADMIN" ? "Administrador" : user.role === "ANALYST" ? "Analista" : "Visualizador"}</div>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs sm:contents">
-                      <span className="whitespace-nowrap">{totalByUser.get(user.id) ?? 0} análises</span>
-                      <span className="whitespace-nowrap">{monthlyByUser.get(user.id) ?? 0} no mês</span>
-                      <span className="whitespace-nowrap text-status-success">{deliveredByUser.get(user.id) ?? 0} prontas</span>
-                      <span className="whitespace-nowrap text-status-danger">{deletedCountByUser.get(user.id) ?? 0} excluídas</span>
-                    </div>
-                    <div className="min-w-0 text-xs text-muted-foreground">
-                      <LastAccess at={user.lastActiveAt} />
-                      {latest ? <span className="block truncate">Última análise: {latest.studentName ?? latest.courseName ?? "Curso não identificado"} · {formatDateTime(latest.createdAt)}</span> : <span className="block">Nenhuma análise registrada</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      <PoloReportCard className="mt-6 shadow-sm" description="Atendimentos por polo em todo o sistema. Clique no polo para filtrar a lista; exporte o relatório completo ou de um polo em CSV." rows={byPolo} />
-    </>
-  );
+    <section className="mt-5 grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(18rem,1.15fr)]">
+      <JourneyCard title="Em aberto" value={notEnrolled} detail="Confirmadas como não matriculadas" icon={FileText} href="/analyses?enrollment=NOT_ENROLLED" tone="sky" />
+      <JourneyCard title="Concluídas" value={completed} detail={`${completionRate}% do volume recebido`} icon={CheckCircle2} href="/analyses?status=COMPLETED" tone="cyan" />
+      <JourneyCard title="Matriculadas" value={enrolled} detail={`${conversion}% das análises concluídas`} icon={GraduationCap} href="/analyses" tone="emerald" />
+      <Card className="border-0 bg-slate-50 shadow-sm"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><CircleAlert className="size-4 text-brand-navy" /> Funil</CardTitle></CardHeader><CardContent className="space-y-3">{funnel.map((stage, index) => { const percent = total ? Math.round((stage.value / total) * 100) : 0; return <Link key={stage.label} href={stage.href} className="block"><div className="mb-1 flex justify-between text-xs"><span className="font-medium">{stage.label}</span><span>{stage.value} {index > 0 && `(${percent}%)`}</span></div><div className="h-8 overflow-hidden rounded-sm bg-slate-200"><div className={`flex h-full items-center justify-end px-2 text-xs font-semibold text-white ${stage.color} transition-all duration-700 motion-reduce:transition-none`} style={{ width: `${Math.max(stage.value ? 12 : 0, percent)}%` }}>{stage.value > 0 && `${percent}%`}</div></div></Link>; })}</CardContent></Card>
+    </section>
+
+    <section className="mt-5 grid gap-4 lg:grid-cols-3">
+      <KpiStrip title="Em acompanhamento" value={pending} label="Aguardando retorno de matrícula" color="border-sky-500" href="/analyses?followUp=due" />
+      <KpiStrip title="Equipe ativa" value={activeUsers} label="Usuários com acesso liberado" color="border-cyan-500" href="#atividade-equipe" />
+      <KpiStrip title="Conversão concluída → matrícula" value={`${conversion}%`} label={`${enrolled} matrícula(s) de ${completed} concluídas`} color="border-emerald-500" href="/analyses?status=COMPLETED" />
+    </section>
+
+    <section id="atividade-equipe" className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <Card className="shadow-sm"><CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0"><div><CardTitle className="flex items-center gap-2 text-base"><Users className="size-4 text-brand-navy" /> Equipe</CardTitle><p className="mt-1 text-xs text-muted-foreground">Produção e último acesso por responsável.</p></div><span className="rounded-full bg-brand-navy px-2.5 py-1 text-xs font-semibold text-white">{activeUsers} ativos</span></CardHeader><CardContent className="grid gap-2 sm:grid-cols-2">{users.map((user) => { const latest = user.analyses[0]; return <Link key={user.id} href={`/analyses?user=${user.id}`} className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:border-brand-cyan-500 hover:bg-brand-cyan-50/40"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-semibold text-white">{initials(user.name)}</span><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{user.name}</div><div className="mt-0.5 flex gap-2 text-xs text-muted-foreground"><span>{periodByUser.get(user.id) ?? 0} no período</span><span className="text-status-success">{completedByUser.get(user.id) ?? 0} prontas</span></div><div className="mt-1 truncate text-[11px] text-muted-foreground">Último acesso: {user.lastActiveAt ? formatDateTime(user.lastActiveAt) : "nunca acessou"}</div><div className="truncate text-[11px] text-muted-foreground">{latest ? `Última análise: ${latest.studentName ?? latest.courseName ?? "—"}` : "Sem análises"}</div></div><ArrowUpRight className="size-4 text-muted-foreground" /></Link>; })}</CardContent></Card>
+      <Card className="bg-brand-navy text-white shadow-sm"><CardHeader><CardTitle className="text-base">Índices da operação</CardTitle><p className="text-xs text-cyan-100">Leitura calculada para o período selecionado.</p></CardHeader><CardContent className="space-y-4 text-sm"><Index label="Conclusão" value={`${completionRate}%`} note={`${completed} de ${total} recebidas`} percent={completionRate} /><Index label="Conversão em matrícula" value={`${conversion}%`} note={`${enrolled} de ${completed} concluídas`} percent={conversion} /><Index label="Retornos informados" value={`${responseRate}%`} note={`${returned} de ${completed} concluídas`} percent={responseRate} /><Index label="Em acompanhamento" value={pending} note="Aguardando retorno de matrícula" percent={completed ? Math.round((pending / completed) * 100) : 0} /><Link href="/analyses?followUp=due" className="flex items-center justify-between rounded-lg bg-white px-3 py-2.5 font-medium text-brand-navy transition-transform hover:-translate-y-0.5">Tratar retornos pendentes <ArrowUpRight className="size-4" /></Link></CardContent></Card>
+    </section>
+    <PoloReportCard className="mt-6 shadow-sm" description="Atendimentos por polo no período. Abra a lista ou exporte o CSV." rows={byPolo} exportQuery={exportQuery} />
+  </>;
 }
 
-/** Tempo sem uso do sistema: destaca quem está há mais de 7 (atenção) ou 30 dias (crítico) sem acessar. */
-function LastAccess({ at }: { at: Date | null }) {
-  const days = daysSince(at);
-  const tone = days === null || days > 30 ? "text-status-danger" : days > 7 ? "text-status-warning" : "text-status-success";
-  return (
-    <span className="block" title={at ? formatDateTime(at) : undefined}>
-      Último acesso: <span className={`font-medium ${tone}`}>{at ? formatRelativeTime(at) : "nunca acessou"}</span>
-      {at && <span className="text-muted-foreground/80"> · {formatDateTime(at)}</span>}
-    </span>
-  );
-}
+function JourneyCard({ title, value, detail, icon: Icon, href, tone }: { title: string; value: number; detail: string; icon: typeof FileText; href: string; tone: "sky" | "cyan" | "emerald" }) { const tones = { sky: "border-sky-500 text-sky-600", cyan: "border-cyan-500 text-cyan-600", emerald: "border-emerald-500 text-emerald-600" }; return <Link href={href} className="group rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"><Card className={`h-full border-t-4 ${tones[tone]} shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md`}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3"><CardTitle className="text-base text-foreground">{title}</CardTitle><Icon className="size-5" /></CardHeader><CardContent><div className="text-4xl font-semibold tracking-tight text-foreground">{value}</div><p className="mt-3 text-xs text-muted-foreground">{detail}</p><span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-navy">Ver análises <ArrowUpRight className="size-3.5" /></span></CardContent></Card></Link>; }
+function KpiStrip({ title, value, label, color, href }: { title: string; value: string | number; label: string; color: string; href: string }) { return <Link href={href} className={`rounded-xl border-l-4 ${color} bg-card p-4 shadow-sm transition-shadow hover:shadow-md`}><div className="text-xs font-medium text-muted-foreground">{title}</div><div className="mt-2 text-2xl font-semibold">{value}</div><div className="mt-1 text-xs text-muted-foreground">{label}</div></Link>; }
+function Index({ label, value, note, percent }: { label: string; value: string | number; note: string; percent: number }) { return <div><div className="flex items-baseline justify-between gap-3"><span className="text-cyan-100">{label}</span><span className="text-lg font-semibold">{value}</span></div><p className="mt-0.5 text-[11px] text-slate-200">{note}</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-cyan-300 transition-all duration-700 motion-reduce:transition-none" style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} /></div></div>; }
+function initials(name: string) { return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "—"; }

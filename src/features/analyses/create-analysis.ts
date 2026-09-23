@@ -34,8 +34,8 @@ export interface CreateAnalysisInput {
   userId: string;
   bytes: Buffer;
   originalName: string;
-  /** Obrigatórios: são a fonte oficial da previsão e nunca são lidos do PDF. */
-  entryPeriod: number;
+  /** Lido do PDF durante o processamento; usado apenas em envios legados. */
+  entryPeriod?: number | null;
   entryTerm: string;
   /** Identificação do atendimento, informada pelo analista. */
   studentName: string;
@@ -85,7 +85,9 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
     throw new PdfValidationError("TOO_MANY_PAGES", `O PDF tem ${pageCount} páginas; o limite é ${settings.maxPdfPages}.`);
   }
 
-  if (!Number.isInteger(input.entryPeriod) || input.entryPeriod < 1 || input.entryPeriod > 20) throw new Error("Período de ingresso inválido.");
+  if (input.entryPeriod !== undefined && input.entryPeriod !== null && (!Number.isInteger(input.entryPeriod) || input.entryPeriod < 1 || input.entryPeriod > 20)) {
+    throw new Error("Período de ingresso inválido.");
+  }
   if (!isValidTerm(input.entryTerm)) throw new Error("Semestre de ingresso inválido.");
   const studentName = cleanStudentName(input.studentName);
   if (studentName.length < 3) throw new Error("Informe o nome do aluno.");
@@ -110,7 +112,7 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
   const storage = getStorage();
   const stored = await storage.save(input.bytes, { extension: "pdf" });
   const entryTerm = input.entryTerm;
-  const entryPeriod = input.entryPeriod;
+  const entryPeriod = input.entryPeriod ?? null;
   const startTerm = input.startTerm && isValidTerm(input.startTerm) ? input.startTerm : entryTerm;
   const safeName = input.originalName.replace(/[\\/:*?"<>|]/g, "_").slice(0, 200) || "documento.pdf";
 
@@ -122,7 +124,7 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
         startTerm,
         entryTerm,
         entryPeriod,
-        entryPeriodSource: "USER",
+        entryPeriodSource: entryPeriod === null ? null : "USER",
         studentName,
         poloCode: polo.code,
         poloName: polo.name,

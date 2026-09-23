@@ -59,7 +59,7 @@ export async function reauditAnalysisAction(analysisId: unknown): Promise<Action
 
 const entrySchema = z.object({ analysisId: idSchema, entryPeriod: z.coerce.number().int().min(1).max(20), reason: z.string().max(500).optional() });
 
-/** Confirmação manual do período de ingresso (§16) → recálculo completo. */
+/** Aplica um cenário manual de período de ingresso e recalcula a previsão. */
 export async function confirmEntryPeriodAction(input: unknown): Promise<ActionResult> {
   try {
     const user = await requirePermission("analysis:review");
@@ -77,9 +77,32 @@ export async function confirmEntryPeriodAction(input: unknown): Promise<ActionRe
     await recalculateAnalysis(analysisId);
     await recordAudit({ userId: user.id, action: "analysis.entry_period_confirmed", entityType: "CurricularAnalysis", entityId: analysisId, metadata: { entryPeriod } });
     revalidatePath(`/analyses/${analysisId}`);
-    return ok(undefined, "Período de ingresso confirmado. Previsão recalculada.");
+    return ok(undefined, "Cenário de período aplicado. Previsão recalculada.");
   } catch (err) {
     logger.error("confirmEntryPeriodAction", { err: String(err) });
+    return toActionError(err);
+  }
+}
+
+/** Restaura o período explicitamente identificado no PDF após uma simulação. */
+export async function restoreDocumentEntryPeriodAction(analysisId: unknown): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("analysis:review");
+    const id = idSchema.parse(analysisId);
+    const a = await requireAnalysisAccess(id, user);
+    if (isProcessingStatus(a.status)) return fail("Aguarde o processamento terminar.");
+    const claim = await prisma.documentClaim.findFirst({ where: { analysisId: id, type: "ENTRY_PERIOD", value: { not: null } }, orderBy: { createdAt: "asc" } });
+    if (!claim?.value) return fail("Este PDF não informa um período de ingresso que possa ser restaurado.");
+    await prisma.$transaction([
+      prisma.curricularAnalysis.update({ where: { id }, data: { entryPeriod: claim.value, entryPeriodSource: "DOCUMENT" } }),
+      prisma.manualCorrection.create({ data: { analysisId: id, userId: user.id, field: "entryPeriod", previousValue: a.entryPeriod?.toString() ?? null, newValue: String(claim.value), reason: "Valor restaurado do PDF" } }),
+    ]);
+    await recalculateAnalysis(id);
+    await recordAudit({ userId: user.id, action: "analysis.entry_period_restored", entityType: "CurricularAnalysis", entityId: id, metadata: { entryPeriod: claim.value } });
+    revalidatePath(`/analyses/${id}`);
+    return ok(undefined, "Período lido no PDF restaurado. Previsão recalculada.");
+  } catch (err) {
+    logger.error("restoreDocumentEntryPeriodAction", { err: String(err) });
     return toActionError(err);
   }
 }
@@ -99,7 +122,7 @@ export async function updateStartTermAction(input: unknown): Promise<ActionResul
     ]);
     await recalculateAnalysis(a.id);
     revalidatePath(`/analyses/${a.id}`);
-    return ok(undefined, "Semestre de ingresso atualizado. Previsão recalculada.");
+    return ok(undefined, "Início da previsão atualizado. Projeção recalculada.");
   } catch (err) {
     return toActionError(err);
   }

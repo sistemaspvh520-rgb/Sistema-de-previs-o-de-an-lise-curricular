@@ -15,7 +15,7 @@ export function PendingTab({ vm, onLocate }: { vm: AnalysisVM; onLocate: (id: st
           <p className="text-xs text-muted-foreground">Ordem de alocação: período mais antigo primeiro; dentro do período, ordem do documento.</p>
         </div>
         {vm.entryPeriod === null ? (
-          <div className="p-6 text-sm text-muted-foreground">Confirme o período de ingresso para separar o backlog.</div>
+          <div className="p-6 text-sm text-muted-foreground">O PDF não informou o período de ingresso. Use a simulação de cenário, se necessário, para separar o backlog.</div>
         ) : backlog.length === 0 ? (
           <div className="p-6 text-sm text-muted-foreground">Nenhuma pendência de períodos anteriores.</div>
         ) : (

@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { AnalysisStatus, Prisma } from "@/generated/prisma/client";
+import type { AnalysisStatus, EnrollmentStatus, Prisma } from "@/generated/prisma/client";
 import { ATTENTION_STATUSES, PROCESSING_STATUSES } from "@/domain/curricular-analysis/status-groups";
 
 export interface ListFilters {
@@ -13,6 +13,7 @@ export interface ListFilters {
   poloCode?: string;
   /** Somente entregues há mais de 24h sem retorno de matrícula. */
   followUpDue?: boolean;
+  enrollmentStatus?: EnrollmentStatus;
 }
 
 export async function listAnalyses(filters: ListFilters) {
@@ -29,6 +30,7 @@ export async function listAnalyses(filters: ListFilters) {
   if (filters.createdById) where.createdById = filters.createdById;
   if (filters.poloCode) where.poloCode = filters.poloCode;
   if (filters.followUpDue) Object.assign(where, { status: "COMPLETED", enrollmentStatus: "PENDING", followUpDueAt: { lte: new Date() } });
+  if (filters.enrollmentStatus) where.enrollmentStatus = filters.enrollmentStatus;
   if (filters.q) {
     where.OR = [
       { studentName: { contains: filters.q, mode: "insensitive" } },

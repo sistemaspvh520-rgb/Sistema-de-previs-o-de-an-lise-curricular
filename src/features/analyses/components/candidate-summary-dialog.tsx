@@ -10,21 +10,29 @@ import { Textarea } from "@/components/ui/textarea";
 import type { AnalysisVM } from "@/features/analyses/view-model";
 
 export function buildCandidateSummary(vm: AnalysisVM): string {
-  const ingresso = vm.entryPeriod ? `${vm.entryPeriod}º período` : "a confirmar";
-  const previsao = vm.estimatedCompletionTerm ?? "a confirmar";
+  const pendencias = vm.totals.pending + vm.totals.review;
+  const ingresso = vm.entryPeriod ? `${vm.entryPeriod}º período` : null;
+  const previsao = vm.estimatedCompletionTerm;
+  const primeiroPasso = vm.entryPeriod
+    ? `Você seguirá a partir do ${ingresso}, conforme informado no resultado da análise.`
+    : "Ainda estamos confirmando o período de ingresso informado no documento.";
+  const conclusao = previsao
+    ? `Mantidas as ofertas regulares e a matrícula nas disciplinas previstas, a conclusão estimada é ${previsao}.`
+    : "A previsão de conclusão será disponibilizada após a confirmação completa da análise.";
   return [
-    "Analisamos seu aproveitamento curricular 🎓",
+    "Olá! Concluímos a análise do seu aproveitamento curricular 🎓",
     "",
-    vm.studentName ? `Aluno(a): ${vm.studentName}` : null,
-    vm.courseName ? `Curso: ${vm.courseName}${vm.courseFormat ? ` (${formatCourseFormat(vm.courseFormat)})` : ""}` : null,
-    vm.poloName ? `Polo: ${vm.poloName}` : null,
-    `Ingresso previsto: ${ingresso}`,
-    `Disciplinas aproveitadas: ${vm.totals.exempted}`,
-    `Pendências identificadas: ${vm.totals.pending + vm.totals.review}`,
-    `Previsão estimada de conclusão: ${previsao}`,
-    ...(vm.narrative ? ["", ...vm.narrative.headerLines.filter((l) => l.startsWith("⚠️") || l.startsWith("Semestres")), "", "A previsão fica assim:", "", ...vm.narrative.bulletLines, "", vm.narrative.conclusionLine ?? ""] : []),
+    vm.studentName ? `${vm.studentName}, veja seu resultado:` : "Veja seu resultado:",
+    vm.courseName ? `Curso: ${vm.courseName}${vm.courseFormat ? ` (${formatCourseFormat(vm.courseFormat)})` : ""}.` : null,
     "",
-    "A previsão considera a análise curricular e as regras acadêmicas.",
+    `✓ ${vm.totals.exempted} ${vm.totals.exempted === 1 ? "disciplina foi aproveitada" : "disciplinas foram aproveitadas"}.`,
+    `• ${pendencias} ${pendencias === 1 ? "disciplina permanece" : "disciplinas permanecem"} para cursar.`,
+    `• ${primeiroPasso}`,
+    `• ${conclusao}`,
+    ...(vm.narrative?.bulletLines.length ? ["", "Organização prevista:", ...vm.narrative.bulletLines] : []),
+    "",
+    "Esta é uma previsão acadêmica e pode ser ajustada caso haja alteração na oferta de disciplinas, matrícula ou regras institucionais.",
+    "Em caso de dúvida, fale conosco — estamos à disposição.",
   ]
     .filter((l) => l !== null)
     .join("\n");

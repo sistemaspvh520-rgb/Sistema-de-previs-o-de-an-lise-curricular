@@ -13,6 +13,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   ChartColumnIncreasing,
+  BookOpen,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ const ICONS = {
   review: ClipboardCheck,
   management: ChartNoAxesCombined,
   reports: ChartColumnIncreasing,
+  grades: BookOpen,
   settings: Settings,
 } as const;
 

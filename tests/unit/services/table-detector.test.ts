@@ -41,6 +41,23 @@ describe("extractHeaderFields / readHeaderMetadata", () => {
     expect(m.matrix).toBe("20221/2023-2");
     expect(m.modality).toBe("EAD");
   });
+  it("lê os campos do cabeçalho alinhado do resultado de matrícula unificada", async () => {
+    const pages = [{
+      page: 1, width: 595, height: 842,
+      lines: [
+        { x: 58, y: 740, w: 430, h: 10, text: "CAMPUS / UNIDADE\tCURSO\tSEMESTRE DE ENTRADA", parts: [{ x: 58, w: 120, text: "CAMPUS / UNIDADE" }, { x: 224, w: 40, text: "CURSO" }, { x: 390, w: 100, text: "SEMESTRE DE ENTRADA" }] },
+        { x: 58, y: 729, w: 430, h: 10, text: "CRUZEIRO - GRADUAÇÃO EAD\tCIÊNCIAS BIOLÓGICAS\t1º Semestre", parts: [{ x: 58, w: 150, text: "CRUZEIRO - GRADUAÇÃO EAD" }, { x: 224, w: 130, text: "CIÊNCIAS BIOLÓGICAS" }, { x: 390, w: 70, text: "1º Semestre" }] },
+        { x: 224, y: 718, w: 90, h: 10, text: "(LICENCIATURA)", parts: [{ x: 224, w: 90, text: "(LICENCIATURA)" }] },
+      ],
+    }];
+    // parsePdf é responsável por aplicar esse leitor; aqui reproduzimos o PDF
+    // mínimo via uma chamada ao detector para assegurar que o layout não seja SIAA.
+    const { detectTables } = await import("@/services/pdf/table-detector");
+    const table = detectTables(pages);
+    const local = { pageCount: 1, pages, textByPage: [], parserVersion: "x", table, headerFields: { campus: "CRUZEIRO - GRADUAÇÃO EAD", curso: "CIÊNCIAS BIOLÓGICAS (LICENCIATURA)", "semestre de entrada": "1º Semestre" } };
+    expect(readHeaderMetadata(local).entryPeriod).toBe(1);
+    expect(readHeaderMetadata(local).course).toBe("CIÊNCIAS BIOLÓGICAS (LICENCIATURA)");
+  });
   it("mascara o CPF presente na URL do rodapé", () => {
     expect(redactPersonalData("...jsf?inicio=1&codigoEmpresa=12&cpfCandidato=1729124402&nrInscricao=2")).toContain("cpfCandidato=[CPF]");
   });

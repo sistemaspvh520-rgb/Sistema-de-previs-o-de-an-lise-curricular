@@ -38,7 +38,6 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, co
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [entryTerm, setEntryTerm] = useState(defaultStartTerm);
-  const [entryPeriod, setEntryPeriod] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [studentName, setStudentName] = useState("");
   const [poloCode, setPoloCode] = useState("");
@@ -75,7 +74,7 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, co
   const nameReady = studentName.trim().length >= 3;
   const selectedPolo = polos.find((polo) => polo.code === poloCode);
   const poloReady = Boolean(selectedPolo);
-  const entryReady = Boolean(entryPeriod) && termReady && nameReady && poloReady && formatReady && reanalysisReady;
+  const entryReady = termReady && nameReady && poloReady && formatReady && reanalysisReady;
 
   const pick = useCallback(
     (f: File | undefined) => {
@@ -100,7 +99,6 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, co
     const fd = new FormData();
     fd.append("file", file);
     fd.append("entryTerm", entryTerm);
-    fd.append("entryPeriod", entryPeriod);
     fd.append("studentName", studentName.trim());
     fd.append("poloCode", poloCode);
     fd.append("courseFormat", courseFormat);
@@ -206,7 +204,7 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, co
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-semibold text-brand-navy">Antes de iniciar, identifique o atendimento</h2>
-            <p className="text-sm text-muted-foreground">Aluno, polo, formato do curso e ingresso são obrigatórios: identificam o atendimento e definem toda a previsão.</p>
+            <p className="text-sm text-muted-foreground">Aluno, polo e formato identificam o atendimento. O período de ingresso será lido diretamente do PDF.</p>
           </div>
           {entryReady && <span className="inline-flex items-center gap-1.5 text-sm font-medium text-status-success"><CircleCheck className="size-4" /> Dados prontos</span>}
         </div>
@@ -276,17 +274,9 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, co
             {formatReady ? <p className="text-xs text-muted-foreground">EAD Digital ou Semipresencial.</p> : <p className="text-xs font-medium text-status-warning">Obrigatório: selecione o formato do curso.</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="entryPeriod">Período de ingresso <span className="text-status-danger">*</span></Label>
-            <Select value={entryPeriod} onValueChange={setEntryPeriod}>
-              <SelectTrigger id="entryPeriod" className={cn("w-full", !entryPeriod && "border-status-warning/50")}><SelectValue placeholder="Selecionar" /></SelectTrigger>
-            <SelectContent>{Array.from({ length: 20 }, (_, i) => i + 1).map((period) => <SelectItem key={period} value={String(period)}>{period}º período</SelectItem>)}</SelectContent>
-            </Select>
-            {entryPeriod ? <p className="text-xs text-muted-foreground">Em qual período o candidato começa a grade.</p> : <p className="text-xs font-medium text-status-warning">Obrigatório: selecione o período para liberar a análise.</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="entryTerm">Semestre de ingresso <span className="text-status-danger">*</span></Label>
+            <Label htmlFor="entryTerm">Primeiro semestre da previsão</Label>
             <TermSelect id="entryTerm" value={entryTerm} onChange={setEntryTerm} currentYear={currentYear} className="w-full" />
-            {termReady ? <p className="text-xs text-muted-foreground">Também define o primeiro semestre da previsão.</p> : <p className="text-xs font-medium text-status-warning">Obrigatório: selecione o semestre de ingresso.</p>}
+            {termReady ? <p className="text-xs text-muted-foreground">Usamos este semestre para iniciar a previsão; o período da grade vem do PDF.</p> : <p className="text-xs font-medium text-status-warning">Escolha quando a previsão deve começar.</p>}
           </div>
           <div className="flex flex-col gap-2 md:col-span-2 md:flex-row md:items-center md:justify-end">
             {!file && <p className="text-xs text-muted-foreground md:mr-auto">Selecione o PDF acima para continuar.</p>}
@@ -298,13 +288,13 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, co
         </div>
       </section>
 
-      {/* Confirmação explícita: o ingresso é a base de toda a previsão e não é lido do PDF. */}
+      {/* O período acadêmico é extraído do PDF; o analista só confirma os dados do atendimento. */}
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirme os dados do atendimento</AlertDialogTitle>
             <AlertDialogDescription>
-              A previsão inteira é calculada a partir destes dados. Eles não são lidos do PDF — confira antes de iniciar.
+              O período de ingresso será identificado no PDF. Confira os dados do atendimento e quando a previsão deve começar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <dl className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
@@ -313,8 +303,8 @@ export function UploadDropzone({ maxMb, defaultStartTerm, currentYear, polos, co
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Polo</dt><dd className="break-words font-medium">{poloReady ? `${poloCode} · ${selectedPolo?.name}` : "—"}</dd></div>
             {hasPrevious && reanalysis === "yes" && <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Reanálise</dt><dd className="font-medium text-status-warning">Sim — vinculada à análise anterior</dd></div>}
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Formato</dt><dd className="font-medium">{formatReady ? formatCourseFormat(courseFormat as CourseFormat) : "—"}</dd></div>
-            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Ingresso</dt><dd className="font-medium">{entryPeriod ? `${entryPeriod}º período` : "—"}</dd></div>
-            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Semestre</dt><dd className="font-medium">{termReady ? describeTerm(entryTerm) : "—"}</dd></div>
+            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Período</dt><dd className="font-medium">Será lido do PDF</dd></div>
+            <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2"><dt className="text-muted-foreground">Previsão a partir de</dt><dd className="font-medium">{termReady ? describeTerm(entryTerm) : "—"}</dd></div>
           </dl>
           <AlertDialogFooter>
             <AlertDialogCancel>Revisar</AlertDialogCancel>

@@ -12,11 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AnalysisStatusBadge, ReliabilityBadge, ANALYSIS_STATUS_LABELS } from "@/components/shared/status-badge";
 import { formatDateTime, ordinal, pluralize } from "@/lib/utils";
-import type { AnalysisStatus } from "@/generated/prisma/enums";
+import type { AnalysisStatus, EnrollmentStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { formatCourseFormat } from "@/domain/course-formats";
 import { countDueFollowUps } from "@/services/follow-up/follow-up";
+import { AnalysisTableRowLink } from "@/features/analyses/components/analysis-table-row-link";
 
 export const metadata: Metadata = { title: "Análises" };
 export const dynamic = "force-dynamic";
@@ -40,13 +41,14 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
   const settings = await getSystemSettings();
   const poloCode = typeof params.polo === "string" && settings.polos.some((polo) => polo.code === params.polo) ? params.polo : undefined;
   const followUpDue = params.followUp === "due";
+  const enrollmentStatus = params.enrollment === "NOT_ENROLLED" ? "NOT_ENROLLED" as EnrollmentStatus : undefined;
   // Gestor pode filtrar por responsável; demais perfis só veem as próprias análises.
   const isAdmin = user.role === "ADMIN";
   const userFilter = isAdmin && typeof params.user === "string" && /^[0-9a-f-]{36}$/.test(params.user) ? params.user : undefined;
   const page = Number(params.page ?? 1) || 1;
   const [team, listed, dueTotal] = await Promise.all([
     isAdmin ? prisma.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }) : [],
-    listAnalyses({ status, statusGroup, q, page, poloCode, followUpDue, createdById: isAdmin ? userFilter : user.id }),
+    listAnalyses({ status, statusGroup, q, page, poloCode, followUpDue, enrollmentStatus, createdById: isAdmin ? userFilter : user.id }),
     countDueFollowUps(isAdmin ? userFilter : user.id),
   ]);
   const { items, total, pageSize } = listed;
@@ -130,7 +132,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
               </TableRow>
             )}
             {items.map((a) => (
-              <TableRow key={a.id} className="cursor-pointer animate-in fade-in slide-in-from-bottom-1 duration-300">
+              <AnalysisTableRowLink key={a.id} href={`/analyses/${a.id}`}>
                 <TableCell className="w-full max-w-0 whitespace-normal">
                   <Link href={`/analyses/${a.id}`} className="block min-w-0">
                     <div className="font-medium">{a.studentName ?? a.courseName ?? "Curso não identificado"}</div>
@@ -152,7 +154,7 @@ export default async function AnalysesPage({ searchParams }: PageProps<"/analyse
                   {a.reviewItemsCount > 0 && <div className="mt-1 text-[11px] text-muted-foreground">{pluralize(a.reviewItemsCount, "observação", "observações")}</div>}
                 </TableCell>}
                 <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">{formatDateTime(a.createdAt)}</TableCell>
-              </TableRow>
+              </AnalysisTableRowLink>
             ))}
           </TableBody>
         </Table>

@@ -18,8 +18,9 @@ import { AuditTab } from "@/features/analyses/components/audit-tab";
 import { HistoryTab } from "@/features/analyses/components/history-tab";
 import { PendingTab } from "@/features/analyses/components/pending-tab";
 import { CandidateSummaryDialog } from "@/features/analyses/components/candidate-summary-dialog";
-import { EntryPeriodBanner, AdditionalRuleBanner } from "@/features/analyses/components/entry-period-banner";
+import { AdditionalRuleBanner, EntryPeriodSimulationDialog } from "@/features/analyses/components/entry-period-banner";
 import { EnrollmentBanner } from "@/features/analyses/components/enrollment-banner";
+import { UploadReanalysisDialog } from "@/features/analyses/components/upload-reanalysis-dialog";
 import { formatDateTime } from "@/lib/time";
 import { DeleteAnalysisButton } from "@/features/analyses/components/delete-analysis-button";
 import { RequestAnalysisDeletionButton } from "@/features/analyses/components/request-analysis-deletion-button";
@@ -35,7 +36,7 @@ const PdfViewer = dynamic(() => import("@/features/analyses/components/pdf-viewe
   loading: () => <div className="flex h-full items-center justify-center rounded-xl border"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>,
 });
 
-export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: boolean; diagnostics: boolean; delete?: boolean; requestDelete?: boolean } }) {
+export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { create?: boolean; review: boolean; diagnostics: boolean; delete?: boolean; requestDelete?: boolean } }) {
   const [tab, setTab] = useState("summary");
   const [showPdf, setShowPdf] = useState(false);
   const [page, setPage] = useState(1);
@@ -44,6 +45,7 @@ export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: b
   // O analista pode corrigir uma análise entregue; toda alteração é registrada e recalculada.
   const editable = perms.review && !vm.isProcessing;
   const pdfAvailable = !!vm.document && !vm.document.deletedAt;
+  const documentPeriod = vm.claims.find((claim) => claim.type === "ENTRY_PERIOD" && claim.value !== null)?.value ?? null;
 
   function locate(s: SubjectVM) {
     setSelected(s);
@@ -60,15 +62,22 @@ export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: b
 
   return (
     <div className="space-y-6">
-      {vm.entryPeriod === null && !vm.isProcessing && <EntryPeriodBanner analysisId={vm.id} periods={vm.totals.periods} canEdit={editable} />}
       {vm.projectionIncomplete && vm.entryPeriod !== null && <AdditionalRuleBanner />}
       {vm.status === "COMPLETED" && <EnrollmentBanner analysisId={vm.id} status={vm.enrollment.status} note={vm.enrollment.note} updatedAtLabel={vm.enrollment.updatedAt ? formatDateTime(vm.enrollment.updatedAt) : null} updatedByName={vm.enrollment.updatedByName} due={vm.enrollment.due} canEdit={perms.review} />}
 
-      <SummaryCards vm={vm} showSources={perms.diagnostics} />
+      {vm.subjects.length > 0 && <SummaryCards vm={vm} showSources={perms.diagnostics} />}
+      {vm.subjects.length === 0 && !vm.isProcessing && (
+        <div className="rounded-xl border border-status-warning/30 bg-status-warning-bg p-5 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="font-semibold text-status-warning">Ainda não há disciplinas disponíveis nesta análise</div>
+          <p className="mt-1 text-sm text-status-warning/90">Envie o PDF atualizado para criar uma nova solicitação. O documento anterior continuará preservado no histórico.</p>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <CandidateSummaryDialog vm={vm} />
+        {vm.subjects.length > 0 && <CandidateSummaryDialog vm={vm} />}
         {editable && <StartTermDialog vm={vm} />}
+        <EntryPeriodSimulationDialog analysisId={vm.id} currentPeriod={vm.entryPeriod} documentPeriod={documentPeriod} periods={vm.totals.periods} canEdit={editable} />
+        {perms.create && <UploadReanalysisDialog analysisId={vm.id} />}
         <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           {perms.delete && <DeleteAnalysisButton analysisId={vm.id} />}
           {perms.requestDelete && <RequestAnalysisDeletionButton analysisId={vm.id} />}
@@ -80,7 +89,7 @@ export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: b
         </div>
       </div>
 
-      <div className={cn("grid gap-6", showPdf && "xl:grid-cols-2")}>
+      {vm.subjects.length > 0 && <div className={cn("grid gap-6", showPdf && "xl:grid-cols-2")}>
         <Tabs value={tab} onValueChange={setTab} className="min-w-0">
           <TabsList className="flex h-auto w-full flex-nowrap justify-start gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
             <TabsTrigger value="summary" className={TAB}>Resumo</TabsTrigger>
@@ -97,7 +106,7 @@ export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: b
             {perms.diagnostics && <TabsTrigger value="history" className={TAB}>Histórico</TabsTrigger>}
           </TabsList>
 
-          <TabsContent value="summary" className="mt-4">
+          <TabsContent value="summary" className="mt-4 animate-in fade-in slide-in-from-bottom-1 duration-300">
             <SummaryTab vm={vm} onLocate={locate} selectedId={selected?.id} showDiagnostics={perms.diagnostics} />
           </TabsContent>
           <TabsContent value="grade" className="mt-4">
@@ -129,7 +138,7 @@ export function AnalysisView({ vm, perms }: { vm: AnalysisVM; perms: { review: b
             <PdfViewer url={`/api/analyses/${vm.id}/document`} page={page} onPageChange={setPage} highlight={selected?.bbox ?? null} />
           </div>
         )}
-      </div>
+      </div>}
 
       <SubjectEditDialog analysisId={vm.id} subject={editing} open={!!editing} onOpenChange={(o) => !o && setEditing(null)} />
     </div>
@@ -140,9 +149,9 @@ function SummaryTab({ vm, onLocate, selectedId, showDiagnostics }: { vm: Analysi
   return (
     <div className="space-y-6">
       {showDiagnostics && <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Semestre de ingresso</div>
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Início da previsão</div>
         <div className="mt-1 text-2xl font-semibold">{vm.startTerm}</div>
-        <div className="text-xs text-muted-foreground">Primeiro semestre da projeção (ingresso no {vm.entryPeriod ? `${vm.entryPeriod}º período` : "período a confirmar"}).</div>
+        <div className="text-xs text-muted-foreground">Primeiro semestre da projeção {vm.entryPeriod ? `(período do PDF: ${vm.entryPeriod}º)` : ""}.</div>
       </div>}
       <GradeByPeriod subjects={vm.subjects} entryPeriod={vm.entryPeriod} onLocate={onLocate} selectedId={selectedId} />
     </div>
@@ -164,14 +173,14 @@ function StartTermDialog({ vm }: { vm: AnalysisVM }) {
   }
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="outline">Semestre de ingresso: {vm.startTerm}</Button></DialogTrigger>
+      <DialogTrigger asChild><Button variant="outline" className="animate-in fade-in slide-in-from-bottom-1 duration-500">Início da previsão: {vm.startTerm}</Button></DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Semestre de ingresso</DialogTitle>
-          <DialogDescription>É também o primeiro semestre da previsão. Ao alterar, os dois valores são atualizados.</DialogDescription>
+          <DialogTitle>Início da previsão</DialogTitle>
+          <DialogDescription>Escolha em qual semestre-calendário a projeção deve começar. O período acadêmico continua sendo lido do PDF.</DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="term">Semestre letivo de ingresso</Label>
+          <Label htmlFor="term">Primeiro semestre projetado</Label>
           <TermSelect id="term" value={term} onChange={setTerm} />
         </div>
         <DialogFooter>

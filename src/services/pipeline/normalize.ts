@@ -40,6 +40,17 @@ function normalizeForMatch(s: string): string {
     .trim();
 }
 
+/** A lista de dispensadas do resultado unificado não tem coluna Série por projeto.
+ * Se o parser local confirmou a linha, isso não é incerteza de leitura. */
+function isConfirmedUnifiedExemption(local: LocalExtraction | null, subject: ExtractedSubject, name: string): boolean {
+  const table = local?.table;
+  if (!table) return false;
+  const isUnified = Object.values(table.freeText).flat().some((line) => line.startsWith("Total de disciplinas dispensadas:"));
+  if (!isUnified) return false;
+  const row = table.rows.find((candidate) => !candidate.pageBreakDuplicate && candidate.page === subject.sourcePage && candidate.rowIndex === subject.sourceRow);
+  return !!row && row.usedSubject !== null && normalizeForMatch(row.name) === normalizeForMatch(name);
+}
+
 /** Procura a linha lógica (tabela) ou visual do parser local que corresponde à disciplina. */
 function findBoundingBox(local: LocalExtraction | null, subject: ExtractedSubject, name: string, code: string | null): NormalizedSubject["bbox"] {
   if (!local) return null;
@@ -103,7 +114,8 @@ export function normalizeExtraction(
     seen.set(rowHash, count + 1);
     if (count > 0) rowHash = `${rowHash.slice(0, 20)}-${count}`;
 
-    const readability: Readability = s.readability;
+    const confirmedUnifiedExemption = isConfirmedUnifiedExemption(local, s, name);
+    const readability: Readability = confirmedUnifiedExemption ? "CLEAR" : s.readability;
     const code = s.code && /^\d+$/.test(s.code.trim()) ? s.code.trim() : null;
     return {
       rowHash,
@@ -117,7 +129,7 @@ export function normalizeExtraction(
       sourcePage: s.sourcePage,
       sourceRow: s.sourceRow,
       bbox: findBoundingBox(local, s, name, code),
-      note: s.note,
+      note: confirmedUnifiedExemption ? null : s.note,
       sortIndex: index,
     };
   });

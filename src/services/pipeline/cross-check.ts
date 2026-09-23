@@ -79,7 +79,7 @@ export function crossCheckWithLocalTable(local: LocalExtraction | null, subjects
 /** Período de ingresso e metadados lidos deterministicamente do cabeçalho ("Série: 4", "Curso: ...", "Grade: ..."). */
 export function readHeaderMetadata(local: LocalExtraction | null): { entryPeriod: number | null; course: string | null; matrix: string | null; campus: string | null; modality: string | null } {
   const f = local?.headerFields ?? {};
-  const serie = f["serie"] ?? f["série"];
+  const serie = f["serie"] ?? f["série"] ?? f["semestre de entrada"];
   const n = serie ? Number(serie.replace(/[^0-9]/g, "")) : NaN;
   return {
     entryPeriod: Number.isInteger(n) && n >= 1 && n <= 20 ? n : null,
