@@ -59,8 +59,8 @@ export default async function ReportsPage({
     completed,
     enrolled,
     pendingEnrollment,
-    notEnrolled,
     courses,
+    courseOutcomes,
     recent,
     followUps,
     byPolo,
@@ -79,15 +79,17 @@ export default async function ReportsPage({
     prisma.curricularAnalysis.count({
       where: { ...base, status: "COMPLETED", enrollmentStatus: "PENDING" },
     }),
-    prisma.curricularAnalysis.count({
-      where: { ...base, enrollmentStatus: "NOT_ENROLLED" },
-    }),
     prisma.curricularAnalysis.groupBy({
       by: ["courseName"],
       where: { ...base, courseName: { not: null } },
       _count: { _all: true },
       orderBy: { _count: { courseName: "desc" } },
       take: 5,
+    }),
+    prisma.curricularAnalysis.groupBy({
+      by: ["courseName", "enrollmentStatus"],
+      where: { ...base, courseName: { not: null }, status: "COMPLETED" },
+      _count: { _all: true },
     }),
     prisma.curricularAnalysis.findMany({
       where: base,
@@ -118,6 +120,26 @@ export default async function ReportsPage({
     countAnalysesByPolo({ createdById: user.id, monthStart }),
   ]);
   const conversion = completed ? Math.round((enrolled / completed) * 100) : 0;
+  const conversionByCourse = Object.values(
+    courseOutcomes.reduce<
+      Record<string, { name: string; completed: number; enrolled: number }>
+    >((acc, row) => {
+      if (!row.courseName) return acc;
+      const current = acc[row.courseName] ?? {
+        name: row.courseName,
+        completed: 0,
+        enrolled: 0,
+      };
+      current.completed += row._count._all;
+      if (row.enrollmentStatus === "ENROLLED")
+        current.enrolled += row._count._all;
+      acc[row.courseName] = current;
+      return acc;
+    }, {}),
+  )
+    .filter((course) => course.completed > 0)
+    .sort((a, b) => b.completed - a.completed)
+    .slice(0, 5);
   const cards = [
     {
       label: "Minhas análises",
@@ -280,6 +302,48 @@ export default async function ReportsPage({
               {enrolled} · {conversion}%
             </p>
           </div>
+        </CardContent>
+      </Card>
+      <Card className="mt-6 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Conversão por curso</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Matrículas confirmadas entre as análises concluídas no período.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {conversionByCourse.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Ainda não há resultados de matrícula suficientes para comparar
+              cursos.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {conversionByCourse.map((course) => {
+                const rate = Math.round(
+                  (course.enrolled / course.completed) * 100,
+                );
+                return (
+                  <div key={course.name}>
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span className="truncate font-medium">
+                        {course.name}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground">
+                        {course.enrolled}/{course.completed} · {rate}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-status-success"
+                        style={{ width: `${rate}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
       <Card className="mt-6 overflow-hidden shadow-sm">
