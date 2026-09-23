@@ -180,12 +180,14 @@ export default async function ReportsPage({
   ];
   return (
     <>
-      <PageHeader
-        eyebrow="Acompanhamento pessoal"
-        title="Meus relatórios"
-        description="Acompanhe volume, conversão e oportunidades de retorno em um único lugar."
-      />
-      <section className="relative mt-4 overflow-hidden rounded-2xl border border-brand-cyan/30 bg-[linear-gradient(110deg,#00284d,#071426)] px-5 py-4 text-white shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="-mt-2">
+        <PageHeader
+          eyebrow="Acompanhamento pessoal"
+          title="Meus relatórios"
+          description="Acompanhe volume, conversão e oportunidades de retorno em um único lugar."
+        />
+      </div>
+      <section className="relative overflow-hidden rounded-2xl border border-brand-cyan/30 bg-[linear-gradient(110deg,#00284d,#071426)] px-5 py-4 text-white shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500">
         <div className="relative flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-200">
@@ -203,9 +205,11 @@ export default async function ReportsPage({
           </span>
         </div>
       </section>
-      <DateRangeFilter />
+      <div className="mt-3">
+        <DateRangeFilter />
+      </div>
       <section
-        className="mt-4 rounded-2xl border border-brand-navy bg-brand-navy p-3 shadow-xl sm:p-4"
+        className="mt-3 rounded-2xl border border-brand-navy bg-brand-navy p-3 shadow-xl sm:p-4"
         aria-label="Resumo operacional"
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
