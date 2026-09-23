@@ -34,6 +34,7 @@ export async function listDueFollowUps(userId: string | undefined, take = 20) {
       poloName: true,
       followUpDueAt: true,
       completedAt: true,
+      enrollmentReanalysisAt: true,
       createdBy: { select: { id: true, name: true } },
     },
   });
@@ -68,6 +69,7 @@ export async function notifyDueFollowUps(now = new Date()) {
       courseName: true,
       poloName: true,
       completedAt: true,
+      enrollmentReanalysisAt: true,
       followUpNotifiedAt: true,
       followUpNotificationCount: true,
       createdBy: {
@@ -129,6 +131,11 @@ export async function notifyDueFollowUps(now = new Date()) {
       polo: a.poloName ?? "—",
       url: appUrl(`/analyses/${a.id}`),
       completedAt: a.completedAt,
+      reanalysis: a.enrollmentReanalysisAt !== null,
+      businessDaysOpen: businessDaysSince(
+        a.enrollmentReanalysisAt ?? a.completedAt,
+        now,
+      ),
     }));
     let emailDelivered = false;
     if (user.followUpEmailEnabled && isEmailConfigured()) {
@@ -150,14 +157,16 @@ export async function notifyDueFollowUps(now = new Date()) {
         logger.warn("follow_up.email_failed", { userId, err: String(err) });
       }
     }
-    const title =
-      items.length === 1
-        ? "O aluno se matriculou?"
-        : `${items.length} retornos de matrícula pendentes`;
+    const urgent = list.some((item) => item.businessDaysOpen > 2);
+    const title = urgent
+      ? `URGENTE: ${list.length} resultado(s) sem atualização`
+      : items.length === 1
+        ? "Verifique o resultado do atendimento"
+        : `${items.length} resultados aguardando atualização`;
     const body =
       items.length === 1
-        ? `${list[0].student} · ${list[0].course}. Informe se houve matrícula.`
-        : `Informe se ${list
+        ? `${list[0].student} · ${list[0].course}. Verifique o resultado e atualize a situação.`
+        : `Verifique e atualize a situação de ${list
             .map((i) => i.student)
             .slice(0, 3)
             .join(

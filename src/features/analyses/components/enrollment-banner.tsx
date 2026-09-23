@@ -135,13 +135,13 @@ export function EnrollmentBanner({
             )}
           >
             {due
-              ? "Confirmação obrigatória: o aluno se matriculou?"
-              : "Confirmação obrigatória de matrícula"}
+              ? "Ação necessária: verifique o resultado do atendimento"
+              : "Atualize o resultado do atendimento"}
           </div>
           <p className="text-sm text-muted-foreground">
             {due
-              ? "A análise foi entregue há mais de 24 horas. Informe o resultado para concluir este retorno."
-              : "Após o atendimento, informe se houve matrícula. Sem resposta, o aviso continuará no e-mail e no sistema."}
+              ? "Já se passaram 24 horas. Consulte o resultado e informe se houve matrícula, não matrícula ou reanálise."
+              : "Após 24 horas, verifique o resultado e atualize esta situação. Os lembretes chegam no início do expediente e novamente durante o dia."}
           </p>
         </div>
       </div>
@@ -172,7 +172,8 @@ export function EnrollmentBanner({
               />
               <span>
                 <RotateCcw className="mr-1 inline size-3.5" />
-                Foi feita reanálise — solicitar nova confirmação em 24h
+                Foi solicitada/finalizada reanálise — verificar novo resultado
+                em 24h
               </span>
             </label>
           </div>
