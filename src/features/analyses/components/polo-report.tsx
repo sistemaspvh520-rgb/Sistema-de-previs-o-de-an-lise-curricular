@@ -40,7 +40,7 @@ export function PoloReportCard({
     >
       <CardHeader
         className={cn(
-          "flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-brand-cyan/20 bg-brand-cyan-50/70",
+          "flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-brand-cyan/20 bg-brand-cyan-50/70 px-6 py-4",
           variant === "glass" && "border-white/10 bg-white/[0.05]",
         )}
       >

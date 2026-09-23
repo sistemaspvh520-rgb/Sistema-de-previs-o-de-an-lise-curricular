@@ -414,7 +414,7 @@ export default async function ReportsPage({
         </CardContent>
       </Card>
       <PoloReportCard
-        className="mt-5 overflow-hidden border-sky-200 bg-white shadow-[0_10px_30px_rgba(15,45,75,0.07)]"
+        className="mt-5 overflow-hidden border-sky-200 bg-white shadow-[0_10px_30px_rgba(15,45,75,0.07)] [--card-spacing:0px]"
         title="Minhas análises por polo"
         description="Clique no polo para abrir a lista ou exporte o relatório em CSV."
         rows={byPolo}
