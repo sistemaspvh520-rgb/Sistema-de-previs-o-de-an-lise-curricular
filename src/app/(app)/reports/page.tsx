@@ -19,6 +19,7 @@ import { startOfCurrentMonth } from "@/lib/time";
 import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
 import { countDueFollowUps } from "@/services/follow-up/follow-up";
+import { countStaleEnrollmentCases } from "@/services/follow-up/management-alerts";
 import { DashboardRing } from "@/components/dashboard/dashboard-ring";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -61,6 +62,8 @@ export default async function ReportsPage({
     completed,
     enrolled,
     pendingEnrollment,
+    reanalysesInProgress,
+    staleEnrollment,
     courseOutcomes,
     recent,
     followUps,
@@ -77,6 +80,15 @@ export default async function ReportsPage({
       where: { ...base, enrollmentStatus: "ENROLLED" },
     }),
     countDueFollowUps(user.id),
+    prisma.curricularAnalysis.count({
+      where: {
+        ...base,
+        status: "COMPLETED",
+        enrollmentStatus: "PENDING",
+        enrollmentReanalysisAt: { not: null },
+      },
+    }),
+    countStaleEnrollmentCases(base),
     prisma.curricularAnalysis.groupBy({
       by: ["courseName", "enrollmentStatus"],
       where: { ...base, courseName: { not: null }, status: "COMPLETED" },
@@ -133,33 +145,34 @@ export default async function ReportsPage({
     .slice(0, 5);
   const cards = [
     {
-      label: createdAt ? "No período" : "Neste mês",
-      value: createdAt ? inPeriod : month,
+      label: "Entradas",
+      value: inPeriod,
       icon: FileText,
-      hint: "Análises iniciadas",
+      hint: "Recebidas no período",
       href: "/analyses",
-    },
-    {
-      label: "Prontas",
-      value: completed,
-      icon: CheckCircle2,
-      hint: "Resultados concluídos",
-      href: "/analyses?status=COMPLETED",
-    },
-    {
-      label: "Retornos a tratar",
-      value: pendingEnrollment,
-      icon: UserRoundX,
-      hint: "Com retorno vencido e pendente",
-      href: "/analyses?followUp=due",
-      alert: pendingEnrollment > 0,
     },
     {
       label: "Matrículas",
       value: `${enrolled} · ${conversion}%`,
       icon: CalendarDays,
-      hint: "Confirmadas entre as análises prontas",
+      hint: "Conversão das entradas",
       href: "/analyses",
+    },
+    {
+      label: "Em reanálise",
+      value: reanalysesInProgress,
+      icon: UserRoundX,
+      hint: "Nova confirmação em andamento",
+      href: "/analyses?followUp=due",
+      alert: false,
+    },
+    {
+      label: "+2 dias úteis",
+      value: staleEnrollment,
+      icon: AlertTriangle,
+      hint: "Sem matrícula, inclusive reanálises",
+      href: "/analyses?followUp=due",
+      alert: staleEnrollment > 0,
     },
   ];
   return (

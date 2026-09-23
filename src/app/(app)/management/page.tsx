@@ -19,6 +19,7 @@ import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
 import { DashboardRing } from "@/components/dashboard/dashboard-ring";
+import { countStaleEnrollmentCases } from "@/services/follow-up/management-alerts";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Gestão" };
@@ -66,6 +67,7 @@ export default async function ManagementPage({
     notEnrolled,
     overdueFollowUps,
     notificationSetupPending,
+    reanalysesInProgress,
   ] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
     prisma.user.findMany({
@@ -121,18 +123,20 @@ export default async function ManagementPage({
     prisma.curricularAnalysis.count({
       where: { ...periodWhere, enrollmentStatus: "NOT_ENROLLED" },
     }),
-    prisma.curricularAnalysis.count({
-      where: {
-        status: "COMPLETED",
-        enrollmentStatus: "PENDING",
-        followUpDueAt: { lte: overdueLimit },
-      },
-    }),
+    countStaleEnrollmentCases(periodWhere),
     prisma.user.count({
       where: {
         isActive: true,
         role: { in: ["ADMIN", "ANALYST"] },
         followUpPreferencesConfirmedAt: null,
+      },
+    }),
+    prisma.curricularAnalysis.count({
+      where: {
+        ...periodWhere,
+        status: "COMPLETED",
+        enrollmentStatus: "PENDING",
+        enrollmentReanalysisAt: { not: null },
       },
     }),
   ]);
@@ -280,10 +284,10 @@ export default async function ManagementPage({
             <div>
               <p className="text-sm font-semibold">Prioridade de hoje</p>
               <p className="mt-1 text-2xl font-semibold">
-                {overdueFollowUps} retorno(s) há mais de 48h
+                {overdueFollowUps} caso(s) há mais de 2 dias úteis
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Abra a fila, registre a matrícula ou programe o próximo contato.
+                Sem matrícula, inclusive em reanálise. Abra a fila e investigue.
               </p>
             </div>
             <ArrowUpRight className="ml-auto size-4" />
@@ -312,9 +316,9 @@ export default async function ManagementPage({
 
       <section className="mt-5 grid gap-4 lg:grid-cols-3">
         <KpiStrip
-          title="Em acompanhamento"
-          value={pending}
-          label="Aguardando retorno de matrícula"
+          title="Em reanálise"
+          value={reanalysesInProgress}
+          label="Aguardando nova confirmação"
           color="border-sky-500"
           href="/analyses?followUp=due"
         />
