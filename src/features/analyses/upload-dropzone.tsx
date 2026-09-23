@@ -259,7 +259,7 @@ export function UploadDropzone({
               <FileUp className="size-4" /> Selecionar PDF
             </Button>
             <p className="mt-2 text-xs text-muted-foreground">
-              Somente histórico escolar acadêmico em PDF · até {maxMb} MB
+              Somente PDF de resultado do SIAA · até {maxMb} MB
             </p>
           </div>
         )}
@@ -268,11 +268,11 @@ export function UploadDropzone({
       <div className="flex gap-3 rounded-xl border border-brand-cyan-200 bg-brand-cyan-50/60 p-4 text-sm text-brand-navy">
         <ShieldAlert className="mt-0.5 size-5 shrink-0 text-brand-cyan-700" />
         <div>
-          <strong>Documento obrigatório: histórico escolar.</strong>
+          <strong>Documento obrigatório: PDF de resultado do SIAA.</strong>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
             Antes de iniciar, o sistema confere curso, disciplinas e dados
-            acadêmicos. Boleto, contrato, declaração, diploma ou outros PDFs
-            serão bloqueados.
+            acadêmicos do resultado do SIAA. Boleto, contrato, declaração,
+            diploma ou outros PDFs serão bloqueados.
           </p>
         </div>
       </div>

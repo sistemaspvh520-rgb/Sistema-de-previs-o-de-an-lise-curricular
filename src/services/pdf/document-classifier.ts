@@ -79,7 +79,7 @@ export class InvalidCurricularDocumentError extends Error {
   readonly code = "INVALID_CURRICULAR_DOCUMENT";
   constructor(readonly classification: DocumentClassification) {
     super(
-      "Envie o histórico escolar acadêmico do aluno, contendo curso, disciplinas cursadas e dados acadêmicos. Outros PDFs não podem iniciar uma análise curricular.",
+      "Envie o PDF de resultado do SIAA do aluno, contendo curso, disciplinas cursadas e dados acadêmicos. Outros PDFs não podem iniciar uma análise curricular.",
     );
     this.name = "InvalidCurricularDocumentError";
   }
