@@ -12,24 +12,25 @@ const normalize = (value: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-const HISTORY_HEADERS = ["historico escolar", "historico academico"];
-const ACADEMIC_SIGNALS = [
-  "disciplinas cursadas",
-  "disciplina",
-  "componentes curriculares",
-  "aproveitamento",
-  "situacao academica",
-  "rendimento academico",
-  "carga horaria",
-  "nota final",
+/** Marcadores presentes no PDF de resultado emitido pelo SIAA. */
+const SIAA_HEADERS = [
+  "analise curricular",
+  "solicitacao de transferencia",
+  "solicitacao de 2a graduacao",
 ];
-const IDENTITY_SIGNALS = [
-  "rgm",
-  "ra",
-  "registro academico",
-  "dados do aluno",
-  "aluno(a)",
-  "curso",
+const SIAA_RESULT_SIGNALS = [
+  "resumo do aproveitamento",
+  "disciplinas dispensadas",
+  "disciplinas a cursar",
+  "situacao de ingresso",
+  "data da analise",
+];
+const ACADEMIC_SIGNALS = [
+  "disciplina",
+  "dispensada",
+  "a cursar",
+  "c.h.",
+  "carga horaria",
 ];
 const REJECTED_DOCUMENTS = [
   "boleto",
@@ -48,9 +49,11 @@ export function classifyCurricularAnalysisText(
   text: string,
 ): DocumentClassification {
   const source = normalize(text);
-  const headers = HISTORY_HEADERS.filter((signal) => source.includes(signal));
-  const history = ACADEMIC_SIGNALS.filter((signal) => source.includes(signal));
-  const identity = IDENTITY_SIGNALS.filter((signal) => source.includes(signal));
+  const headers = SIAA_HEADERS.filter((signal) => source.includes(signal));
+  const result = SIAA_RESULT_SIGNALS.filter((signal) =>
+    source.includes(signal),
+  );
+  const academic = ACADEMIC_SIGNALS.filter((signal) => source.includes(signal));
   const rejected = REJECTED_DOCUMENTS.filter((signal) =>
     source.includes(signal),
   );
@@ -61,17 +64,17 @@ export function classifyCurricularAnalysisText(
         "O PDF parece ser outro tipo de documento, não um histórico escolar acadêmico.",
       matchedSignals: rejected,
     };
-  if (headers.length >= 1 && history.length >= 1 && identity.length >= 1)
+  if (headers.length >= 1 && result.length >= 1 && academic.length >= 1)
     return {
       accepted: true,
-      reason: "Histórico escolar identificado.",
-      matchedSignals: [...headers, ...history, ...identity],
+      reason: "Resultado de análise curricular do SIAA identificado.",
+      matchedSignals: [...headers, ...result, ...academic],
     };
   return {
     accepted: false,
     reason:
-      "Não foi possível confirmar que o arquivo é um histórico escolar com disciplinas e dados acadêmicos.",
-    matchedSignals: [...headers, ...history, ...identity],
+      "Não foi possível confirmar que o arquivo é o PDF de resultado da análise curricular do SIAA.",
+    matchedSignals: [...headers, ...result, ...academic],
   };
 }
 
@@ -79,7 +82,7 @@ export class InvalidCurricularDocumentError extends Error {
   readonly code = "INVALID_CURRICULAR_DOCUMENT";
   constructor(readonly classification: DocumentClassification) {
     super(
-      "Envie o PDF de resultado do SIAA do aluno, contendo curso, disciplinas cursadas e dados acadêmicos. Outros PDFs não podem iniciar uma análise curricular.",
+      "Envie o PDF de resultado da análise curricular do SIAA, com resumo do aproveitamento e disciplinas dispensadas ou a cursar. Outros PDFs não podem iniciar uma análise curricular.",
     );
     this.name = "InvalidCurricularDocumentError";
   }

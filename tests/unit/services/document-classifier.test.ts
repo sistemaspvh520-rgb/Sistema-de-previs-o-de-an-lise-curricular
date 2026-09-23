@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { classifyCurricularAnalysisText } from "@/services/pdf/document-classifier";
 
 describe("classificador de documento curricular", () => {
-  it("aceita histórico escolar com sinais acadêmicos", () => {
+  it("aceita o resultado de análise curricular do SIAA", () => {
     const result = classifyCurricularAnalysisText(
-      "HISTÓRICO ESCOLAR Dados do aluno RGM 123 Curso: Administração Disciplinas cursadas Carga horária Situação acadêmica",
+      "Análise Curricular Solicitação de Transferência Resumo do Aproveitamento Disciplinas Dispensadas — 10 Disciplinas a Cursar — 42 Disciplina C.H. Situação",
     );
     expect(result.accepted).toBe(true);
   });
