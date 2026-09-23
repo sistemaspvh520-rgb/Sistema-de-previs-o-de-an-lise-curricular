@@ -18,6 +18,7 @@ import { startOfCurrentMonth, zonedDateParts } from "@/lib/time";
 import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
+import { DashboardRing } from "@/components/dashboard/dashboard-ring";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Gestão" };
@@ -174,8 +175,9 @@ export default async function ManagementPage({
         title="Gestão à vista"
         description="Acompanhe o funil de análises e a produtividade da operação em tempo real."
       />
-      <section className="overflow-hidden rounded-xl bg-brand-navy text-white shadow-sm">
-        <div className="flex flex-col gap-5 px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
+      <section className="relative overflow-hidden rounded-2xl border border-brand-cyan/30 bg-[radial-gradient(circle_at_18%_0%,rgba(6,147,227,0.45),transparent_42%),linear-gradient(135deg,#00284d,#071426)] text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-brand-cyan/15 blur-3xl" />
+        <div className="relative flex flex-col gap-5 px-6 py-7 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
               Painel executivo
@@ -187,15 +189,18 @@ export default async function ManagementPage({
               Recebimento, conclusão e conversão de matrícula em uma leitura.
             </p>
           </div>
-          <div className="flex w-full max-w-md gap-2 rounded-lg bg-white/10 p-1">
-            <span className="flex-1 rounded-md bg-white px-3 py-2 text-center text-sm font-semibold text-brand-navy">
-              Gestão à vista
-            </span>
+          <div className="flex flex-col items-center gap-2 sm:flex-row">
+            <DashboardRing
+              value={completed}
+              total={total}
+              label="entregues"
+              detail={`${completed} de ${total} análises concluídas`}
+            />
             <Link
               href="/reports"
-              className="flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-white/10"
+              className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/20"
             >
-              Meus relatórios
+              Ver meus relatórios
             </Link>
           </div>
         </div>
@@ -296,8 +301,8 @@ export default async function ManagementPage({
                 {notificationSetupPending} configuração(ões) pendente(s)
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Analistas sem preferência de lembrete ainda não recebem a rotina
-                comercial.
+                Configure lembretes, gerencie contas e use “Acessar como
+                usuário” para suporte — sem precisar da senha da pessoa.
               </p>
             </div>
             <ArrowUpRight className="ml-auto size-4" />
