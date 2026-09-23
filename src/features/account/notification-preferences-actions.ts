@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit-log/audit-log";
+import { unstable_update } from "@/lib/auth";
 import {
   fail,
   ok,
@@ -19,6 +20,7 @@ const schema = z
     repeatDays: z.coerce.number().int().min(1).max(5),
     startHour: z.coerce.number().int().min(0).max(22),
     endHour: z.coerce.number().int().min(1).max(23),
+    cadence: z.enum(["ONCE_DAILY", "TWICE_DAILY"]),
   })
   .refine(
     (value) => value.email || value.push,
@@ -44,6 +46,8 @@ export async function saveNotificationPreferencesAction(
         followUpRepeatBusinessDays: parsed.data.repeatDays,
         followUpBusinessStartHour: parsed.data.startHour,
         followUpBusinessEndHour: parsed.data.endHour,
+        followUpCadence: parsed.data.cadence,
+        followUpPreferencesConfirmedAt: new Date(),
       },
     });
     await recordAudit({
@@ -54,6 +58,7 @@ export async function saveNotificationPreferencesAction(
       metadata: parsed.data,
     });
     revalidatePath("/settings/account");
+    await unstable_update({});
     return ok(undefined, "Preferências de notificação salvas.");
   } catch (error) {
     return toActionError(error);

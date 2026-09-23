@@ -94,6 +94,12 @@ enum EnrollmentStatus {
   NOT_ENROLLED
 }
 
+/** Frequência individual dos resumos de retornos de matrícula. */
+enum FollowUpCadence {
+  ONCE_DAILY
+  TWICE_DAILY
+}
+
 enum CourseFormat {
   EAD_DIGITAL
   SEMIPRESENCIAL
@@ -159,6 +165,9 @@ model User {
   /** Janela individual para receber lembretes; nula = usar o padrão da instituição. */
   followUpBusinessStartHour Int?
   followUpBusinessEndHour   Int?
+  /** Nulo enquanto o usuário ainda não confirmou como deseja receber avisos. */
+  followUpCadence           FollowUpCadence?
+  followUpPreferencesConfirmedAt DateTime? @db.Timestamptz(6)
   lastLoginAt  DateTime? @db.Timestamptz(6)
   /** Última atividade com sessão válida (atualizada com throttle pelo callback de sessão). */
   lastActiveAt DateTime? @db.Timestamptz(6)

@@ -35,8 +35,13 @@ export const authConfig = {
         session.user.role = token.role as Role;
         session.user.name = token.name ?? null;
         session.user.mustChangePassword = Boolean(token.mustChangePassword);
-        session.user.impersonatorId = (token.impersonatorId as string | undefined) ?? null;
-        session.user.impersonatorName = (token.impersonatorName as string | undefined) ?? null;
+        session.user.notificationPreferencesConfirmed = Boolean(
+          token.notificationPreferencesConfirmed,
+        );
+        session.user.impersonatorId =
+          (token.impersonatorId as string | undefined) ?? null;
+        session.user.impersonatorName =
+          (token.impersonatorName as string | undefined) ?? null;
       }
       return session;
     },

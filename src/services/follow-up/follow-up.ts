@@ -10,6 +10,7 @@ import {
   isBusinessHours,
   isSameNotificationPeriod,
   isSameZonedDate,
+  notificationPeriod,
 } from "@/lib/time";
 
 /** Depois do primeiro aviso, cobra novamente no próximo dia útil enquanto não houver retorno. */
@@ -81,6 +82,7 @@ export async function notifyDueFollowUps(now = new Date()) {
           followUpMaxReminders: true,
           followUpBusinessStartHour: true,
           followUpBusinessEndHour: true,
+          followUpCadence: true,
         },
       },
     },
@@ -88,6 +90,12 @@ export async function notifyDueFollowUps(now = new Date()) {
   const byUser = new Map<string, typeof due>();
   for (const a of due) {
     if (!a.createdBy.isActive) continue;
+    if (!a.createdBy.followUpCadence) continue;
+    if (
+      a.createdBy.followUpCadence === "ONCE_DAILY" &&
+      notificationPeriod(now) === "afternoon"
+    )
+      continue;
     const startHour =
       a.createdBy.followUpBusinessStartHour ??
       settings.followUpBusinessStartHour;

@@ -7,6 +7,7 @@ declare module "next-auth" {
       id: string;
       role: Role;
       mustChangePassword: boolean;
+      notificationPreferencesConfirmed: boolean;
       impersonatorId?: string | null;
       impersonatorName?: string | null;
     } & DefaultSession["user"];
@@ -14,6 +15,7 @@ declare module "next-auth" {
   interface User {
     role?: Role;
     mustChangePassword?: boolean;
+    notificationPreferencesConfirmed?: boolean;
     impersonatorId?: string | null;
     impersonatorName?: string | null;
   }
@@ -25,6 +27,7 @@ declare module "next-auth/jwt" {
     role?: Role;
     checkedAt?: number;
     mustChangePassword?: boolean;
+    notificationPreferencesConfirmed?: boolean;
     impersonatorId?: string;
     impersonatorName?: string;
   }

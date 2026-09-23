@@ -12,6 +12,7 @@ import { ChangePasswordForm } from "@/features/account/change-password-form";
 import { NotificationPreferences } from "@/features/account/notification-preferences";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { getSystemSettings } from "@/repositories/settings-repository";
 
 export const metadata: Metadata = { title: "Minha conta" };
 export const dynamic = "force-dynamic";
@@ -22,16 +23,22 @@ export default async function AccountPage({
   const user = await requireUser();
   const params = await searchParams;
   const first = params.first === "1" || user.mustChangePassword;
-  const preferences = await prisma.user.findUniqueOrThrow({
-    where: { id: user.id },
-    select: {
-      followUpEmailEnabled: true,
-      followUpPushEnabled: true,
-      followUpRepeatBusinessDays: true,
-      followUpBusinessStartHour: true,
-      followUpBusinessEndHour: true,
-    },
-  });
+  const notificationsRequired = params.notifications === "required";
+  const [preferences, settings] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: {
+        followUpEmailEnabled: true,
+        followUpPushEnabled: true,
+        followUpRepeatBusinessDays: true,
+        followUpBusinessStartHour: true,
+        followUpBusinessEndHour: true,
+        followUpCadence: true,
+        followUpPreferencesConfirmedAt: true,
+      },
+    }),
+    getSystemSettings(),
+  ]);
   return (
     <>
       <PageHeader
@@ -76,6 +83,13 @@ export default async function AccountPage({
               initialRepeatDays={preferences.followUpRepeatBusinessDays}
               initialStartHour={preferences.followUpBusinessStartHour}
               initialEndHour={preferences.followUpBusinessEndHour}
+              initialCadence={
+                preferences.followUpCadence ?? settings.followUpDefaultCadence
+              }
+              required={
+                notificationsRequired ||
+                !preferences.followUpPreferencesConfirmedAt
+              }
             />
           </CardContent>
         </Card>
