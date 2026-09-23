@@ -270,9 +270,11 @@ export default async function ReportsPage({
         </Link>
       )}
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-brand-navy/10 bg-card shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Últimas análises</CardTitle>
+        <Card className="overflow-hidden border-brand-navy/20 bg-brand-navy-50/50 shadow-md">
+          <CardHeader className="border-b border-brand-navy/10 bg-brand-navy px-5 py-4">
+            <CardTitle className="text-base text-white">
+              Últimas análises
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {recent.length === 0 ? (
@@ -285,7 +287,7 @@ export default async function ReportsPage({
                   <li key={analysis.id}>
                     <Link
                       href={`/analyses/${analysis.id}`}
-                      className="flex items-center gap-3 px-6 py-3 transition-colors hover:bg-muted/60"
+                      className="flex items-center gap-3 border-l-4 border-transparent px-5 py-3 transition-colors hover:border-brand-cyan hover:bg-white/70"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">
@@ -307,10 +309,12 @@ export default async function ReportsPage({
             )}
           </CardContent>
         </Card>
-        <Card className="border-brand-navy/10 bg-card shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Conversão por curso</CardTitle>
-            <p className="text-xs text-muted-foreground">
+        <Card className="overflow-hidden border-status-success/25 bg-status-success-bg/50 shadow-md">
+          <CardHeader className="border-b border-status-success/20 bg-status-success px-5 py-4">
+            <CardTitle className="text-base text-white">
+              Conversão por curso
+            </CardTitle>
+            <p className="text-xs text-white/80">
               Matrículas confirmadas entre as análises concluídas no período.
             </p>
           </CardHeader>
@@ -336,7 +340,7 @@ export default async function ReportsPage({
                           {course.enrolled}/{course.completed} · {rate}%
                         </span>
                       </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-status-success/15">
                         <div
                           className="h-full rounded-full bg-status-success"
                           style={{ width: `${rate}%` }}
@@ -350,8 +354,8 @@ export default async function ReportsPage({
           </CardContent>
         </Card>
       </div>
-      <Card className="mt-6 overflow-hidden border-status-warning/25 bg-status-warning-bg/35 shadow-sm">
-        <CardHeader>
+      <Card className="mt-6 overflow-hidden border-status-warning/40 bg-status-warning-bg shadow-md">
+        <CardHeader className="border-b border-status-warning/20 bg-status-warning-bg">
           <CardTitle className="flex items-center gap-2 text-base">
             <UserRoundX className="size-4 text-status-warning" /> Oportunidades
             de follow-up
@@ -371,7 +375,7 @@ export default async function ReportsPage({
                 <Link
                   key={analysis.id}
                   href={`/analyses/${analysis.id}`}
-                  className="grid gap-1 px-6 py-3 text-sm transition-colors hover:bg-muted/60 sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-4"
+                  className="grid gap-1 border-l-4 border-transparent px-5 py-3 text-sm transition-colors hover:border-status-warning hover:bg-white/45 sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-4"
                 >
                   <div className="font-medium">
                     {analysis.studentName ?? "Aluno não identificado"}
@@ -397,7 +401,7 @@ export default async function ReportsPage({
         </CardContent>
       </Card>
       <PoloReportCard
-        className="mt-6 shadow-sm"
+        className="mt-6 overflow-hidden border-brand-cyan/30 bg-brand-cyan-50/45 shadow-md"
         title="Minhas análises por polo"
         description="Clique no polo para abrir a lista ou exporte o relatório em CSV."
         rows={byPolo}
