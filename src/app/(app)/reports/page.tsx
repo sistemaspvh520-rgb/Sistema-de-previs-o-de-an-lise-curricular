@@ -149,6 +149,7 @@ export default async function ReportsPage({
       icon: FileText,
       hint: "Recebidas no período",
       href: "/analyses",
+      tone: "cyan",
     },
     {
       label: "Matrículas",
@@ -156,6 +157,7 @@ export default async function ReportsPage({
       icon: CalendarDays,
       hint: "Conversão das entradas",
       href: "/analyses",
+      tone: "emerald",
     },
     {
       label: "Em reanálise",
@@ -164,6 +166,7 @@ export default async function ReportsPage({
       hint: "Nova confirmação em andamento",
       href: "/analyses?followUp=due",
       alert: false,
+      tone: "gold",
     },
     {
       label: "+2 dias úteis",
@@ -172,6 +175,7 @@ export default async function ReportsPage({
       hint: "Sem matrícula, inclusive reanálises",
       href: "/analyses?followUp=due",
       alert: staleEnrollment > 0,
+      tone: "danger",
     },
   ];
   return (
@@ -201,7 +205,7 @@ export default async function ReportsPage({
       </section>
       <DateRangeFilter />
       <section
-        className="mt-4 rounded-2xl border border-brand-navy/10 bg-gradient-to-br from-brand-navy-50 via-brand-bg to-brand-cyan-50/50 p-3 sm:p-4"
+        className="mt-4 rounded-2xl border border-brand-navy bg-brand-navy p-3 shadow-xl sm:p-4"
         aria-label="Resumo operacional"
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -215,15 +219,18 @@ export default async function ReportsPage({
               >
                 <Card
                   className={cn(
-                    "h-full border-l-4 shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md",
-                    card.alert
-                      ? "border-l-status-warning border-status-warning/50 bg-status-warning-bg"
-                      : "border-l-brand-cyan-700 bg-card",
+                    "h-full border border-white/10 bg-white/7 text-white shadow-lg transition-all duration-300 group-hover:-translate-y-0.5 group-hover:bg-white/12",
+                    card.tone === "cyan" && "border-t-4 border-t-brand-cyan",
+                    card.tone === "emerald" &&
+                      "border-t-4 border-t-status-success",
+                    card.tone === "gold" && "border-t-4 border-t-brand-gold",
+                    card.tone === "danger" &&
+                      "border-t-4 border-t-status-danger",
                   )}
                 >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <div className="space-y-1">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                      <CardTitle className="text-sm font-medium text-cyan-100">
                         {card.label}
                       </CardTitle>
                       {card.alert && (
@@ -235,17 +242,13 @@ export default async function ReportsPage({
                     <Icon
                       className={cn(
                         "size-4",
-                        card.alert
-                          ? "text-status-warning"
-                          : "text-brand-cyan-700",
+                        card.alert ? "text-status-warning" : "text-brand-cyan",
                       )}
                     />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-semibold">{card.value}</div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {card.hint}
-                    </p>
+                    <div className="text-3xl font-bold">{card.value}</div>
+                    <p className="mt-1 text-xs text-slate-300">{card.hint}</p>
                   </CardContent>
                 </Card>
               </Link>

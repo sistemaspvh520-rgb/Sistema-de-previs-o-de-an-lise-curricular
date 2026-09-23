@@ -459,9 +459,9 @@ function JourneyCard({
   tone: "sky" | "cyan" | "emerald";
 }) {
   const tones = {
-    sky: "border-sky-500 text-sky-600",
-    cyan: "border-cyan-500 text-cyan-600",
-    emerald: "border-emerald-500 text-emerald-600",
+    sky: "border-t-sky-400",
+    cyan: "border-t-brand-cyan",
+    emerald: "border-t-status-success",
   };
   return (
     <Link
@@ -469,18 +469,18 @@ function JourneyCard({
       className="group rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
     >
       <Card
-        className={`h-full border-t-4 ${tones[tone]} shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md`}
+        className={`h-full border border-white/10 border-t-4 ${tones[tone]} bg-brand-navy text-white shadow-lg transition-all duration-300 group-hover:-translate-y-0.5 group-hover:bg-brand-navy-900`}
       >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-          <CardTitle className="text-base text-foreground">{title}</CardTitle>
+          <CardTitle className="text-base text-cyan-100">{title}</CardTitle>
           <Icon className="size-5" />
         </CardHeader>
         <CardContent>
-          <div className="text-4xl font-semibold tracking-tight text-foreground">
+          <div className="text-4xl font-bold tracking-tight text-white">
             {value}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">{detail}</p>
-          <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-navy">
+          <p className="mt-3 text-xs text-slate-300">{detail}</p>
+          <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-cyan-200">
             Ver análises <ArrowUpRight className="size-3.5" />
           </span>
         </CardContent>
