@@ -276,6 +276,8 @@ model CurricularAnalysis {
   enrollmentUpdatedAt    DateTime?          @db.Timestamptz(6)
   enrollmentUpdatedById  String?            @db.Uuid
   enrollmentNote         String?
+  /** Quando a não-matrícula gerou reanálise, uma nova confirmação vence em 24h. */
+  enrollmentReanalysisAt DateTime?          @db.Timestamptz(6)
   followUpDueAt          DateTime?          @db.Timestamptz(6)
   followUpNotifiedAt     DateTime?          @db.Timestamptz(6)
   followUpNotificationCount Int              @default(0)

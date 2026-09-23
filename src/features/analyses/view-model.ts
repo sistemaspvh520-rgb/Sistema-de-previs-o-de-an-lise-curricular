@@ -1,11 +1,31 @@
 import "server-only";
 import type { AnalysisDetail } from "@/repositories/analysis-repository";
-import { buildRulesFromRecords, type AcademicRules } from "@/domain/curricular-analysis/rules/types";
-import { calculateCurriculumTotals, explainProjection, buildProjectionNarrative, type ProjectionExplanation, type ProjectionNarrative } from "@/domain/curricular-analysis";
+import {
+  buildRulesFromRecords,
+  type AcademicRules,
+} from "@/domain/curricular-analysis/rules/types";
+import {
+  calculateCurriculumTotals,
+  explainProjection,
+  buildProjectionNarrative,
+  type ProjectionExplanation,
+  type ProjectionNarrative,
+} from "@/domain/curricular-analysis";
 import type { ProcessingStep } from "@/services/pipeline/steps";
 import { parseSteps } from "@/services/pipeline/steps";
 import { PROCESSING_STATUSES } from "@/domain/curricular-analysis/status-groups";
-import type { AnalysisStatus, CourseFormat, EnrollmentStatus, EntryPeriodSource, Readability, ReliabilityLevel, SubjectOrigin, SubjectStatus, WarningSeverity, WarningSource } from "@/generated/prisma/enums";
+import type {
+  AnalysisStatus,
+  CourseFormat,
+  EnrollmentStatus,
+  EntryPeriodSource,
+  Readability,
+  ReliabilityLevel,
+  SubjectOrigin,
+  SubjectStatus,
+  WarningSeverity,
+  WarningSource,
+} from "@/generated/prisma/enums";
 
 export interface SubjectVM {
   id: string;
@@ -19,7 +39,15 @@ export interface SubjectVM {
   readability: Readability;
   sourcePage: number;
   sourceRow: number;
-  bbox: { page: number; x: number; y: number; w: number; h: number; pageWidth: number; pageHeight: number } | null;
+  bbox: {
+    page: number;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    pageWidth: number;
+    pageHeight: number;
+  } | null;
   origin: SubjectOrigin;
   note: string | null;
   sortIndex: number;
@@ -96,9 +124,20 @@ export interface AnalysisVM {
   poloCode: string | null;
   poloName: string | null;
   courseFormat: CourseFormat | null;
-  reanalysisOf: { id: string; createdAt: string; courseName: string | null } | null;
+  reanalysisOf: {
+    id: string;
+    createdAt: string;
+    courseName: string | null;
+  } | null;
   reanalyses: Array<{ id: string; createdAt: string }>;
-  enrollment: { status: EnrollmentStatus; note: string | null; updatedAt: string | null; updatedByName: string | null; due: boolean };
+  enrollment: {
+    status: EnrollmentStatus;
+    note: string | null;
+    updatedAt: string | null;
+    updatedByName: string | null;
+    reanalysisAt: string | null;
+    due: boolean;
+  };
   entryPeriod: number | null;
   entryPeriodSource: EntryPeriodSource | null;
   entryTerm: string | null;
@@ -110,7 +149,13 @@ export interface AnalysisVM {
   completedAt: string | null;
   lastCalculatedAt: string | null;
   createdBy: { name: string; email: string };
-  document: { originalName: string; pageCount: number | null; sizeBytes: number; sha256: string; deletedAt: string | null } | null;
+  document: {
+    originalName: string;
+    pageCount: number | null;
+    sizeBytes: number;
+    sha256: string;
+    deletedAt: string | null;
+  } | null;
   versions: {
     ruleSetVersion: string;
     engineVersion: string;
@@ -120,7 +165,13 @@ export interface AnalysisVM {
     auditModel: string | null;
   };
   rules: AcademicRules;
-  totals: { total: number; exempted: number; pending: number; review: number; periods: number[] };
+  totals: {
+    total: number;
+    exempted: number;
+    pending: number;
+    review: number;
+    periods: number[];
+  };
   previousBacklogCount: number | null;
   remainingBacklogCount: number;
   semestersRemaining: number | null;
@@ -130,16 +181,33 @@ export interface AnalysisVM {
   warnings: WarningVM[];
   corrections: CorrectionVM[];
   claims: ClaimVM[];
-  review: { status: "OK" | "REVIEW"; model: string; promptVersion: string; issues: number; createdAt: string } | null;
-  extraction: { model: string; promptVersion: string; privacyMode: string; durationMs: number; createdAt: string } | null;
+  review: {
+    status: "OK" | "REVIEW";
+    model: string;
+    promptVersion: string;
+    issues: number;
+    createdAt: string;
+  } | null;
+  extraction: {
+    model: string;
+    promptVersion: string;
+    privacyMode: string;
+    durationMs: number;
+    createdAt: string;
+  } | null;
   usage: { totalTokens: number; estimatedCost: number; calls: number };
   narrative: ProjectionNarrative | null;
 }
 
 export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
   const rules = buildRulesFromRecords(a.ruleSetVersion.rules);
-  const scheduled = new Map<string, { term: string; kind: "REGULAR" | "BACKLOG" }>();
-  for (const p of a.projections) for (const ps of p.subjects) scheduled.set(ps.subjectId, { term: p.term, kind: ps.kind });
+  const scheduled = new Map<
+    string,
+    { term: string; kind: "REGULAR" | "BACKLOG" }
+  >();
+  for (const p of a.projections)
+    for (const ps of p.subjects)
+      scheduled.set(ps.subjectId, { term: p.term, kind: ps.kind });
 
   const subjectsRows = a.subjects.map((s) => ({
     id: s.id,
@@ -156,10 +224,23 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
   const totals = calculateCurriculumTotals(subjectsRows);
 
   const entryPeriod = a.entryPeriod;
-  const needsTaking = (s: (typeof a.subjects)[number]) => s.status === "PENDING" || (s.status === "REVIEW" && rules.reviewCountsAsPending);
-  const previousBacklogCount = entryPeriod === null ? null : a.subjects.filter((s) => s.period < entryPeriod && needsTaking(s)).length;
+  const needsTaking = (s: (typeof a.subjects)[number]) =>
+    s.status === "PENDING" ||
+    (s.status === "REVIEW" && rules.reviewCountsAsPending);
+  const previousBacklogCount =
+    entryPeriod === null
+      ? null
+      : a.subjects.filter((s) => s.period < entryPeriod && needsTaking(s))
+          .length;
   const remainingIds = new Set(
-    entryPeriod === null ? [] : a.subjects.filter((s) => s.period < entryPeriod && needsTaking(s) && !scheduled.has(s.id)).map((s) => s.id),
+    entryPeriod === null
+      ? []
+      : a.subjects
+          .filter(
+            (s) =>
+              s.period < entryPeriod && needsTaking(s) && !scheduled.has(s.id),
+          )
+          .map((s) => s.id),
   );
 
   const last = a.projections[a.projections.length - 1];
@@ -176,10 +257,17 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
     subjectsFromBacklog: p.subjectsFromBacklog,
     semesterLoad: p.semesterLoad,
     remainingBacklog: p.remainingBacklog,
-    regularSubjectIds: p.subjects.filter((x) => x.kind === "REGULAR").map((x) => x.subjectId),
-    backlogSubjectIds: p.subjects.filter((x) => x.kind === "BACKLOG").map((x) => x.subjectId),
+    regularSubjectIds: p.subjects
+      .filter((x) => x.kind === "REGULAR")
+      .map((x) => x.subjectId),
+    backlogSubjectIds: p.subjects
+      .filter((x) => x.kind === "BACKLOG")
+      .map((x) => x.subjectId),
   }));
-  const backlogSubjects = entryPeriod === null ? [] : a.subjects.filter((s) => s.period < entryPeriod && needsTaking(s));
+  const backlogSubjects =
+    entryPeriod === null
+      ? []
+      : a.subjects.filter((s) => s.period < entryPeriod && needsTaking(s));
   const narrative =
     entryPeriod === null
       ? null
@@ -188,14 +276,24 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
           entryPeriod,
           backlogTotal: backlogSubjects.length,
           backlogPeriodRange: backlogSubjects.length
-            ? { from: Math.min(...backlogSubjects.map((s) => s.period)), to: Math.max(...backlogSubjects.map((s) => s.period)) }
+            ? {
+                from: Math.min(...backlogSubjects.map((s) => s.period)),
+                to: Math.max(...backlogSubjects.map((s) => s.period)),
+              }
             : null,
-          maximumCapacity: Math.max(0, ...projectionRows.map((p) => p.maximumCapacity)),
+          maximumCapacity: Math.max(
+            0,
+            ...projectionRows.map((p) => p.maximumCapacity),
+          ),
           incomplete: a.projectionIncomplete,
           remainingBacklog: remainingIds.size,
         });
   const usageTotals = a.usages.reduce(
-    (acc, u) => ({ totalTokens: acc.totalTokens + u.totalTokens, estimatedCost: acc.estimatedCost + Number(u.estimatedCost), calls: acc.calls + 1 }),
+    (acc, u) => ({
+      totalTokens: acc.totalTokens + u.totalTokens,
+      estimatedCost: acc.estimatedCost + Number(u.estimatedCost),
+      calls: acc.calls + 1,
+    }),
     { totalTokens: 0, estimatedCost: 0, calls: 0 },
   );
 
@@ -213,14 +311,28 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
     poloCode: a.poloCode,
     poloName: a.poloName,
     courseFormat: a.courseFormat,
-    reanalysisOf: a.reanalysisOf ? { id: a.reanalysisOf.id, createdAt: a.reanalysisOf.createdAt.toISOString(), courseName: a.reanalysisOf.courseName } : null,
-    reanalyses: a.reanalyses.map((r) => ({ id: r.id, createdAt: r.createdAt.toISOString() })),
+    reanalysisOf: a.reanalysisOf
+      ? {
+          id: a.reanalysisOf.id,
+          createdAt: a.reanalysisOf.createdAt.toISOString(),
+          courseName: a.reanalysisOf.courseName,
+        }
+      : null,
+    reanalyses: a.reanalyses.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt.toISOString(),
+    })),
     enrollment: {
       status: a.enrollmentStatus,
       note: a.enrollmentNote,
       updatedAt: a.enrollmentUpdatedAt?.toISOString() ?? null,
       updatedByName: a.enrollmentUpdatedBy?.name ?? null,
-      due: a.status === "COMPLETED" && a.enrollmentStatus === "PENDING" && a.followUpDueAt !== null && a.followUpDueAt.getTime() <= Date.now(),
+      reanalysisAt: a.enrollmentReanalysisAt?.toISOString() ?? null,
+      due:
+        a.status === "COMPLETED" &&
+        a.enrollmentStatus === "PENDING" &&
+        a.followUpDueAt !== null &&
+        a.followUpDueAt.getTime() <= Date.now(),
     },
     entryPeriod,
     entryPeriodSource: a.entryPeriodSource,
@@ -234,7 +346,13 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
     lastCalculatedAt: a.lastCalculatedAt?.toISOString() ?? null,
     createdBy: { name: a.createdBy.name, email: a.createdBy.email },
     document: a.document
-      ? { originalName: a.document.originalName, pageCount: a.document.pageCount, sizeBytes: a.document.sizeBytes, sha256: a.document.sha256, deletedAt: a.document.deletedAt?.toISOString() ?? null }
+      ? {
+          originalName: a.document.originalName,
+          pageCount: a.document.pageCount,
+          sizeBytes: a.document.sizeBytes,
+          sha256: a.document.sha256,
+          deletedAt: a.document.deletedAt?.toISOString() ?? null,
+        }
       : null,
     versions: {
       ruleSetVersion: a.ruleSetVersion.version,
@@ -245,11 +363,20 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
       auditModel: a.auditModel,
     },
     rules,
-    totals: { total: totals.total, exempted: totals.exempted, pending: totals.pending, review: totals.review, periods: totals.periods },
+    totals: {
+      total: totals.total,
+      exempted: totals.exempted,
+      pending: totals.pending,
+      review: totals.review,
+      periods: totals.periods,
+    },
     previousBacklogCount,
     remainingBacklogCount: remainingIds.size,
     semestersRemaining: entryPeriod === null ? null : a.projections.length,
-    estimatedCompletionTerm: entryPeriod !== null && !a.projectionIncomplete && last ? last.term : null,
+    estimatedCompletionTerm:
+      entryPeriod !== null && !a.projectionIncomplete && last
+        ? last.term
+        : null,
     subjects: a.subjects.map((s) => ({
       id: s.id,
       rowHash: s.rowHash,
@@ -270,7 +397,11 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
       scheduledKind: scheduled.get(s.id)?.kind ?? null,
       inRemainingBacklog: remainingIds.has(s.id),
     })),
-    projections: a.projections.map((p, i) => ({ id: p.id, ...projectionRows[i], explanation: explainProjection(projectionRows[i], rules) })),
+    projections: a.projections.map((p, i) => ({
+      id: p.id,
+      ...projectionRows[i],
+      explanation: explainProjection(projectionRows[i], rules),
+    })),
     warnings: a.warnings.map((w) => ({
       id: w.id,
       code: w.code,
@@ -293,12 +424,34 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
       user: c.user.name,
       subjectName: c.subject?.name ?? null,
     })),
-    claims: a.claims.map((c) => ({ id: c.id, type: c.type, value: c.value, sourcePage: c.sourcePage, rawText: c.rawText, calculatedValue: c.calculatedValue, matches: c.matches })),
+    claims: a.claims.map((c) => ({
+      id: c.id,
+      type: c.type,
+      value: c.value,
+      sourcePage: c.sourcePage,
+      rawText: c.rawText,
+      calculatedValue: c.calculatedValue,
+      matches: c.matches,
+    })),
     review: a.reviews[0]
-      ? { status: a.reviews[0].status, model: a.reviews[0].model, promptVersion: a.reviews[0].promptVersion, issues: Array.isArray(a.reviews[0].issues) ? (a.reviews[0].issues as unknown[]).length : 0, createdAt: a.reviews[0].createdAt.toISOString() }
+      ? {
+          status: a.reviews[0].status,
+          model: a.reviews[0].model,
+          promptVersion: a.reviews[0].promptVersion,
+          issues: Array.isArray(a.reviews[0].issues)
+            ? (a.reviews[0].issues as unknown[]).length
+            : 0,
+          createdAt: a.reviews[0].createdAt.toISOString(),
+        }
       : null,
     extraction: a.extractions[0]
-      ? { model: a.extractions[0].model, promptVersion: a.extractions[0].promptVersion, privacyMode: a.extractions[0].privacyMode, durationMs: a.extractions[0].durationMs, createdAt: a.extractions[0].createdAt.toISOString() }
+      ? {
+          model: a.extractions[0].model,
+          promptVersion: a.extractions[0].promptVersion,
+          privacyMode: a.extractions[0].privacyMode,
+          durationMs: a.extractions[0].durationMs,
+          createdAt: a.extractions[0].createdAt.toISOString(),
+        }
       : null,
     usage: usageTotals,
     narrative,

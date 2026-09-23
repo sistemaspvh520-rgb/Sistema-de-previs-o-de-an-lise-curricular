@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, FileText, UserRoundX } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  FileText,
+  UserRoundX,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
@@ -144,6 +151,7 @@ export default async function ReportsPage({
       icon: UserRoundX,
       hint: "Com retorno vencido e pendente",
       href: "/analyses?followUp=due",
+      alert: pendingEnrollment > 0,
     },
     {
       label: "Matrículas",
@@ -161,35 +169,77 @@ export default async function ReportsPage({
         description="Acompanhe volume, conversão e oportunidades de retorno em um único lugar."
       />
       <DateRangeFilter />
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link
-              key={card.label}
-              href={card.href}
-              className="group rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <Card className="h-full border-l-4 border-l-brand-cyan-700 shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {card.label}
-                  </CardTitle>
-                  <Icon className="size-4 text-brand-cyan-700" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-semibold">{card.value}</div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {card.hint}
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-      <div className="mt-6">
-        <Card className="shadow-sm">
+      <section
+        className="mt-4 rounded-2xl border border-brand-navy/10 bg-gradient-to-br from-brand-navy-50 via-brand-bg to-brand-cyan-50/50 p-3 sm:p-4"
+        aria-label="Resumo operacional"
+      >
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={card.label}
+                href={card.href}
+                className="group rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <Card
+                  className={cn(
+                    "h-full border-l-4 shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md",
+                    card.alert
+                      ? "border-l-status-warning border-status-warning/50 bg-status-warning-bg"
+                      : "border-l-brand-cyan-700 bg-card",
+                  )}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div className="space-y-1">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        {card.label}
+                      </CardTitle>
+                      {card.alert && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-status-warning px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                          <AlertTriangle className="size-3" /> Ação necessária
+                        </span>
+                      )}
+                    </div>
+                    <Icon
+                      className={cn(
+                        "size-4",
+                        card.alert
+                          ? "text-status-warning"
+                          : "text-brand-cyan-700",
+                      )}
+                    />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold">{card.value}</div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {card.hint}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+      {pendingEnrollment > 0 && (
+        <Link
+          href="/analyses?followUp=due"
+          className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-status-warning/40 bg-status-warning-bg px-4 py-3 text-sm transition-colors hover:bg-status-warning-bg/70 focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <span className="flex items-center gap-2 font-medium text-foreground">
+            <AlertTriangle className="size-4 text-status-warning" />
+            {pendingEnrollment === 1
+              ? "Há 1 retorno aguardando confirmação obrigatória."
+              : `Há ${pendingEnrollment} retornos aguardando confirmação obrigatória.`}
+          </span>
+          <span className="shrink-0 font-semibold text-status-warning">
+            Resolver agora →
+          </span>
+        </Link>
+      )}
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card className="border-brand-navy/10 bg-card shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Últimas análises</CardTitle>
           </CardHeader>
@@ -226,50 +276,50 @@ export default async function ReportsPage({
             )}
           </CardContent>
         </Card>
-      </div>
-      <Card className="mt-6 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Conversão por curso</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Matrículas confirmadas entre as análises concluídas no período.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {conversionByCourse.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Ainda não há resultados de matrícula suficientes para comparar
-              cursos.
+        <Card className="border-brand-navy/10 bg-card shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Conversão por curso</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Matrículas confirmadas entre as análises concluídas no período.
             </p>
-          ) : (
-            <div className="space-y-4">
-              {conversionByCourse.map((course) => {
-                const rate = Math.round(
-                  (course.enrolled / course.completed) * 100,
-                );
-                return (
-                  <div key={course.name}>
-                    <div className="flex justify-between gap-3 text-sm">
-                      <span className="truncate font-medium">
-                        {course.name}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {course.enrolled}/{course.completed} · {rate}%
-                      </span>
+          </CardHeader>
+          <CardContent>
+            {conversionByCourse.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Ainda não há resultados de matrícula suficientes para comparar
+                cursos.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {conversionByCourse.map((course) => {
+                  const rate = Math.round(
+                    (course.enrolled / course.completed) * 100,
+                  );
+                  return (
+                    <div key={course.name}>
+                      <div className="flex justify-between gap-3 text-sm">
+                        <span className="truncate font-medium">
+                          {course.name}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {course.enrolled}/{course.completed} · {rate}%
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-status-success"
+                          style={{ width: `${rate}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-status-success"
-                        style={{ width: `${rate}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      <Card className="mt-6 overflow-hidden shadow-sm">
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      <Card className="mt-6 overflow-hidden border-status-warning/25 bg-status-warning-bg/35 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <UserRoundX className="size-4 text-status-warning" /> Oportunidades
