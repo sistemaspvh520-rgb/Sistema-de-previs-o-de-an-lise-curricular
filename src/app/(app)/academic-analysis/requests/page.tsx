@@ -1,5 +1,15 @@
 import { RequestLiveUpdates } from "@/features/student-portal/request-live-updates";
 import Link from "next/link";
+import {
+  Inbox,
+  FilePlus2,
+  Search,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  RotateCcw,
+  type LucideIcon,
+} from "lucide-react";
 import type {
   Prisma,
   AcademicDocumentType,
@@ -48,7 +58,7 @@ export default async function AcademicRequestsPage({
       ? { status: q.status as AcademicRequestStatus }
       : {}),
   };
-  const [requests, count, statuses, types, metrics] = await Promise.all([
+  const [requests, count, statuses, types] = await Promise.all([
     prisma.academicRequest.findMany({
       where,
       include: {
@@ -71,11 +81,6 @@ export default async function AcademicRequestsPage({
     prisma.academicAnalysisSource.groupBy({
       by: ["documentType"],
       where: { enrollment: scope },
-      _count: true,
-    }),
-    prisma.academicRequest.groupBy({
-      by: ["aiUsed", "createdVersion"],
-      where: { sourceDocument: { enrollment: scope } },
       _count: true,
     }),
   ]);
@@ -104,47 +109,66 @@ export default async function AcademicRequestsPage({
         </p>
       </header>
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
+        {(
           [
-            "Abertas",
-            [
-              "RECEIVED",
-              "PROCESSING",
-              "UNDER_REVIEW",
-              "WAITING_NEW_DOCUMENT",
-            ].reduce((n, s) => n + statusCount(s), 0),
-          ],
-          ["Novas", statusCount("RECEIVED")],
-          [
-            "Em análise",
-            statusCount("PROCESSING") + statusCount("UNDER_REVIEW"),
-          ],
-          ["Sem alterações / reutilizadas", statusCount("NO_CHANGES")],
-          ["Concluídas", statusCount("COMPLETED")],
-          [
-            "Necessitam revisão",
-            statusCount("UNDER_REVIEW") + statusCount("FAILED"),
-          ],
-          [
-            "Documentos recusados",
-            statusCount("REJECTED") + statusCount("WAITING_NEW_DOCUMENT"),
-          ],
-          ["Sem responsável", 0],
-          [
-            "Processadas sem IA",
-            metrics.filter((m) => !m.aiUsed).reduce((n, m) => n + m._count, 0),
-          ],
-          ["IA necessária", 0],
-          [
-            "Nova versão criada",
-            metrics
-              .filter((m) => m.createdVersion)
-              .reduce((n, m) => n + m._count, 0),
-          ],
-        ].map(([label, value]) => (
-          <article key={label} className="rounded-xl border bg-white p-4">
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-[#003B71]">
+            {
+              label: "Abertas",
+              value: [
+                "RECEIVED",
+                "PROCESSING",
+                "UNDER_REVIEW",
+                "WAITING_NEW_DOCUMENT",
+              ].reduce((n, s) => n + statusCount(s), 0),
+              icon: Inbox,
+              accent: "text-sky-700 bg-sky-50",
+            },
+            {
+              label: "Novas",
+              value: statusCount("RECEIVED"),
+              icon: FilePlus2,
+              accent: "text-sky-700 bg-sky-50",
+            },
+            {
+              label: "Em análise",
+              value: statusCount("PROCESSING") + statusCount("UNDER_REVIEW"),
+              icon: Search,
+              accent: "text-amber-700 bg-amber-50",
+            },
+            {
+              label: "Necessitam revisão",
+              value: statusCount("FAILED"),
+              icon: AlertTriangle,
+              accent: "text-amber-700 bg-amber-50",
+            },
+            {
+              label: "Recusadas",
+              value: statusCount("REJECTED"),
+              icon: XCircle,
+              accent: "text-rose-700 bg-rose-50",
+            },
+            {
+              label: "Reutilizadas",
+              value: statusCount("NO_CHANGES"),
+              icon: RotateCcw,
+              accent: "text-slate-600 bg-slate-100",
+            },
+            {
+              label: "Concluídas",
+              value: statusCount("COMPLETED"),
+              icon: CheckCircle2,
+              accent: "text-emerald-700 bg-emerald-50",
+            },
+          ] satisfies { label: string; value: number; icon: LucideIcon; accent: string }[]
+        ).map(({ label, value, icon: Icon, accent }) => (
+          <article
+            key={label}
+            className="rounded-xl border bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div className={`inline-flex size-8 items-center justify-center rounded-lg ${accent}`}>
+              <Icon className="size-4" aria-hidden="true" />
+            </div>
+            <p className="mt-3 text-xs text-slate-500">{label}</p>
+            <p className="mt-1 text-2xl font-semibold text-[#003B71]">
               {value}
             </p>
           </article>

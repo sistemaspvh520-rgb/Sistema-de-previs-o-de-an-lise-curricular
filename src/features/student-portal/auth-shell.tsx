@@ -1,4 +1,5 @@
 import { PortalHeroArtwork } from "@/components/shared/portal-hero-artwork";
+import { CampaignSignature } from "@/components/shared/campaign-signature";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { PortalEffects } from "./effects";
@@ -33,7 +34,7 @@ export function PortalAuthShell({
               Acompanhe suas conquistas, entenda sua situação e veja o caminho
               até a formatura.
             </p>
-            <Image src="/brand/escolha-estrela-assinatura.png" alt="Escolha ter estrela. cruzeirodosulvirtual.com.br" width={1230} height={352} sizes="(max-width: 640px) 180px, 260px" className="mt-3 h-auto w-full max-w-[180px] sm:mt-4 sm:max-w-[220px] lg:max-w-[260px]" />
+            <CampaignSignature className="mt-3 sm:mt-4" />
             <p className="mt-4 hidden border-t border-white/20 pt-4 text-xs text-blue-100 sm:block sm:pt-6 sm:text-sm">
               Sua trajetória acadêmica, em um só lugar.
             </p>

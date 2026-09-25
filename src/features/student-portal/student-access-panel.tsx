@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -13,6 +14,14 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createStudentAction, studentAccessAction } from "./actions";
@@ -180,6 +189,31 @@ export function CreateStudentForm({
         </div>
       )}
     </form>
+  );
+}
+
+/** Fluxo de criação de acesso em modal — evita ter que rolar a página até um formulário solto no fim. */
+export function CreateStudentDialog() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <UserPlus className="size-4" /> Criar acesso
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Criar acesso do aluno</DialogTitle>
+          <DialogDescription>
+            O aluno recebe um convite para definir a própria senha e consultar sua análise no portal.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="mt-2">
+          <CreateStudentForm />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -5,7 +5,7 @@ import {
   accessStatus,
   enrollmentScope,
 } from "@/services/student-portal/access";
-import { CreateStudentForm } from "@/features/student-portal/student-access-panel";
+import { CreateStudentDialog } from "@/features/student-portal/student-access-panel";
 import { LinkLegacyStudent } from "@/features/student-portal/link-legacy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,12 +98,7 @@ export default async function StudentsPage({
             Acompanhe a situação acadêmica e gerencie o acesso ao portal.
           </p>
         </div>
-        <a
-          href="#criar-acesso"
-          className="rounded-xl bg-[#003B71] px-5 py-3 text-sm font-semibold text-white"
-        >
-          Criar acesso
-        </a>
+        <CreateStudentDialog />
       </div>
       <form className="flex flex-wrap gap-3 rounded-2xl border bg-white p-4">
         <label className="min-w-40 flex-1 text-xs font-medium">
@@ -120,7 +115,7 @@ export default async function StudentsPage({
           <select
             name="status"
             defaultValue={params.status ?? ""}
-            className="mt-2 block h-10 rounded-md border bg-white px-3 text-sm"
+            className="mt-2 block h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <option value="">Todos</option>
             <option value="active">Ativos</option>
@@ -140,22 +135,13 @@ export default async function StudentsPage({
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
-                {[
-                  "Aluno / RGM",
-                  "Curso",
-                  "E-mail",
-                  "Acesso",
-                  "Última análise",
-                  "Período / situação",
-                  "Ações",
-                ].map((label) => (
-                  <th
-                    key={label}
-                    className="whitespace-nowrap px-5 py-3 font-medium"
-                  >
-                    {label}
-                  </th>
-                ))}
+                <th className="whitespace-nowrap px-5 py-3 font-medium">Aluno / RGM</th>
+                <th className="hidden whitespace-nowrap px-5 py-3 font-medium md:table-cell">Curso</th>
+                <th className="hidden whitespace-nowrap px-5 py-3 font-medium md:table-cell">E-mail</th>
+                <th className="whitespace-nowrap px-5 py-3 font-medium">Acesso</th>
+                <th className="hidden whitespace-nowrap px-5 py-3 font-medium lg:table-cell">Última análise</th>
+                <th className="hidden whitespace-nowrap px-5 py-3 font-medium xl:table-cell">Período / situação</th>
+                <th className="whitespace-nowrap px-5 py-3 font-medium">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -170,10 +156,10 @@ export default async function StudentsPage({
                         {student.rgm}
                       </span>
                     </td>
-                    <td className="min-w-40 px-5 py-4">
+                    <td className="hidden min-w-40 px-5 py-4 md:table-cell">
                       {student.courseName ?? "—"}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="hidden px-5 py-4 md:table-cell">
                       {student.studentUser?.email ?? "—"}
                     </td>
                     <td className="px-5 py-4">
@@ -181,13 +167,13 @@ export default async function StudentsPage({
                         {accessStatus(student.studentUser)}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4">
+                    <td className="hidden whitespace-nowrap px-5 py-4 lg:table-cell">
                       {student.currentVersion?.createdAt.toLocaleDateString(
                         "pt-BR",
                         { timeZone: "America/Porto_Velho" },
                       ) ?? "—"}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="hidden px-5 py-4 xl:table-cell">
                       {snapshot
                         ? `${snapshot.result.currentPeriod ?? "—"}º · ${snapshot.result.previousPending} pendências`
                         : "Aguardando extrato"}
@@ -248,15 +234,6 @@ export default async function StudentsPage({
           </ul>
         </section>
       )}
-      <section
-        id="criar-acesso"
-        className="rounded-2xl border bg-white p-5 sm:p-6"
-      >
-        <h2 className="mb-5 text-lg font-semibold text-[#003B71]">
-          Criar acesso do aluno
-        </h2>
-        <CreateStudentForm />
-      </section>
     </div>
   );
 }

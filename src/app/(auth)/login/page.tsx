@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { BrandLogo } from "@/components/shared/brand-logo";
+import { CampaignSignature } from "@/components/shared/campaign-signature";
 import { LoginForm } from "@/features/auth/login-form";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             <LoginForm callbackUrl={callbackUrl} />
           </div>
         </div>
-        <Image src="/brand/escolha-estrela-assinatura.png" alt="Escolha ter estrela. cruzeirodosulvirtual.com.br" width={1230} height={352} sizes="300px" className="mx-auto mt-7 h-auto w-full max-w-[300px]" />
+        <CampaignSignature className="mt-7 text-center" />
         <p className="mt-6 text-center text-xs text-white/60">
           Sistema interno · Universidade Cruzeiro do Sul Virtual
         </p>
