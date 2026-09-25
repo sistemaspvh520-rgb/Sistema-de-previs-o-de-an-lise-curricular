@@ -5,7 +5,7 @@ Produção roda na **Vercel** (Next.js, região `gru1`) com **Supabase** (Postgr
 | Recurso          | Identificação                                                                                                                                                                                                                            |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Projeto Supabase | `Sistema de previsão de análise curricular` · ref `gflvyhutqhfrfpdpcgii` · `sa-east-1`                                                                                                                                                   |
-| Projeto Vercel   | `analise-curricular` · time `Sistemas PVH` · conectado ao GitHub `main` · **URL pública: https://analise-curricular.vercel.app** (a URL com sufixo `-sistemas-pvh` é protegida pela Deployment Protection e não deve ser usada em links) |
+| Projeto Vercel   | `analise-curricular` · time `Sistemas PVH` · conectado ao GitHub `main` · **URL pública: https://analise-curricular.vercel.app** · Deployment Protection (Vercel Authentication e Password Protection) desativada em 25/09/2026 — deployments por branch/preview (`https://analise-curricular-git-<branch>-sistemas-pvh.vercel.app`) também ficam acessíveis sem login na Vercel |
 | Storage          | bucket privado `documents` (criado automaticamente no primeiro upload)                                                                                                                                                                   |
 
 ## Variáveis de ambiente (Vercel → Settings → Environment Variables → Production)
@@ -60,6 +60,7 @@ Sem essa variável o sistema funciona normalmente, mas convites/links ficam desa
 - **Upload falhava com "PDF corrompido"**: (1) o worker/fontes do pdf.js não entravam no bundle serverless — resolvido com `outputFileTracingIncludes` em `next.config.ts`; (2) `require.resolve("pdfjs-dist/package.json")` era transformado pelo Turbopack em id numérico no build — resolvido em `src/services/pdf/parser.ts` com resolução dinâmica + fallback. A causa real agora é registrada em `pdf.open_failed` nos logs.
 - **Storage "Invalid Compact JWS"**: `supabase projects api-keys` sem `--reveal` devolve a chave `sb_secret_` **mascarada**; use sempre `--reveal` ao copiar a chave para `SUPABASE_SECRET_KEY`.
 - **Links de e-mail caíam no login da Vercel**: usar sempre `APP_URL=https://analise-curricular.vercel.app` (domínio de produção); a URL `…-sistemas-pvh.vercel.app` é de deployment. A Vercel Authentication foi desativada pelo responsável em 21/09.
+- **Subdomínios/previews pareciam "não funcionar"**: a Deployment Protection ainda estava ativa para os deployments de preview (por branch/PR), mesmo com a produção já liberada — o responsável desativou "Vercel Authentication" e "Password Protection" em Project Settings → Deployment Protection em 25/09/2026. Nenhuma mudança de código foi necessária: `src/proxy.ts`, o CSP de `next.config.ts` e `AUTH_TRUST_HOST=true` já eram independentes de host.
 
 ## O que acontece no deploy
 
