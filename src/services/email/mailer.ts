@@ -1,11 +1,12 @@
 import "server-only";
 import nodemailer from "nodemailer";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { getEnv } from "@/lib/env";
+import { appUrl } from "@/lib/app-url";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { LOGO_CID, type EmailContent } from "@/services/email/templates";
+import type { EmailContent } from "@/services/email/templates";
+
+export { appUrl };
 
 export class EmailNotConfiguredError extends Error {
   constructor() {
@@ -20,13 +21,6 @@ export function isEmailConfigured(): boolean {
 }
 
 let transporter: nodemailer.Transporter | null = null;
-let logoBuffer: Buffer | null = null;
-
-/** Logo institucional embutida (CID) — funciona no Gmail/Outlook sem depender de URL pública. */
-function getLogo(): Buffer {
-  logoBuffer ??= readFileSync(path.join(process.cwd(), "src/services/email/assets/logo-cruzeiro.png"));
-  return logoBuffer;
-}
 
 function getTransporter(): nodemailer.Transporter {
   if (transporter) return transporter;
@@ -63,7 +57,6 @@ export async function sendMail(input: SendMailInput): Promise<{ messageId: strin
       html: input.content.html,
       replyTo: env.EMAIL_USER,
       headers: { "X-Auto-Response-Suppress": "All", "Auto-Submitted": "auto-generated" },
-      attachments: [{ filename: "logo-cruzeiro.png", content: getLogo(), cid: LOGO_CID, contentType: "image/png", contentDisposition: "inline" }],
     });
     await prisma.auditLog.create({
       data: { userId: input.actorUserId ?? null, action: "email.sent", entityType: "User", entityId: input.targetUserId ?? null, metadata: { kind: input.kind, to: input.to, messageId: info.messageId } },
@@ -77,9 +70,4 @@ export async function sendMail(input: SendMailInput): Promise<{ messageId: strin
     logger.error("email.failed", { kind: input.kind, to: input.to, err: err instanceof Error ? err.message : String(err) });
     throw err;
   }
-}
-
-export function appUrl(path = ""): string {
-  const base = getEnv().APP_URL ?? process.env.AUTH_URL ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
-  return `${base.replace(/\/$/, "")}${path}`;
 }

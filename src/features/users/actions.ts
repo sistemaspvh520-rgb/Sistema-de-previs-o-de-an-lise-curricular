@@ -21,6 +21,7 @@ const createSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome.").max(120),
   email: z.string().trim().email("E-mail inválido.").transform((v) => v.toLowerCase()),
   role: roleSchema,
+  poloCode: z.string().trim().max(20).nullable().optional(),
 });
 
 /** Cria o usuário com senha temporária gerada automaticamente (troca obrigatória no primeiro acesso). */
@@ -34,7 +35,7 @@ export async function createUserAction(input: unknown): Promise<ActionResult<{ i
     if (exists) return fail("Já existe um usuário com este e-mail.");
 
     const user = await prisma.user.create({
-      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, passwordHash: await hash(crypto.randomUUID()) },
+      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, poloCode: parsed.data.poloCode || null, passwordHash: await hash(crypto.randomUUID()) },
     });
     const temporaryPassword = await assignTemporaryPassword(user.id);
     await recordAudit({ userId: admin.id, action: "user.create", entityType: "User", entityId: user.id, metadata: { email: user.email, role: user.role } });
@@ -65,6 +66,7 @@ const updateSchema = z.object({
   email: z.string().trim().email("E-mail inválido.").transform((v) => v.toLowerCase()),
   role: roleSchema,
   isActive: z.boolean(),
+  poloCode: z.string().trim().max(20).nullable().optional(),
 });
 
 export async function updateUserAction(input: unknown): Promise<ActionResult> {
@@ -86,7 +88,7 @@ export async function updateUserAction(input: unknown): Promise<ActionResult> {
 
     await prisma.user.update({
       where: { id: parsed.data.id },
-      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, isActive: parsed.data.isActive },
+      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, isActive: parsed.data.isActive, poloCode: parsed.data.poloCode || null },
     });
     await recordAudit({
       userId: admin.id,

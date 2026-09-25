@@ -52,10 +52,10 @@ export default async function AcademicAnalysisPage({ searchParams }: PageProps<"
   const reviews = reviewResult.items;
   const hasFilters = Boolean(query || (isAdmin && responsibleId) || status || period);
   return <div className="academic-analysis-shell mx-auto max-w-[1440px] space-y-6 pb-8">
-    <section className="relative isolate min-h-[360px] overflow-hidden rounded-2xl bg-brand-navy shadow-sm sm:rounded-3xl lg:min-h-[390px]">
+    <section className="relative isolate min-h-[240px] overflow-hidden rounded-2xl bg-brand-navy shadow-sm sm:rounded-3xl lg:min-h-[280px]">
       <PortalHeroArtwork />
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,rgba(7,53,99,0.9)_0%,rgba(7,53,99,0.52)_42%,rgba(7,53,99,0.08)_100%)] md:bg-[linear-gradient(90deg,rgba(7,53,99,0.98)_0%,rgba(7,53,99,0.96)_28%,rgba(7,53,99,0.86)_38%,rgba(7,53,99,0.68)_48%,rgba(7,53,99,0.42)_58%,rgba(7,53,99,0.16)_68%,rgba(7,53,99,0.04)_76%,transparent_84%)]" />
-      <div className="flex min-h-[360px] items-end px-6 py-8 text-white md:items-center sm:px-10 md:py-14 lg:min-h-[390px] lg:px-14">
+      <div className="flex min-h-[240px] items-end px-6 py-6 text-white md:items-center sm:px-10 md:py-10 lg:min-h-[280px] lg:px-14">
         <div className="w-full max-w-xl text-left">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Acompanhamento acadêmico</p>
           <h1 className="mt-3 max-w-lg text-3xl font-semibold leading-[1.08] tracking-tight sm:text-4xl"><span className="block">Uma jornada mais clara</span><span className="block">até a formatura.</span></h1>

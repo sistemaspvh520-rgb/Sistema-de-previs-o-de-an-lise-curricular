@@ -18,7 +18,7 @@ export async function getCommercialInsights(scope: CommercialInsightScope) {
   const where = whereFor(scope);
   const completedWhere = { ...where, status: "COMPLETED" as const };
   const [timings, candidates] = await Promise.all([
-    prisma.curricularAnalysis.findMany({ where: { ...where, completedAt: { not: null } }, select: { createdAt: true, completedAt: true } }),
+    prisma.curricularAnalysis.findMany({ where: { ...where, completedAt: { not: null } }, orderBy: { completedAt: "desc" }, take: 5000, select: { createdAt: true, completedAt: true } }),
     prisma.curricularAnalysis.findMany({
       where: { ...completedWhere, enrollmentStatus: "PENDING" },
       orderBy: { completedAt: "asc" },

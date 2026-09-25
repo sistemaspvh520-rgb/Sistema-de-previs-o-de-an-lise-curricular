@@ -76,7 +76,8 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }:
     if (/conferência automática encontrou/i.test(warning) && !rowCountMismatch) return false;
     return true;
   });
-  const historyMappingRequired = Boolean(snapshot.documentType && snapshot.documentType !== "CURRICULAR_EXTRACT" && (!periodConfirmed || snapshot.disciplines.some(row => row.inMainCurriculum && row.period === null)));
+  const unmappedDisciplines = snapshot.disciplines.filter((row) => row.inMainCurriculum && row.period === null).length;
+  const historyMappingRequired = Boolean(snapshot.documentType && snapshot.documentType !== "CURRICULAR_EXTRACT" && (!periodConfirmed || unmappedDisciplines > 0));
   const graduationForecast = historyMappingRequired ? null : estimateGraduation({ disciplines: snapshot.disciplines, currentPeriod: result.currentPeriod, analysisDate, calendarTerms, rules, extractionWarnings: actionableExtractionWarnings, sourceDisciplineCount: snapshot.sourceDisciplineCount, sourceParsedDisciplineCount: snapshot.sourceParsedDisciplineCount });
   const formattedForecast = graduationForecast ? formatGraduationForecast(graduationForecast) : null;
   const forecastCalculated = Boolean(graduationForecast?.completionTermMin);
@@ -242,7 +243,14 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }:
   return (
     <div className="academic-report-page mx-auto min-w-0 max-w-[1440px] space-y-5 p-4 pb-10 sm:space-y-6 sm:p-6 sm:pb-10 lg:p-8 lg:pb-10">
       <SourceAttribution type={review.snapshot.documentType} />
-      {historyMappingRequired && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">MAPEAMENTO CURRICULAR NECESSÁRIO. Confirme a posição das disciplinas e o período atual para calcular vagas e prazo de conclusão. O semestre letivo 2026/2 não representa o 2º período curricular.</p>}
+      {historyMappingRequired && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold">MAPEAMENTO CURRICULAR NECESSÁRIO. O semestre letivo não representa o período curricular por si só.</p>
+        <ul className="mt-2 list-inside list-disc space-y-1">
+          {!periodConfirmed && <li>Período atual ainda não confirmado.</li>}
+          {unmappedDisciplines > 0 && <li>{unmappedDisciplines} disciplina(s) da grade principal sem período mapeado.</li>}
+        </ul>
+        <p className="mt-2 text-xs leading-5 text-amber-900/80">Enquanto essas pendências existirem, vagas e prazo de conclusão não são calculados.</p>
+      </div>}
       <div className="no-print">
         <header className="mb-6 grid min-w-0 gap-5 border-b border-slate-200/80 pb-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="min-w-0">
@@ -275,6 +283,17 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }:
               </label>
               <Button type="button" size="sm" className="h-10 shrink-0" onClick={confirmPeriod} disabled={working || (periodConfirmed && !periodHasChanged) || selectedPeriod === null}>{working ? "Salvando…" : "Confirmar"}</Button>
             </div>
+          </div>
+        </div>
+      </aside>}
+
+      {periodConfirmed && unmappedDisciplines > 0 && <aside id="confirmar-mapeamento" className="no-print fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-amber-300 bg-white p-4 shadow-[0_18px_60px_-18px_rgba(15,42,66,0.35)] sm:inset-x-auto sm:bottom-5 sm:right-5 sm:p-5" aria-live="polite" aria-labelledby="confirm-mapping-title">
+        <div className="flex items-start gap-3">
+          <span aria-hidden="true" className="mt-1 size-2.5 shrink-0 rounded-full bg-amber-500 ring-4 ring-amber-100" />
+          <div className="min-w-0 flex-1">
+            <p id="confirm-mapping-title" className="text-sm font-semibold text-slate-900">{unmappedDisciplines} disciplina(s) sem período mapeado</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">O período foi confirmado, mas ainda faltam disciplinas da grade principal sem posição no currículo. Enquanto isso não for resolvido, vagas e prazo de conclusão não são calculados.</p>
+            <Button type="button" size="sm" className="mt-3 h-9" onClick={openDisciplineReview}>Revisar disciplinas</Button>
           </div>
         </div>
       </aside>}

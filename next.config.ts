@@ -32,11 +32,10 @@ const nextConfig: NextConfig = {
   logging: { serverFunctions: false, incomingRequests: { ignore: [/definir-senha/] } },
   poweredByHeader: false,
   serverExternalPackages: ["pdfjs-dist", "@node-rs/argon2", "@prisma/client", "pg"],
-  // Arquivos lidos em runtime que o rastreamento automático não vê: logo dos e-mails e o worker/fontes do pdf.js
+  // Arquivos lidos em runtime que o rastreamento automático não vê: worker/fontes do pdf.js
   // (carregados por import() dinâmico em Node) — sem isso o upload falha na Vercel com "PDF corrompido".
   outputFileTracingIncludes: {
     "/**": [
-      "./src/services/email/assets/**",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
       "./node_modules/pdfjs-dist/standard_fonts/**",

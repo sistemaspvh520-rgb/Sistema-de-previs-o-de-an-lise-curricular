@@ -49,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ROLE_LABELS } from "@/lib/rbac";
+import { POLOS } from "@/domain/polos";
 import {
   deleteUserAction,
   impersonateUserAction,
@@ -61,6 +62,8 @@ import {
 import { TemporaryPasswordDialog } from "@/features/users/temporary-password-dialog";
 import type { Role } from "@/generated/prisma/enums";
 
+const NO_POLO = "__none__";
+
 interface UserRow {
   id: string;
   name: string;
@@ -69,6 +72,7 @@ interface UserRow {
   isActive: boolean;
   mustChangePassword: boolean;
   inviteSentAt: string | null;
+  poloCode: string | null;
 }
 
 export function UserRowActions({
@@ -88,6 +92,7 @@ export function UserRowActions({
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState<Role>(user.role);
+  const [polo, setPolo] = useState(user.poloCode ?? NO_POLO);
   const [pending, start] = useTransition();
 
   function saveEdit() {
@@ -98,6 +103,7 @@ export function UserRowActions({
         email,
         role,
         isActive: user.isActive,
+        poloCode: polo === NO_POLO ? null : polo,
       });
       if (res.ok) {
         toast.success(res.message);
@@ -282,6 +288,20 @@ export function UserRowActions({
                     <SelectItem key={r} value={r}>
                       {ROLE_LABELS[r]}
                     </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Polo</Label>
+              <Select value={polo} onValueChange={setPolo}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_POLO}>Sem polo definido</SelectItem>
+                  {POLOS.map((p) => (
+                    <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

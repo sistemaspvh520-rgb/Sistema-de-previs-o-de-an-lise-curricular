@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { appUrl, isEmailConfigured, sendMail } from "@/services/email/mailer";
+import { academicUpdateEmail } from "@/services/email/templates";
+import { getSystemSettings } from "@/repositories/settings-repository";
 import { logger } from "@/lib/logger";
 
 export async function notifyAcademicUpdate(
@@ -19,16 +21,13 @@ export async function notifyAcademicUpdate(
     )
       return;
     const url = appUrl("/portal");
+    const settings = await getSystemSettings();
     await sendMail({
       to: enrollment.studentUser.email,
       kind: "ACADEMIC_UPDATE",
       actorUserId,
       targetUserId: enrollment.studentUser.id,
-      content: {
-        subject: "Sua análise acadêmica foi atualizada",
-        text: `A equipe acadêmica atualizou sua análise. Acesse seu Portal Acadêmico: ${url}`,
-        html: `<p>A equipe acadêmica atualizou sua análise.</p><p><a href="${url}">Acessar meu Portal Acadêmico</a></p>`,
-      },
+      content: academicUpdateEmail({ url, institution: settings.institutionName }),
     });
   } catch {
     logger.warn("portal.notification_failed", { enrollmentId });

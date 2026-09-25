@@ -4,6 +4,7 @@ import { getSystemSettings } from "@/repositories/settings-repository";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GeneralSettingsForm } from "@/features/settings/general-form";
+import { PoloContactsForm } from "@/features/settings/polo-contacts-form";
 
 export const metadata: Metadata = { title: "Configurações gerais" };
 export const dynamic = "force-dynamic";
@@ -23,6 +24,15 @@ export default async function GeneralSettingsPage() {
           </CardHeader>
           <CardContent>
             <GeneralSettingsForm initial={settings} readOnly={false} />
+          </CardContent>
+        </Card>
+        <Card className="mt-6 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Contatos por polo</CardTitle>
+            <CardDescription>Mantenedor e coordenações acadêmica/comercial de cada polo — exibidos ao aluno no portal, conforme o polo do tutor responsável.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PoloContactsForm polos={settings.polos} initial={settings.poloContacts} readOnly={false} />
           </CardContent>
         </Card>
       </div>

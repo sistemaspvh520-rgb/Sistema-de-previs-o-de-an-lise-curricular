@@ -11,6 +11,7 @@ import { formatRelativeTime } from "@/lib/time";
 import { UserFormDialog } from "@/features/users/user-form-dialog";
 import { UserRowActions } from "@/features/users/user-row-actions";
 import { isEmailConfigured } from "@/services/email/mailer";
+import { findPolo } from "@/domain/polos";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MailWarning } from "lucide-react";
@@ -71,7 +72,10 @@ export default async function UsersPage() {
                     <span className="font-medium">{u.name}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {u.email}
+                  {u.poloCode && <span className="mt-0.5 block text-xs">{findPolo(u.poloCode)?.name ?? u.poloCode}</span>}
+                </TableCell>
                 <TableCell><Badge variant="secondary">{ROLE_LABELS[u.role]}</Badge></TableCell>
                 <TableCell>
                   {u.isActive ? (
@@ -89,7 +93,7 @@ export default async function UsersPage() {
                 </TableCell>
                 <TableCell className="text-muted-foreground" title={u.lastActiveAt ? formatDateTime(u.lastActiveAt) : undefined}>{u.lastActiveAt ? formatRelativeTime(u.lastActiveAt) : "nunca acessou"}</TableCell>
                 <TableCell>
-                  <UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} />
+                  <UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null, poloCode: u.poloCode }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} />
                 </TableCell>
               </TableRow>
             ))}
@@ -103,6 +107,7 @@ export default async function UsersPage() {
                 <div className="min-w-0">
                   <h2 className="truncate font-medium">{u.name}</h2>
                   <p className="break-all text-sm text-muted-foreground">{u.email}</p>
+                  {u.poloCode && <p className="text-xs text-muted-foreground">{findPolo(u.poloCode)?.name ?? u.poloCode}</p>}
                 </div>
                 <Badge variant="secondary" className="shrink-0">{ROLE_LABELS[u.role]}</Badge>
               </div>
@@ -114,7 +119,7 @@ export default async function UsersPage() {
                 <span>{u.mustChangePassword ? (u.inviteSentAt ? `Convite enviado em ${formatDateTime(u.inviteSentAt)}` : "Convite ainda não enviado") : "Senha definida pelo usuário"}</span>
                 <span>Último acesso: {u.lastActiveAt ? `${formatRelativeTime(u.lastActiveAt)} · ${formatDateTime(u.lastActiveAt)}` : "nunca acessou"}</span>
               </div>
-              <div className="border-t pt-2"><UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} /></div>
+              <div className="border-t pt-2"><UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null, poloCode: u.poloCode }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} /></div>
             </article>
           ))}
         </div>

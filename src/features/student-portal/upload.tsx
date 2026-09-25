@@ -175,7 +175,7 @@ export function StudentUpload({
   }
   return (
     <section
-      className="rounded-2xl border border-sky-100 bg-white p-5 sm:p-6"
+      className="rounded-2xl border border-brand-cyan/20 bg-white p-5 shadow-[0_16px_40px_-36px_rgba(6,147,227,0.45)] sm:p-6"
       id="atualizar-analise"
       aria-labelledby="update-title"
     >
@@ -190,7 +190,7 @@ export function StudentUpload({
           </p>
         </div>
         <Button
-          className="min-h-11 w-full sm:w-auto"
+          className="min-h-11 w-full bg-brand-cyan text-white hover:bg-brand-cyan/90 sm:w-auto"
           onClick={() => setOpen(!open)}
           disabled={processing || sending}
         >
@@ -201,7 +201,7 @@ export function StudentUpload({
       {(processing || sending) && (
         <div
           role="status"
-          className="mt-5 flex items-center gap-3 rounded-xl bg-sky-50 p-4 text-sm text-[#003B71]"
+          className="mt-5 flex items-center gap-3 rounded-xl bg-brand-cyan-50 p-4 text-sm text-[#003B71]"
         >
           <Loader2 className="size-5 shrink-0 animate-spin" />
           <div>
@@ -254,9 +254,9 @@ export function StudentUpload({
               setDragging(false);
               void choose(e.dataTransfer.files);
             }}
-            className={`rounded-2xl border-2 border-dashed p-6 text-center transition-colors ${dragging ? "border-sky-500 bg-sky-100" : "border-sky-200 bg-sky-50/50"}`}
+            className={`rounded-2xl border-2 border-dashed p-6 text-center transition-colors ${dragging ? "border-brand-cyan bg-brand-cyan-50" : "border-brand-cyan/30 bg-brand-cyan-50/50"}`}
           >
-            <UploadCloud className="mx-auto size-8 text-sky-700" />
+            <UploadCloud className="mx-auto size-8 text-brand-cyan-700" />
             <p className="mt-3 font-semibold text-[#003B71]">
               Arraste seu PDF aqui
             </p>
@@ -332,7 +332,7 @@ export function StudentUpload({
           <Button
             type="submit"
             disabled={!file || !confirmed || duplicate || processing || sending}
-            className="min-h-11 w-full sm:w-auto"
+            className="min-h-11 w-full bg-brand-cyan text-white hover:bg-brand-cyan/90 sm:w-auto"
           >
             Enviar PDF
           </Button>

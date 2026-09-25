@@ -42,7 +42,7 @@ export async function StudentRequestsList({
               <p className="text-sm font-semibold">
                 #{r.protocol} · {documentLabels[r.sourceDocument.documentType]}
               </p>
-              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs text-sky-800">
+              <span className="rounded-full bg-brand-cyan-50 px-3 py-1 text-xs text-brand-cyan-700">
                 {requestLabels[r.status]}
               </span>
             </div>
@@ -60,7 +60,7 @@ export async function StudentRequestsList({
             ) && (
               <a
                 href="#atualizar-analise"
-                className="mt-3 inline-block text-sm font-semibold text-sky-700 underline"
+                className="mt-3 inline-block text-sm font-semibold text-brand-cyan-700 underline"
               >
                 Enviar novo PDF
               </a>
@@ -68,7 +68,7 @@ export async function StudentRequestsList({
             {support && (
               <Link
                 href={`/academic-analysis/requests/${r.id}`}
-                className="mt-3 ml-3 inline-block text-sm text-sky-700 underline"
+                className="mt-3 ml-3 inline-block text-sm text-brand-cyan-700 underline"
               >
                 Abrir solicitação
               </Link>
@@ -83,12 +83,18 @@ export async function StudentRequestsList({
       )}
       <nav className="mt-3 flex justify-between text-sm">
         {page > 1 && (
-          <Link href={`${base}requests=${page - 1}#minhas-solicitacoes`}>
+          <Link
+            href={`${base}requests=${page - 1}#minhas-solicitacoes`}
+            className="font-medium text-brand-cyan-700 hover:underline"
+          >
             Mais recentes
           </Link>
         )}
         {page * 20 < count && (
-          <Link href={`${base}requests=${page + 1}#minhas-solicitacoes`}>
+          <Link
+            href={`${base}requests=${page + 1}#minhas-solicitacoes`}
+            className="font-medium text-brand-cyan-700 hover:underline"
+          >
             Anteriores
           </Link>
         )}

@@ -11,11 +11,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ROLE_LABELS } from "@/lib/rbac";
 import { createUserAction } from "@/features/users/actions";
 import { TemporaryPasswordDialog } from "@/features/users/temporary-password-dialog";
+import { POLOS } from "@/domain/polos";
 import type { Role } from "@/generated/prisma/enums";
+
+const NO_POLO = "__none__";
 
 export function UserFormDialog() {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<Role>("ANALYST");
+  const [polo, setPolo] = useState(NO_POLO);
   const [pending, start] = useTransition();
   const [created, setCreated] = useState<{ name: string; login: string; password: string; note: string } | null>(null);
 
@@ -23,7 +27,7 @@ export function UserFormDialog() {
     const name = String(formData.get("name") ?? "");
     const email = String(formData.get("email") ?? "").toLowerCase();
     start(async () => {
-      const res = await createUserAction({ name, email, role });
+      const res = await createUserAction({ name, email, role, poloCode: polo === NO_POLO ? null : polo });
       if (res.ok) {
         toast.success(res.message);
         setOpen(false);
@@ -72,6 +76,19 @@ export function UserFormDialog() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Polo</Label>
+                <Select value={polo} onValueChange={setPolo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_POLO}>Sem polo definido</SelectItem>
+                    {POLOS.map((p) => (
+                      <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Define os contatos institucionais mostrados aos alunos deste tutor.</p>
               </div>
             </div>
             <DialogFooter className="mt-6">

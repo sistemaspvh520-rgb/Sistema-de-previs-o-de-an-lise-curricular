@@ -1,9 +1,11 @@
 /**
  * Templates de e-mail transacional — HTML com CSS inline (compatível com Gmail/Outlook) + versão texto.
- * Identidade: navy #003E69 · ciano #00B9E4 (os mesmos tokens de src/styles/tokens.css).
+ * Identidade: navy #003b71 · ciano #0693e3 (os mesmos tokens de src/styles/tokens.css).
  */
+import { appUrl } from "@/lib/app-url";
 
-const NAVY = "#003E69";
+const NAVY = "#003b71";
+const CYAN = "#0693e3";
 const TEXT = "#17212B";
 const MUTED = "#5B6B7B";
 const BG = "#F5F7FA";
@@ -42,8 +44,9 @@ function layout(opts: {
 <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;">${escape(opts.preheader)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:32px 12px;"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #DFE5EC;">
+  <tr><td style="background:${CYAN};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
   <tr><td style="background:${NAVY};padding:22px 28px 18px;">
-    <img src="cid:logo-cruzeiro" alt="Cruzeiro do Sul Virtual" width="276" height="65" style="display:block;width:276px;max-width:100%;height:auto;border:0;" />
+    <img src="${appUrl("/brand/logo-cruzeiro-do-sul-virtual.png")}" alt="Cruzeiro do Sul Virtual" width="220" height="53" style="display:block;width:220px;max-width:100%;height:auto;border:0;" />
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.18);color:#ffffff;font-size:14px;font-weight:600;letter-spacing:.01em;">Sistema de Análise Curricular Inteligente</div>
   </td></tr>
   <tr><td style="padding:28px 28px 8px;">
@@ -67,8 +70,6 @@ export interface EmailContent {
   text: string;
 }
 
-/** Content-ID da logo embutida (anexada pelo mailer). */
-export const LOGO_CID = "logo-cruzeiro";
 export const SYSTEM_NAME = "Sistema de Análise Curricular Inteligente";
 
 export function inviteEmail(p: {
@@ -150,6 +151,20 @@ export function temporaryPasswordEmail(p: {
       institution: p.institution,
     }),
     text: `${first}, aqui está sua senha temporária.\n\nLogin: ${p.login}\nSenha temporária: ${p.password}\nEntrar: ${p.loginUrl}\n\nNo primeiro acesso você criará sua senha definitiva.`,
+  };
+}
+
+export function academicUpdateEmail(p: { url: string; institution: string }): EmailContent {
+  return {
+    subject: "Sua análise acadêmica foi atualizada",
+    html: layout({
+      preheader: "A equipe acadêmica atualizou sua análise.",
+      title: "Sua análise acadêmica foi atualizada",
+      intro: "A equipe acadêmica atualizou sua análise. Acesse seu Portal Acadêmico para conferir a situação mais recente.",
+      button: { label: "Acessar meu Portal Acadêmico", url: p.url },
+      institution: p.institution,
+    }),
+    text: `A equipe acadêmica atualizou sua análise. Acesse seu Portal Acadêmico: ${p.url}`,
   };
 }
 

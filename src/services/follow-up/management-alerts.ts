@@ -23,6 +23,10 @@ export async function listStaleEnrollmentCases(
       enrollmentReanalysisAt: true,
       enrollmentStatus: true,
     },
+    // Rede de segurança: o filtro por dias úteis é feito em JS (não dá pra empurrar pro SQL),
+    // mas nada impede que essa consulta cresça sem limite com o histórico da instituição.
+    orderBy: { completedAt: "desc" },
+    take: 5000,
   });
   return candidates
     .filter(

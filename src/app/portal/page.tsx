@@ -17,7 +17,10 @@ import { ChangePasswordForm } from "@/features/account/change-password-form";
 import { portalLogoutAction } from "@/features/auth/actions";
 import { dismissWelcomeAction } from "@/features/student-portal/actions";
 import { getSystemSettings } from "@/repositories/settings-repository";
+import type { PoloContactEntry } from "@/repositories/settings-repository";
 import { isProcessingFresh } from "@/services/student-portal/processing";
+import { SettingsSheet } from "@/features/student-portal/settings-sheet";
+import { findPolo } from "@/domain/polos";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -92,6 +95,20 @@ export default async function StudentPortalPage({
     `${base}${base.includes("?") ? "&" : "?"}${key}=${value}`;
   const processing = isProcessingFresh(job);
   const snapshot = selected ? presentAcademicSnapshot(selected) : undefined;
+  const polo = enrollment.owner?.poloCode
+    ? findPolo(enrollment.owner.poloCode)
+    : null;
+  const poloContacts = enrollment.owner?.poloCode
+    ? settings.poloContacts[enrollment.owner.poloCode]
+    : undefined;
+  const contactRoles: Array<[string, PoloContactEntry | undefined]> = poloContacts
+    ? [
+        ["Mantenedor", poloContacts.mantenedor],
+        ["Coordenação acadêmica", poloContacts.coordAcademico],
+        ["Coordenação comercial", poloContacts.coordComercial],
+      ]
+    : [];
+  const filledContacts = contactRoles.filter(([, entry]) => entry?.nome);
   return (
     <PortalEffects>
       <div className="portal-dashboard min-h-dvh bg-[#f5f8fc] text-slate-900">
@@ -120,18 +137,97 @@ export default async function StudentPortalPage({
                 priority
               />
             </Link>
-            <div className="flex items-center gap-3">
-              <a
-                href="#minha-conta"
-                className="flex min-h-11 items-center gap-2 text-sm font-medium"
-              >
-                <span className="grid size-9 place-items-center rounded-full bg-sky-100 text-[#003B71]">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <span className="grid size-9 place-items-center rounded-full bg-brand-cyan-50 text-brand-cyan-700">
                   {enrollment.name[0]}
                 </span>
-                <span className="max-w-24 truncate sm:max-w-40">
+                <span className="hidden max-w-24 truncate sm:inline sm:max-w-40">
                   {enrollment.name.split(" ")[0]}
                 </span>
-              </a>
+              </span>
+              <SettingsSheet>
+                <section>
+                  <h3 className="font-semibold text-[#003B71]">Contatos</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Fale com quem acompanha sua jornada acadêmica.
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    {enrollment.owner && (
+                      <div className="rounded-xl border border-brand-cyan/20 bg-brand-cyan-50/60 p-4 text-sm">
+                        <p className="text-xs font-semibold tracking-wide text-brand-cyan-700 uppercase">
+                          Seu tutor
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900">
+                          {enrollment.owner.name}
+                        </p>
+                        <p className="break-all text-slate-600">
+                          {enrollment.owner.email}
+                        </p>
+                      </div>
+                    )}
+                    {polo && (
+                      <p className="text-xs text-slate-500">
+                        Polo {polo.code} · {polo.name}
+                      </p>
+                    )}
+                    {filledContacts.map(([label, entry]) => (
+                      <div
+                        key={label}
+                        className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm"
+                      >
+                        <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                          {label}
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900">
+                          {entry!.nome}
+                        </p>
+                        {entry!.email && (
+                          <p className="break-all text-slate-600">
+                            {entry!.email}
+                          </p>
+                        )}
+                        {entry!.telefone && (
+                          <p className="text-slate-600">{entry!.telefone}</p>
+                        )}
+                      </div>
+                    ))}
+                    {!enrollment.owner && !filledContacts.length && (
+                      <p className="text-sm text-slate-500">
+                        Nenhum contato institucional disponível no momento.
+                      </p>
+                    )}
+                  </div>
+                </section>
+                <StudentRequestsList
+                  enrollmentId={enrollment.id}
+                  support={support}
+                  page={Math.max(
+                    1,
+                    Math.min(10000, Math.floor(Number(params.requests) || 1)),
+                  )}
+                />
+                <section>
+                  <h3 className="font-semibold text-[#003B71]">
+                    Minha conta
+                  </h3>
+                  <p className="my-4 break-all text-sm text-slate-600">
+                    {enrollment.name}
+                    <br />
+                    {enrollment.studentUser?.email ?? "Acesso ainda não criado"}
+                    <br />
+                    RGM {enrollment.rgm}
+                  </p>
+                  {support ? (
+                    <p className="text-sm text-slate-500">
+                      A senha é pessoal. Envie um link de recuperação pelo
+                      perfil do aluno.
+                    </p>
+                  ) : (
+                    <ChangePasswordForm />
+                  )}
+                </section>
+              </SettingsSheet>
               {!support && (
                 <form action={portalLogoutAction}>
                   <button className="min-h-11 px-2 text-sm text-slate-500">
@@ -141,18 +237,10 @@ export default async function StudentPortalPage({
               )}
             </div>
           </div>
-          <nav
-            aria-label="Portal do aluno"
-            className="mx-auto flex max-w-6xl justify-between gap-3 border-t border-slate-100 px-4 py-3 text-xs font-semibold text-[#003B71] sm:justify-start sm:gap-8 sm:px-6 sm:text-sm"
-          >
-            <Link href={base}>Minha análise</Link>
-            <a href="#minhas-solicitacoes">Minhas solicitações</a>
-            <a href="#minha-conta">Conta</a>
-          </nav>
         </header>
         <main className="mx-auto max-w-6xl space-y-6 px-4 py-7 sm:px-6 sm:py-10">
           {!support && !enrollment.welcomedAt && (
-            <section className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
+            <section className="rounded-2xl border border-brand-cyan/25 bg-gradient-to-br from-brand-cyan-50 via-white to-sky-50 p-5">
               <h2 className="font-semibold text-[#003B71]">
                 Bem-vindo ao seu Portal Acadêmico.
               </h2>
@@ -161,7 +249,7 @@ export default async function StudentPortalPage({
                 um documento acadêmico atualizado quando houver mudanças.
               </p>
               <form action={dismissWelcomeAction}>
-                <button className="mt-3 min-h-11 rounded-xl bg-[#003B71] px-4 text-sm font-medium text-white">
+                <button className="mt-3 min-h-11 rounded-xl bg-brand-cyan px-4 text-sm font-medium text-white hover:bg-brand-cyan/90">
                   Acessar minha análise
                 </button>
               </form>
@@ -188,6 +276,14 @@ export default async function StudentPortalPage({
               </p>
             )}
           </div>
+          {!previous && (
+            <StudentUpload
+              enrollmentId={enrollment.id}
+              maxMb={Math.min(settings.maxUploadMb, 20)}
+              support={support}
+              initialProcessing={Boolean(processing)}
+            />
+          )}
           {previous && (
             <div
               role="status"
@@ -224,14 +320,6 @@ export default async function StudentPortalPage({
               </p>
             </section>
           )}
-          {!previous && (
-            <StudentUpload
-              enrollmentId={enrollment.id}
-              maxMb={Math.min(settings.maxUploadMb, 20)}
-              support={support}
-              initialProcessing={Boolean(processing)}
-            />
-          )}
           <section
             id="historico"
             className="rounded-2xl border bg-white p-5 sm:p-6"
@@ -257,7 +345,7 @@ export default async function StudentPortalPage({
                           {dateLabel(version.createdAt)}
                         </Link>
                         {version.id === enrollment.currentVersionId && (
-                          <span className="ml-3 rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-800">
+                          <span className="ml-3 rounded-full bg-brand-cyan px-2 py-1 text-xs font-semibold text-white">
                             Atual
                           </span>
                         )}
@@ -268,7 +356,7 @@ export default async function StudentPortalPage({
                       </div>
                       <Link
                         href={withParam("version", version.id)}
-                        className="min-h-11 rounded-lg border px-4 py-3 text-sm"
+                        className="min-h-11 rounded-lg border border-brand-cyan/30 px-4 py-3 text-sm text-brand-cyan-700 hover:bg-brand-cyan-50"
                       >
                         Ver análise
                       </Link>
@@ -277,7 +365,7 @@ export default async function StudentPortalPage({
                       <summary className="cursor-pointer py-2 font-medium text-slate-600">
                         Ver o que mudou
                       </summary>
-                      <ul className="space-y-2 border-l-2 border-sky-100 pl-4 text-slate-600">
+                      <ul className="space-y-2 border-l-2 border-brand-cyan/20 pl-4 text-slate-600">
                         {(version.changeSummary as string[]).map(
                           (change, index) => (
                             <li key={index}>{change}</li>
@@ -296,48 +384,23 @@ export default async function StudentPortalPage({
             )}
             <div className="flex justify-between text-sm">
               {page > 1 && (
-                <Link href={withParam("history", String(page - 1))}>
+                <Link
+                  href={withParam("history", String(page - 1))}
+                  className="font-medium text-brand-cyan-700 hover:underline"
+                >
                   Mais recentes
                 </Link>
               )}
               {page * 20 < historyCount && (
-                <Link href={withParam("history", String(page + 1))}>
+                <Link
+                  href={withParam("history", String(page + 1))}
+                  className="font-medium text-brand-cyan-700 hover:underline"
+                >
                   Atualizações anteriores
                 </Link>
               )}
             </div>
           </section>
-          <StudentRequestsList
-            enrollmentId={enrollment.id}
-            support={support}
-            page={Math.max(
-              1,
-              Math.min(10000, Math.floor(Number(params.requests) || 1)),
-            )}
-          />
-          <details
-            id="minha-conta"
-            className="rounded-2xl border bg-white p-5 sm:p-6"
-          >
-            <summary className="cursor-pointer font-semibold text-[#003B71]">
-              Minha conta
-            </summary>
-            <p className="my-4 break-all text-sm text-slate-600">
-              {enrollment.name}
-              <br />
-              {enrollment.studentUser?.email ?? "Acesso ainda não criado"}
-              <br />
-              RGM {enrollment.rgm}
-            </p>
-            {support ? (
-              <p className="text-sm text-slate-500">
-                A senha é pessoal. Envie um link de recuperação pelo perfil do
-                aluno.
-              </p>
-            ) : (
-              <ChangePasswordForm />
-            )}
-          </details>
           <CampaignBanner />
           <footer className="pb-3 pt-2 text-center text-xs text-slate-400">
             Cruzeiro do Sul Virtual · Portal Acadêmico

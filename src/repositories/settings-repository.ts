@@ -7,6 +7,18 @@ import type { FollowUpCadence } from "@/generated/prisma/enums";
 import { POLOS, type Polo } from "@/domain/polos";
 import { COURSE_FORMATS } from "@/domain/course-formats";
 
+export interface PoloContactEntry {
+  nome: string;
+  email: string;
+  telefone: string;
+}
+
+export interface PoloContacts {
+  mantenedor: PoloContactEntry;
+  coordAcademico: PoloContactEntry;
+  coordComercial: PoloContactEntry;
+}
+
 export interface SystemSettings {
   retentionPolicy: RetentionPolicy;
   aiPrivacyMode: AIPrivacyMode;
@@ -22,6 +34,8 @@ export interface SystemSettings {
   followUpBusinessEndHour: number;
   followUpRepeatBusinessDays: number;
   followUpDefaultCadence: FollowUpCadence;
+  /** Contatos institucionais (mantenedor, coordenação acadêmica e comercial) por código de polo. */
+  poloContacts: Record<string, PoloContacts>;
 }
 
 const DEFAULTS: SystemSettings = {
@@ -39,7 +53,35 @@ const DEFAULTS: SystemSettings = {
   followUpBusinessEndHour: 18,
   followUpRepeatBusinessDays: 1,
   followUpDefaultCadence: "TWICE_DAILY",
+  poloContacts: {},
 };
+
+const EMPTY_CONTACT: PoloContactEntry = { nome: "", email: "", telefone: "" };
+
+function validContactEntry(value: unknown): PoloContactEntry {
+  if (!value || typeof value !== "object") return { ...EMPTY_CONTACT };
+  const v = value as Record<string, unknown>;
+  return {
+    nome: typeof v.nome === "string" ? v.nome : "",
+    email: typeof v.email === "string" ? v.email : "",
+    telefone: typeof v.telefone === "string" ? v.telefone : "",
+  };
+}
+
+function validPoloContacts(value: unknown): Record<string, PoloContacts> {
+  if (!value || typeof value !== "object") return {};
+  const result: Record<string, PoloContacts> = {};
+  for (const [code, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Record<string, unknown>;
+    result[code] = {
+      mantenedor: validContactEntry(e.mantenedor),
+      coordAcademico: validContactEntry(e.coordAcademico),
+      coordComercial: validContactEntry(e.coordComercial),
+    };
+  }
+  return result;
+}
 
 function validPolos(value: unknown): Polo[] {
   if (!Array.isArray(value)) return DEFAULTS.polos;
@@ -104,6 +146,7 @@ export async function getSystemSettings(): Promise<SystemSettings> {
       map.followUpDefaultCadence === "ONCE_DAILY"
         ? "ONCE_DAILY"
         : DEFAULTS.followUpDefaultCadence,
+    poloContacts: validPoloContacts(map.poloContacts),
   };
 }
 

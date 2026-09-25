@@ -16,12 +16,13 @@ export const metadata = { title: "Alunos · Análise Acadêmica" };
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; lpage?: string }>;
 }) {
   const user = await requirePagePermission("students:manage");
   const params = await searchParams;
   const query = params.q?.trim().slice(0, 100) ?? "";
   const page = Math.max(1, Math.floor(Number(params.page) || 1));
+  const legacyPage = Math.max(1, Math.floor(Number(params.lpage) || 1));
   const filters: Record<string, Prisma.StudentEnrollmentWhereInput> = {
     active: { studentUser: { isActive: true, mustChangePassword: false } },
     pending: { studentUser: { isActive: true, mustChangePassword: true } },
@@ -43,7 +44,21 @@ export default async function StudentsPage({
         }
       : {}),
   };
-  const [students, count, legacy] = await Promise.all([
+  const legacyWhere: Prisma.AcademicGridReviewWhereInput = {
+    enrollmentId: null,
+    rgm: { not: null },
+    ...(user.role === "ADMIN" ? {} : { createdById: user.id }),
+    ...(query
+      ? {
+          OR: [
+            { studentName: { contains: query, mode: "insensitive" } },
+            { rgm: { contains: query } },
+          ],
+        }
+      : {}),
+  };
+  const showLegacy = !params.status || params.status === "none";
+  const [students, count, legacy, legacyGroups] = await Promise.all([
     prisma.studentEnrollment.findMany({
       where,
       include: {
@@ -57,30 +72,25 @@ export default async function StudentsPage({
       take: 30,
     }),
     prisma.studentEnrollment.count({ where }),
-    !params.status || params.status === "none"
+    showLegacy
       ? prisma.academicGridReview.findMany({
-          where: {
-            enrollmentId: null,
-            rgm: { not: null },
-            ...(user.role === "ADMIN" ? {} : { createdById: user.id }),
-            ...(query
-              ? {
-                  OR: [
-                    { studentName: { contains: query, mode: "insensitive" } },
-                    { rgm: { contains: query } },
-                  ],
-                }
-              : {}),
-          },
+          where: legacyWhere,
           distinct: ["rgm"],
           orderBy: { createdAt: "desc" },
+          skip: (legacyPage - 1) * 30,
           take: 30,
           select: { id: true, studentName: true, rgm: true, courseName: true },
         })
       : [],
+    showLegacy
+      ? prisma.academicGridReview.groupBy({ by: ["rgm"], where: legacyWhere, _count: true })
+      : [],
   ]);
+  const legacyCount = legacyGroups.length;
   const pagination = (number: number) =>
     `/academic-analysis/students?${new URLSearchParams({ q: query, status: params.status ?? "", page: String(number) })}`;
+  const legacyPagination = (number: number) =>
+    `/academic-analysis/students?${new URLSearchParams({ q: query, status: params.status ?? "", lpage: String(number) })}#analises-sem-acesso`;
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -205,13 +215,16 @@ export default async function StudentsPage({
         </div>
       </section>
       {legacy.length > 0 && (
-        <section className="rounded-2xl border bg-white p-5">
-          <h2 className="font-semibold text-[#003B71]">
-            Análises existentes · sem acesso
-          </h2>
+        <section id="analises-sem-acesso" className="rounded-2xl border bg-white p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold text-[#003B71]">
+              Análises existentes · sem acesso
+            </h2>
+            <span className="text-sm text-slate-500">{legacyCount} registro(s)</span>
+          </div>
           <p className="mt-2 text-sm text-slate-500">
             Vincule o cadastro pelo RGM para disponibilizar as análises já
-            realizadas.
+            realizadas. {legacyCount > 30 && "Refine a busca acima para encontrar um registro específico mais rápido."}
           </p>
           <ul className="mt-4 divide-y">
             {legacy.map((review) => (
@@ -232,6 +245,12 @@ export default async function StudentsPage({
               </li>
             ))}
           </ul>
+          <div className="mt-4 flex justify-between text-sm">
+            {legacyPage > 1 && <Link href={legacyPagination(legacyPage - 1)}>Anterior</Link>}
+            {legacyPage * 30 < legacyCount && (
+              <Link href={legacyPagination(legacyPage + 1)}>Próxima</Link>
+            )}
+          </div>
         </section>
       )}
     </div>
