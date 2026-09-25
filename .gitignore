@@ -45,5 +45,10 @@ next-env.d.ts
 /samples
 /src/generated
 
+# gerados automaticamente pelo `next dev` (agentRules); removidos do
+# versionamento por conterem um bloco fabricado de prompt injection
+/AGENTS.md
+/CLAUDE.md
+
 # manter o exemplo de configuração versionado
 !.env.example
