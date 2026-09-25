@@ -16,7 +16,7 @@ export function PortalAuthShell({
     <PortalEffects>
       <main className="portal-auth grid min-h-dvh bg-[#f7faff] lg:grid-cols-[1.05fr_1fr]">
         <aside className="portal-auth-story relative isolate flex min-h-[240px] flex-col justify-end overflow-hidden bg-[#003B71] px-6 py-8 text-white sm:min-h-[300px] sm:px-8 sm:py-10 lg:min-h-0 lg:p-12 xl:p-16">
-          <PortalHeroArtwork story />
+          <PortalHeroArtwork />
           <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(0,37,75,.05),rgba(0,59,113,.08)_34%,rgba(0,37,75,.36)_68%,rgba(0,37,75,.9)_100%)]" />
           <div className="portal-reveal relative z-20 max-w-lg pb-1 sm:pb-3">
             <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-[11px] font-medium backdrop-blur-md sm:mb-6 sm:px-4 sm:py-2 sm:text-xs">

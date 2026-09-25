@@ -18,6 +18,7 @@ import { StudentUpload } from "@/features/student-portal/upload";
 import { StudentAnalysisView } from "@/features/student-portal/analysis-view";
 import { Button } from "@/components/ui/button";
 import { getSystemSettings } from "@/repositories/settings-repository";
+import { cn } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 export default async function StudentProfilePage({
   params,
@@ -63,68 +64,75 @@ export default async function StudentProfilePage({
       >
         Voltar aos alunos
       </Link>
-      <header className="rounded-2xl border bg-white p-5 sm:p-6">
-        <h1 className="text-2xl font-semibold text-[#003B71]">
-          {student.name}
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">
-          RGM {student.rgm} ·{" "}
-          {student.courseName ?? "Curso ainda não identificado"}
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <form action={viewStudentPortalAction}>
-            <input name="enrollmentId" type="hidden" value={id} />
-            <Button>Visualizar como aluno</Button>
-          </form>
-          {student.currentVersion && (
+      <div
+        className={cn(
+          "gap-4",
+          student.studentUser ? "grid lg:grid-cols-[1fr_320px]" : "space-y-4",
+        )}
+      >
+        <header className="rounded-2xl border bg-white p-5 sm:p-6">
+          <h1 className="text-2xl font-semibold text-[#003B71]">
+            {student.name}
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            RGM {student.rgm} ·{" "}
+            {student.courseName ?? "Curso ainda não identificado"}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <form action={viewStudentPortalAction}>
+              <input name="enrollmentId" type="hidden" value={id} />
+              <Button>Visualizar como aluno</Button>
+            </form>
+            {student.currentVersion && (
+              <Button asChild variant="outline">
+                <Link
+                  href={`/academic-analysis/${student.currentVersion.reviewId}`}
+                >
+                  Visualizar análise / corrigir dados
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="outline">
-              <Link
-                href={`/academic-analysis/${student.currentVersion.reviewId}`}
-              >
-                Visualizar análise / corrigir dados
-              </Link>
+              <a href="#atualizar">Atualizar análise / enviar PDF</a>
             </Button>
-          )}
-          <Button asChild variant="outline">
-            <a href="#atualizar">Atualizar análise / enviar PDF</a>
-          </Button>
-          <Button asChild variant="outline">
-            <a href="#historico">Histórico</a>
-          </Button>
-        </div>
-      </header>
-      <section className="rounded-2xl border bg-white p-5 sm:p-6">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[#003B71]">
-              Acesso ao portal
-            </h2>
-            <p className="mt-2 text-sm">{accessStatus(student.studentUser)}</p>
-            <p className="mt-1 break-all text-sm text-slate-500">
-              {student.studentUser?.email ?? "Nenhum e-mail vinculado"}
-            </p>
+            <Button asChild variant="outline">
+              <a href="#historico">Histórico</a>
+            </Button>
           </div>
-          <p className="text-xs text-slate-500">
+        </header>
+        <section className="rounded-2xl border bg-white p-4 sm:p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Acesso ao portal
+          </h2>
+          <p className="mt-2 text-sm font-medium text-[#003B71]">
+            {accessStatus(student.studentUser)}
+          </p>
+          <p className="mt-1 break-all text-xs text-slate-500">
+            {student.studentUser?.email ?? "Nenhum e-mail vinculado"}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
             Último login:{" "}
             {student.studentUser?.lastLoginAt?.toLocaleString("pt-BR", {
               timeZone: "America/Porto_Velho",
             }) ?? "Ainda não acessou"}
           </p>
-        </div>
-        <CreateStudentForm
-          key={student.id}
-          student={student}
-          hasAccess={Boolean(student.studentUser)}
-        />
-        {student.studentUser && (
-          <StudentAccessPanel
-            enrollmentId={id}
-            email={student.studentUser.email}
-            active={student.studentUser.isActive}
-            invited={student.studentUser.mustChangePassword}
-          />
-        )}
-      </section>
+          <div className="mt-4">
+            <CreateStudentForm
+              key={student.id}
+              student={student}
+              hasAccess={Boolean(student.studentUser)}
+            />
+          </div>
+          {student.studentUser && (
+            <StudentAccessPanel
+              enrollmentId={id}
+              email={student.studentUser.email}
+              active={student.studentUser.isActive}
+              invited={student.studentUser.mustChangePassword}
+            />
+          )}
+        </section>
+      </div>
       {student.currentVersion && (
         <>
           <p className="text-sm text-slate-500">

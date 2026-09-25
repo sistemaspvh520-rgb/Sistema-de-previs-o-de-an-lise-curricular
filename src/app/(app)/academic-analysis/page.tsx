@@ -52,7 +52,6 @@ export default async function AcademicAnalysisPage({ searchParams }: PageProps<"
   const reviews = reviewResult.items;
   const hasFilters = Boolean(query || (isAdmin && responsibleId) || status || period);
   return <div className="academic-analysis-shell mx-auto max-w-[1440px] space-y-6 pb-8">
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-white p-4"><p className="text-sm text-slate-600">Acompanhe os alunos e gerencie o acesso ao Portal Acadêmico.</p><div className="flex flex-wrap gap-3"><Button asChild variant="outline"><Link href="/academic-analysis/requests">{isAdmin ? "Central Acadêmica" : "Solicitações"}</Link></Button><Button asChild><Link href="/academic-analysis/students">Alunos e acessos</Link></Button></div></div>
     <section className="relative isolate min-h-[360px] overflow-hidden rounded-2xl bg-brand-navy shadow-sm sm:rounded-3xl lg:min-h-[390px]">
       <PortalHeroArtwork />
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,rgba(7,53,99,0.9)_0%,rgba(7,53,99,0.52)_42%,rgba(7,53,99,0.08)_100%)] md:bg-[linear-gradient(90deg,rgba(7,53,99,0.98)_0%,rgba(7,53,99,0.96)_28%,rgba(7,53,99,0.86)_38%,rgba(7,53,99,0.68)_48%,rgba(7,53,99,0.42)_58%,rgba(7,53,99,0.16)_68%,rgba(7,53,99,0.04)_76%,transparent_84%)]" />

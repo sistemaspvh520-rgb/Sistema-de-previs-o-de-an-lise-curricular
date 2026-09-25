@@ -68,7 +68,7 @@ export async function ensureEnrollment(
       );
       if (courses.size > 1 || names.size > 1)
         throw new PortalInputError(
-          "Há dados divergentes para este RGM. Confira nome e curso nas análises existentes antes de criar o acesso.",
+          "Há dados divergentes para este RGM. Confira nome e curso nas análises existentes antes de continuar.",
         );
       const enrollment = await tx.studentEnrollment.create({
         data: {

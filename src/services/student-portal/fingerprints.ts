@@ -9,15 +9,14 @@ export const canonicalText = (value: string | null | undefined) =>
     .normalize("NFKC")
     .replace(/\s+/g, " ")
     .trim()
-    .toLocaleUpperCase("pt-BR");
-export const canonicalCourse = (value: string | null | undefined) =>
-  canonicalText(value)
+    .toLocaleUpperCase("pt-BR")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(
-      /^(?:CURSO )?(?:SUPERIOR DE TECNOLOGIA EM |TECNOLOGIA EM |BACHARELADO EM |LICENCIATURA EM )/,
-      "",
-    );
+    .replace(/[\u0300-\u036f]/g, "");
+export const canonicalCourse = (value: string | null | undefined) =>
+  canonicalText(value).replace(
+    /^(?:CURSO )?(?:SUPERIOR DE TECNOLOGIA EM |TECNOLOGIA EM |BACHARELADO EM |LICENCIATURA EM )/,
+    "",
+  );
 export const canonicalRgm = (value: string) => value.normalize("NFKC").trim();
 
 /** Ignore only explicitly labelled printing metadata, never academic dates or grades. */
