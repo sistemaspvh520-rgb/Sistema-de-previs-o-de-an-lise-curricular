@@ -28,6 +28,7 @@ vi.mock("@/lib/prisma", () => {
   };
   return {
     prisma: {
+      user: { findUnique: async () => state.user ? { ...state.user, isActive: true, sessionVersion: 0, name: "U", email: "u@x", mustChangePassword: false } : null },
       openAIIntegration: {
         upsert,
         update,

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { logger } from "@/lib/logger";
@@ -28,6 +29,8 @@ export interface ParsedPage {
 }
 
 export interface LocalExtraction {
+  /** Known vector outline of the institutional VISUALIZAÇÃO PRÉVIA watermark. */
+  visualPreviewWatermark?: boolean;
   pageCount: number;
   pages: ParsedPage[];
   /** Texto corrido por página (linhas separadas por \n). */
@@ -160,6 +163,7 @@ export async function parsePdf(bytes: Buffer, opts?: { maxPages?: number }): Pro
   try {
     const pageCount = doc.numPages;
     const limit = opts?.maxPages ? Math.min(pageCount, opts.maxPages) : pageCount;
+    let visualPreviewWatermark = false;
     const pages: ParsedPage[] = [];
     const textByPage: string[] = [];
     for (let p = 1; p <= limit; p++) {
@@ -167,13 +171,21 @@ export async function parsePdf(bytes: Buffer, opts?: { maxPages?: number }): Pro
       const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
       const lines = groupIntoLines(content.items as unknown as RawItem[]);
+      if (p === 1 && /HIST[ÓO]RICO ESCOLAR/i.test(lines.map(l => l.text).join(" "))) {
+        const operators = await page.getOperatorList();
+        for (let i = 0; i < operators.fnArray.length; i++) {
+          if (operators.fnArray[i] !== pdfjs.OPS.constructPath) continue;
+          const shape = JSON.stringify(operators.argsArray[i]);
+          if (shape.length > 1000 && createHash("sha256").update(shape).digest("hex") === "b01418f610afb1413f200e31f11524a1c9c0cfeee48932ebbc2dd59fbf08a096") visualPreviewWatermark = true;
+        }
+      }
       pages.push({ page: p, width: viewport.width, height: viewport.height, lines });
       textByPage.push(lines.map((l) => l.text).join("\n"));
       page.cleanup();
     }
     const table = detectTables(pages);
     const headerFields = { ...extractHeaderFields(Object.values(table.freeText).flat()), ...extractUnifiedEnrollmentHeader(pages) };
-    return { pageCount, pages, textByPage, parserVersion: PARSER_VERSION, table, headerFields };
+    return { pageCount, pages, textByPage, visualPreviewWatermark, parserVersion: PARSER_VERSION, table, headerFields };
   } finally {
     await task.destroy().catch((e: unknown) => logger.debug("pdf.destroy", { err: String(e) }));
   }

@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   BellRing,
   Clock3,
-  Sparkles,
   Users,
 } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
@@ -284,34 +283,42 @@ export default async function ManagementPage({
             <p className="mt-1 text-sm text-muted-foreground">média no período selecionado</p>
           </CardContent>
         </Card>
-        <Card className="overflow-hidden border-brand-gold/40 shadow-sm [--card-spacing:0px]">
-          <CardHeader className="border-b border-brand-gold/30 bg-brand-gold-50/60 px-5 py-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="size-4 text-brand-gold" /> Oportunidades prioritárias
-            </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">Análises concluídas, sem matrícula confirmada, com 50% ou mais da grade aproveitada.</p>
+        <Card className="overflow-hidden rounded-2xl border border-amber-200/80 bg-white shadow-[0_12px_34px_-28px_rgba(120,53,15,0.48)] [--card-spacing:0px]">
+          <CardHeader className="border-b border-amber-100 bg-gradient-to-r from-amber-50 via-white to-white px-5 py-4 sm:px-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">Acompanhamento comercial</p>
+                <CardTitle className="mt-1 text-lg font-semibold tracking-tight text-slate-900">Oportunidades prioritárias</CardTitle>
+                <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-600">Análises concluídas, sem matrícula confirmada e com pelo menos 50% da grade aproveitada.</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm">{commercialInsights.highValueLeads.length} {commercialInsights.highValueLeads.length === 1 ? "oportunidade" : "oportunidades"}</span>
+            </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-4 sm:p-5">
             {commercialInsights.highValueLeads.length ? (
-              <ul className="divide-y divide-brand-gold/20">
+              <ul className="grid gap-3 sm:grid-cols-2">
                 {commercialInsights.highValueLeads.slice(0, 6).map((lead) => (
-                  <li key={lead.id}>
-                    <Link href={`/analyses/${lead.id}`} className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-brand-gold-50/50">
-                      <span className="min-w-0"><span className="block truncate text-sm font-semibold">{lead.studentName ?? "Candidato não identificado"}</span><span className="block truncate text-xs text-muted-foreground">{lead.courseName ?? "Curso não identificado"}{lead.poloName ? ` · ${lead.poloName}` : ""}</span></span>
-                      <span className="shrink-0 rounded-full bg-brand-gold px-2.5 py-1 text-xs font-bold text-brand-navy">{lead.exemptedPercentage}% aproveitado</span>
+                  <li key={lead.id} className="min-w-0">
+                    <Link href={`/analyses/${lead.id}`} className="flex h-full items-center justify-between gap-3 rounded-xl border border-slate-200 border-l-4 border-l-amber-400 bg-white px-4 py-3.5 shadow-sm transition hover:border-amber-300 hover:bg-amber-50/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
+                      <span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-900">{lead.studentName ?? "Candidato não identificado"}</span><span className="mt-1 block truncate text-xs text-slate-600">{lead.courseName ?? "Curso não identificado"}{lead.poloName ? ` · ${lead.poloName}` : ""}</span><span className="mt-2 block text-[11px] font-medium uppercase tracking-wide text-amber-800">Análise concluída · matrícula pendente</span></span>
+                      <span className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-2 text-center text-xs font-bold leading-tight text-amber-900"><span className="block text-base">{lead.exemptedPercentage}%</span><span className="block">aproveitado</span></span>
                     </Link>
                   </li>
                 ))}
               </ul>
-            ) : <p className="px-5 py-8 text-sm text-muted-foreground">Nenhuma oportunidade prioritária no período.</p>}
+            ) : <div className="flex items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-4 sm:px-5">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-lg font-bold text-amber-800">0</span>
+              <div><p className="text-sm font-semibold text-slate-800">Nenhuma oportunidade prioritária no período selecionado</p><p className="mt-1 text-xs leading-5 text-slate-600">Análises que atenderem a esses critérios aparecerão automaticamente aqui.</p></div>
+            </div>}
           </CardContent>
         </Card>
       </section>
       <PoloReportCard
-        className="mt-6 shadow-sm"
+        className="mt-2"
         description="Atendimentos por polo no período. Abra a lista ou exporte o CSV."
         rows={byPolo}
         exportQuery={exportQuery}
+        variant="flat"
       />
     </>
   );

@@ -26,7 +26,7 @@ export function PoloReportCard({
   title?: string;
   description?: string;
   className?: string;
-  variant?: "default" | "glass";
+  variant?: "default" | "glass" | "flat";
   exportQuery?: string;
 }) {
   const total = rows.reduce((sum, row) => sum + row.total, 0);
@@ -34,6 +34,8 @@ export function PoloReportCard({
     <Card
       className={cn(
         className,
+        variant === "flat" &&
+          "w-full gap-0 overflow-visible rounded-none border-0 bg-transparent py-0 shadow-none ring-0 [--card-spacing:0px]",
         variant === "glass" &&
           "border border-white/15 bg-white/[0.08] text-white shadow-none backdrop-blur-xl [--card-spacing:0px]",
       )}
@@ -41,6 +43,7 @@ export function PoloReportCard({
       <CardHeader
         className={cn(
           "flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-brand-cyan/20 bg-brand-cyan-50/70 px-6 py-4",
+          variant === "flat" && "rounded-none border-b border-slate-200 bg-transparent px-0 py-3",
           variant === "glass" && "border-white/10 bg-white/[0.05]",
         )}
       >
@@ -79,7 +82,7 @@ export function PoloReportCard({
           </a>
         </Button>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className={cn("p-0", variant === "flat" && "px-0")}>
         {rows.length === 0 ? (
           <p
             className={cn(

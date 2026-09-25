@@ -14,8 +14,8 @@ import { consumeImpersonationToken } from "@/features/users/impersonation";
 const credentialsSchema = z.object({
   email: z
     .string()
-    .email()
-    .transform((v) => v.toLowerCase().trim()),
+    .trim().min(1).max(254)
+    .transform((v) => v.includes("@") ? v.toLowerCase().trim() : v.trim()),
   password: z.string().min(1).max(200),
 });
 
@@ -29,6 +29,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
+        token.sessionVersion = user.sessionVersion ?? 0;
         token.role = (user as { role?: Role }).role;
         token.name = user.name;
         token.mustChangePassword =
@@ -57,6 +58,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const current = await prisma.user.findUnique({
           where: { id: userId },
           select: {
+            sessionVersion: true,
             role: true,
             isActive: true,
             name: true,
@@ -65,7 +67,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
             followUpPreferencesConfirmedAt: true,
           },
         });
-        if (!current || !current.isActive) return null;
+        if (!current || !current.isActive || current.sessionVersion !== (token.sessionVersion ?? 0)) return null;
+        token.sessionVersion = current.sessionVersion;
         token.role = current.role;
         token.name = current.name;
         token.email = current.email;
@@ -89,7 +92,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   providers: [
     Credentials({
       name: "Credenciais",
-      credentials: { email: {}, password: {}, impersonationToken: {} },
+      credentials: { email: {}, password: {}, impersonationToken: {}, portal: {} },
       async authorize(raw, request) {
         // "Acessar como": token de uso único emitido por um ADMIN (ver features/users/impersonation.ts)
         const impersonationToken =
@@ -113,6 +116,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
             email: result.target.email,
             name: result.target.name,
             role: result.target.role,
+            sessionVersion: result.target.sessionVersion,
             mustChangePassword: false,
             notificationPreferencesConfirmed: true,
             impersonatorId: result.admin.id,
@@ -132,9 +136,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email },
-        });
+        const identity = parsed.data.email;
+        const user = identity.includes("@")
+          ? await prisma.user.findUnique({ where: { email: identity } })
+          : (await prisma.studentEnrollment.findUnique({ where: { rgm: identity }, include: { studentUser: true } }))?.studentUser;
+        if (raw.portal === "student" && user?.role !== "STUDENT") return null;
+        if (user?.role === "STUDENT" && user.mustChangePassword) return null;
         if (!user || !user.isActive) return null;
 
         const ok = await verify(user.passwordHash, parsed.data.password);
@@ -147,7 +154,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         await prisma.auditLog.create({
           data: {
             userId: user.id,
-            action: "auth.login",
+            action: user.role === "STUDENT" ? "STUDENT_LOGIN" : "auth.login",
             entityType: "User",
             entityId: user.id,
             ip,
@@ -159,6 +166,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          sessionVersion: user.sessionVersion,
           mustChangePassword: user.mustChangePassword,
           notificationPreferencesConfirmed: Boolean(
             user.followUpPreferencesConfirmedAt,

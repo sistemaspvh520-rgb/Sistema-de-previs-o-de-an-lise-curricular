@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { changeOwnPasswordAction } from "@/features/account/actions";
 
 export function ChangePasswordForm() {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
   function submit(fd: FormData) {
@@ -17,6 +19,7 @@ export function ChangePasswordForm() {
       if (res.ok) {
         toast.success(res.message);
         formRef.current?.reset();
+        router.replace(res.data.loginUrl);
       } else toast.error(res.error);
     });
   }

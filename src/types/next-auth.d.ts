@@ -5,6 +5,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      sessionVersion: number;
       role: Role;
       mustChangePassword: boolean;
       notificationPreferencesConfirmed: boolean;
@@ -13,6 +14,7 @@ declare module "next-auth" {
     } & DefaultSession["user"];
   }
   interface User {
+    sessionVersion?: number;
     role?: Role;
     mustChangePassword?: boolean;
     notificationPreferencesConfirmed?: boolean;
@@ -24,6 +26,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
+    sessionVersion?: number;
     role?: Role;
     checkedAt?: number;
     mustChangePassword?: boolean;

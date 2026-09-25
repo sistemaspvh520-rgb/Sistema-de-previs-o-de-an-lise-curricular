@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { can, type Permission } from "@/lib/rbac";
 import type { Role } from "@/generated/prisma/enums";
@@ -27,23 +28,27 @@ export class UnauthorizedError extends Error {
   }
 }
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+export async function getSessionUser(options: { allowStudent?: boolean } = {}): Promise<SessionUser | null> {
   const session = await auth();
   if (!session?.user?.id || !session.user.role) return null;
+  const current = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true, isActive: true, sessionVersion: true, email: true, name: true, mustChangePassword: true } });
+  if (!current?.isActive || current.sessionVersion !== (session.user.sessionVersion ?? 0)) return null;
+  if (current.role === "STUDENT" && (!options.allowStudent || current.mustChangePassword || session.user.impersonatorId)) return null;
   return {
     id: session.user.id,
-    email: session.user.email ?? "",
-    name: session.user.name ?? "",
-    role: session.user.role,
-    mustChangePassword: Boolean(session.user.mustChangePassword),
+    email: current.email,
+    name: current.name,
+    role: current.role,
+    mustChangePassword: current.mustChangePassword,
     impersonator: session.user.impersonatorId ? { id: session.user.impersonatorId, name: session.user.impersonatorName ?? "Administrador" } : null,
   };
 }
 
 /** Para páginas: redireciona ao login se não autenticado. */
 export async function requireUser(): Promise<SessionUser> {
-  const user = await getSessionUser();
+  const user = await getSessionUser({ allowStudent: true });
   if (!user) redirect("/login");
+  if (user.role === "STUDENT") redirect("/portal");
   return user;
 }
 

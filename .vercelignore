@@ -4,3 +4,13 @@
 .env.local
 .env.development
 .env.test
+
+# Dados e artefatos locais não fazem parte da publicação.
+.env*
+/storage/
+/samples/
+.claude/
+supabase/.temp/
+coverage/
+*.tsbuildinfo
+/src/generated/

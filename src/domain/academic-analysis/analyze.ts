@@ -21,8 +21,17 @@ export function parseAcademicPeriod(raw: string): number | null {
   return Number.isInteger(period) && period >= 1 && period <= 20 ? period : null;
 }
 
+/** Empty tutor-added rows are drafts, not disciplines; ignore them until data is entered. */
+export function isBlankManualDisciplineDraft(discipline: AcademicDiscipline): boolean {
+  return discipline.sourcePage === 0 &&
+    !discipline.name.trim() &&
+    !discipline.code?.trim() &&
+    discipline.period === null &&
+    discipline.workload === null;
+}
+
 export function academicDisciplineNeedsReview(discipline: AcademicDiscipline): boolean {
-  return discipline.inMainCurriculum && (
+  return discipline.inMainCurriculum && !isBlankManualDisciplineDraft(discipline) && (
     !discipline.name.trim() ||
     discipline.name.startsWith("COMPONENTE NÃO IDENTIFICADO") ||
     discipline.period === null ||
@@ -39,8 +48,20 @@ export function academicGridHasUnresolvedRowCount(
   if (sourceParsedDisciplineCount === undefined) return disciplines.length !== sourceDisciplineCount;
   if (sourceParsedDisciplineCount > sourceDisciplineCount) return true;
   const missingFromExtraction = sourceDisciplineCount - sourceParsedDisciplineCount;
-  const tutorAddedRows = disciplines.filter((discipline) => discipline.sourcePage === 0).length;
+  const tutorAddedRows = disciplines.filter((discipline) => discipline.sourcePage === 0 && !isBlankManualDisciplineDraft(discipline)).length;
   return tutorAddedRows < missingFromExtraction;
+}
+
+export function unresolvedAcademicGridRowCount(
+  disciplines: AcademicDiscipline[],
+  sourceDisciplineCount?: number,
+  sourceParsedDisciplineCount?: number,
+): number {
+  if (sourceDisciplineCount === undefined) return 0;
+  const parsedCount = sourceParsedDisciplineCount ?? disciplines.length;
+  const missingFromExtraction = Math.max(0, sourceDisciplineCount - parsedCount);
+  const completedManualRows = disciplines.filter((discipline) => discipline.sourcePage === 0 && !isBlankManualDisciplineDraft(discipline)).length;
+  return Math.max(0, missingFromExtraction - completedManualRows);
 }
 
 export function analyzeAcademicGrid(input: {
@@ -50,7 +71,7 @@ export function analyzeAcademicGrid(input: {
 }): AcademicGridResult {
   const currentPeriodConfirmed = input.currentPeriodConfirmed ?? input.currentPeriod !== null;
   const period = input.currentPeriod;
-  const inGrid = input.disciplines.filter((discipline) => discipline.inMainCurriculum);
+  const inGrid = input.disciplines.filter((discipline) => discipline.inMainCurriculum && !isBlankManualDisciplineDraft(discipline));
   const forCurrentPeriod = period === null ? [] : inGrid.filter((discipline) => discipline.period === period);
   const previous = period === null ? [] : inGrid.filter((discipline) => discipline.period !== null && discipline.period < period);
   const pendingDisciplines = previous.filter((discipline) => discipline.normalizedStatus === "A CURSAR");
@@ -117,19 +138,41 @@ export function analyzeAcademicGrid(input: {
   };
 }
 
+/** One source of truth for both the completion button and the server action. */
+export function academicGridCompletionBlockers(input: {
+  disciplines: AcademicDiscipline[];
+  currentPeriod: number | null;
+  currentPeriodConfirmed: boolean;
+  sourceDisciplineCount?: number;
+  sourceParsedDisciplineCount?: number;
+}): string[] {
+  const blockers: string[] = [];
+  if (input.currentPeriod === null || !input.currentPeriodConfirmed) {
+    blockers.push("Confirme o período atual do aluno.");
+  }
+  const incompleteCount = input.disciplines.filter(academicDisciplineNeedsReview).length;
+  if (incompleteCount > 0) {
+    blockers.push(`Revise o período e a situação de ${incompleteCount} componente(s) da grade.`);
+  }
+  if (academicGridHasUnresolvedRowCount(input.disciplines, input.sourceDisciplineCount, input.sourceParsedDisciplineCount)) {
+    blockers.push("Confira as linhas faltantes do extrato e complete a grade.");
+  }
+  if (input.currentPeriod !== null && input.currentPeriodConfirmed) {
+    const result = analyzeAcademicGrid({ disciplines: input.disciplines, currentPeriod: input.currentPeriod, currentPeriodConfirmed: true });
+    if (result.currentPeriodComponents === 0) blockers.push("Nenhuma disciplina da grade foi identificada no período atual.");
+    if (result.usedExtraSlots > result.extraAllowance) blockers.push("Há mais disciplinas anteriores em andamento do que vagas adicionais disponíveis.");
+  }
+  return blockers;
+}
+
 export function buildStudentMessage(input: {
-  studentName: string | null;
   result: AcademicGridResult;
-  courseName?: string | null;
   forecast?: GraduationForecast | null;
   tutorExpectedCompletionTerm?: string | null;
-  forecastReviewPending?: boolean;
 }): string {
   const { result } = input;
-  const greeting = input.studentName ? `Olá, ${input.studentName}!` : "Olá!";
-  const course = input.courseName ? ` no curso de ${input.courseName}` : "";
   const pendingCount = input.forecast?.knownBacklog ?? result.previousPending;
-  const pending = `${pendingCount} disciplina${pendingCount === 1 ? "" : "s"} de períodos anteriores ainda consta${pendingCount === 1 ? "" : "m"} como pendente${pendingCount === 1 ? "" : "s"}`;
+  const pending = `${pendingCount} disciplina${pendingCount === 1 ? "" : "s"} de períodos anteriores consta${pendingCount === 1 ? "" : "m"} como A CURSAR`;
   const yearsEstimate = input.forecast
     ? input.forecast.yearsMin === input.forecast.yearsMax
       ? `${input.forecast.yearsMin.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${input.forecast.yearsMin === 1 ? "ano" : "anos"}`
@@ -137,8 +180,6 @@ export function buildStudentMessage(input: {
     : null;
   const completionTerms = input.tutorExpectedCompletionTerm
     ? `no período ${input.tutorExpectedCompletionTerm}`
-    : input.forecastReviewPending
-    ? null
     : input.forecast?.completionTermMin && input.forecast.completionTermMax
     ? input.forecast.completionTermMin === input.forecast.completionTermMax
       ? `no período ${input.forecast.completionTermMin}`
@@ -148,27 +189,26 @@ export function buildStudentMessage(input: {
     ? `${formatMonthYear(input.forecast.completionDateMin)}${input.forecast.completionDateMin === input.forecast.completionDateMax ? "" : ` a ${formatMonthYear(input.forecast.completionDateMax)}`}`
     : null;
   const lines = [
-    `${greeting} Como você já está cursando${course}, conferimos seu extrato curricular. Segue o documento em anexo para você acompanhar as informações.`,
+    "Resumo da análise do extrato escolar:",
     "",
     result.currentPeriod === null
-      ? "Precisamos confirmar seu período atual antes de concluir a conferência."
-      : `Você está no ${result.currentPeriod}º período. No extrato, ${pending}.`,
+      ? "• Período atual: precisa ser confirmado com base no extrato."
+      : `• Período atual identificado: ${result.currentPeriod}º.`,
+    `• Disciplinas pendentes de períodos anteriores: ${pending}.`,
     result.previousAlreadyAdded > 0
-      ? `${result.previousAlreadyAdded} disciplina${result.previousAlreadyAdded === 1 ? " anterior já aparece" : "s anteriores já aparecem"} como em andamento.`
+      ? `• Em andamento: ${result.previousAlreadyAdded} disciplina${result.previousAlreadyAdded === 1 ? "" : "s"} anterior${result.previousAlreadyAdded === 1 ? "" : "es"}.`
       : null,
+    `• Vagas adicionais disponíveis neste período: ${result.remainingExtraSlots}.`,
     input.tutorExpectedCompletionTerm
-      ? `Conforme o plano conferido pela tutoria, a previsão é concluir ${completionTerms}. Esse cenário pressupõe aprovação nas disciplinas e rematrícula dentro do prazo.`
-      : input.forecastReviewPending
-      ? "A previsão de conclusão está em conferência pela tutoria. Compartilharemos o período após validar os componentes e as regras acadêmicas."
+      ? `• Previsão estimada de conclusão: ${completionTerms}.`
       : input.forecast
-      ? input.forecast.incomplete
-        ? `Montamos um plano preliminar por semestre, mas ainda não é possível informar uma data de conclusão. A equipe precisa confirmar os pontos pendentes da análise antes de estimar o prazo.`
-        : completionTerms
-        ? `Considerando o andamento atual da grade, a previsão preliminar de conclusão é ${completionTerms}${completionDates ? ` (${completionDates})` : ""}. O calendário dessa faixa está ${input.forecast.calendarConfidence === "OFFICIAL" ? "oficialmente confirmado" : "projetado e ainda precisa ser confirmado"}.`
-        : `Considerando o andamento atual da grade, a previsão preliminar de conclusão é de ${input.forecast.semestersMin === input.forecast.semestersMax ? `${input.forecast.semestersMin} semestre${input.forecast.semestersMin === 1 ? "" : "s"}` : `${input.forecast.semestersMin} a ${input.forecast.semestersMax} semestres`} após o período atual (aproximadamente ${yearsEstimate}).`
+        ? completionTerms
+          ? `• Previsão estimada de conclusão: ${completionTerms}${completionDates ? ` (${completionDates})` : ""}.`
+          : `• Prazo estimado: ${input.forecast.semestersMin === input.forecast.semestersMax ? `${input.forecast.semestersMin} semestre${input.forecast.semestersMin === 1 ? "" : "s"}` : `${input.forecast.semestersMin} a ${input.forecast.semestersMax} semestres`} após o período atual (aproximadamente ${yearsEstimate}).`
+        : "• Previsão de conclusão: não calculável com segurança a partir dos dados identificados no extrato.",
+    input.forecast || input.tutorExpectedCompletionTerm
+      ? "A previsão é uma estimativa e pode mudar conforme aprovação, rematrícula, oferta de disciplinas e pré-requisitos."
       : null,
-    "Essa é uma estimativa para orientação. A conclusão depende da oferta das disciplinas, dos pré-requisitos e da validação acadêmica; por isso, o prazo pode mudar.",
-    "Se quiser, posso esclarecer qualquer informação do extrato com você.",
   ].filter((line): line is string => line !== null);
   return lines.join("\n");
 }

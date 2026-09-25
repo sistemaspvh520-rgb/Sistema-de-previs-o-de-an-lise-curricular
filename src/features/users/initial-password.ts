@@ -25,6 +25,8 @@ export function generateTemporaryPassword(): string {
  * até o primeiro acesso) e marca mustChangePassword. Retorna a senha em texto puro UMA vez.
  */
 export async function assignTemporaryPassword(userId: string, password = generateTemporaryPassword()): Promise<string> {
+  const target = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { role: true } });
+  if (target.role === "STUDENT") throw new Error("Use o convite ou recuperação por link para alunos.");
   const enc = encryptString(password, masterKey(), AAD);
   await prisma.user.update({
     where: { id: userId },
@@ -55,6 +57,6 @@ export async function readTemporaryPassword(userId: string): Promise<string | nu
 export async function clearTemporaryPassword(userId: string, newPasswordHash: string) {
   await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash: newPasswordHash, mustChangePassword: false, initialPasswordEncrypted: null, initialPasswordIv: null, initialPasswordAuthTag: null, initialPasswordKeyVersion: null, initialPasswordSetAt: null },
+    data: { sessionVersion: { increment: 1 }, passwordHash: newPasswordHash, mustChangePassword: false, initialPasswordEncrypted: null, initialPasswordIv: null, initialPasswordAuthTag: null, initialPasswordKeyVersion: null, initialPasswordSetAt: null },
   });
 }

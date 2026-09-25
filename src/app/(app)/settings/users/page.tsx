@@ -30,7 +30,7 @@ function initials(name: string) {
 
 export default async function UsersPage() {
   const admin = await requirePagePermission("users:manage");
-  const users = await prisma.user.findMany({ orderBy: [{ isActive: "desc" }, { name: "asc" }] });
+  const users = await prisma.user.findMany({ where: { role: { not: "STUDENT" } }, orderBy: [{ isActive: "desc" }, { name: "asc" }] });
   const emailEnabled = isEmailConfigured();
 
   return (

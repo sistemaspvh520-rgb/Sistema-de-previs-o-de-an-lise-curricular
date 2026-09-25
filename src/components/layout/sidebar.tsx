@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
@@ -85,7 +86,9 @@ export function Sidebar({ role, onNavigate, onClose, variant = "rail" }: { role:
           const active =
             item.href === "/analyses"
               ? pathname === "/analyses" || /^\/analyses\/(?!new)/.test(pathname)
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              : item.href === "/academic-analysis" && (pathname.startsWith("/academic-analysis/students") || pathname.startsWith("/academic-analysis/requests"))
+                ? false
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
@@ -155,6 +158,9 @@ export function Sidebar({ role, onNavigate, onClose, variant = "rail" }: { role:
           </DropdownMenu>
         )}
       </nav>
+      <div className={cn("shrink-0 border-t border-white/10 px-5 py-5", settingsVisibility)}>
+        <Image src="/brand/escolha-estrela-selo.png" alt="Escolha ter estrela" width={147} height={40} className="mx-auto h-10 w-[147px]" />
+      </div>
     </aside>
   );
 }

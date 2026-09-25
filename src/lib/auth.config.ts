@@ -32,6 +32,7 @@ export const authConfig = {
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.sessionVersion = typeof token.sessionVersion === "number" ? token.sessionVersion : 0;
         session.user.role = token.role as Role;
         session.user.name = token.name ?? null;
         session.user.mustChangePassword = Boolean(token.mustChangePassword);

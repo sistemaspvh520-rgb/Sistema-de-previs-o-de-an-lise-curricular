@@ -5,7 +5,7 @@ import { z } from "zod";
 import { signIn, signOut } from "@/lib/auth";
 
 const schema = z.object({
-  email: z.string().email("Informe um e-mail válido."),
+  email: z.string().trim().min(1, "Informe seu e-mail ou RGM.").max(254),
   password: z.string().min(1, "Informe a senha."),
   callbackUrl: z.string().optional(),
 });
@@ -22,7 +22,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
   const redirectTo =
-    parsed.data.callbackUrl && parsed.data.callbackUrl.startsWith("/") ? parsed.data.callbackUrl : "/analyses/new";
+    parsed.data.callbackUrl && parsed.data.callbackUrl.startsWith("/") && !parsed.data.callbackUrl.startsWith("//") && !parsed.data.callbackUrl.includes("\\") ? parsed.data.callbackUrl : "/analyses/new";
   try {
     await signIn("credentials", {
       email: parsed.data.email,
@@ -32,7 +32,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     return undefined;
   } catch (err) {
     if (err instanceof AuthError) {
-      return { error: "E-mail ou senha inválidos." };
+      return { error: "E-mail, RGM ou senha inválidos." };
     }
     throw err;
   }
@@ -40,4 +40,8 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
+}
+
+export async function portalLogoutAction() {
+  await signOut({ redirectTo: "/portal/login" });
 }

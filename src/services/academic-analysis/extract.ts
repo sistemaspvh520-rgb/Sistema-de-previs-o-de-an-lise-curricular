@@ -265,3 +265,28 @@ export function extractAcademicGrid(local: LocalExtraction, filename: string): A
     manuallyEdited: false,
   };
 }
+
+/** Blocks documents that cannot safely support an academic-grid analysis. */
+export function validateAcademicTranscript(
+  snapshot: AcademicGridSnapshot,
+  fullText: string,
+): string | null {
+  const normalizedText = fold(fullText);
+  if (
+    normalizedText.includes("SOLICITACAO DE TRANSFERENCIA") &&
+    normalizedText.includes("ANALISE CURRICULAR")
+  ) {
+    return "Este arquivo é uma solicitação ou um resultado de análise curricular, não um extrato escolar. Anexe o extrato atualizado do aluno, com identificação, curso e histórico completo. A análise não foi iniciada.";
+  }
+
+  const missing: string[] = [];
+  if (!snapshot.studentName?.trim() && !snapshot.rgm?.trim()) missing.push("identificação do aluno (nome ou RGM)");
+  if (!snapshot.courseName?.trim()) missing.push("curso");
+  if (snapshot.disciplines.filter((discipline) => discipline.inMainCurriculum).length === 0) missing.push("disciplinas e situações acadêmicas");
+  if (snapshot.extractionWarnings.some((warning) => warning.startsWith("A conferência automática encontrou"))) {
+    missing.push("todas as linhas da grade legíveis");
+  }
+
+  if (missing.length === 0) return null;
+  return `Não foi possível iniciar a análise: o PDF não apresentou ${missing.join(", ")}. Anexe um extrato escolar atualizado, completo e legível. A análise curricular só começa após a confirmação de que o documento e os dados estão corretos.`;
+}

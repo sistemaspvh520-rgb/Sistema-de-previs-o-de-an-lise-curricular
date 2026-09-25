@@ -6,6 +6,10 @@ import { can, ROUTE_PERMISSIONS } from "@/lib/rbac";
 const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PATHS = [
+  "/portal/login",
+  "/portal/primeiro-acesso",
+  "/portal/recuperar",
+  "/portal/definir-senha",
   "/login",
   "/definir-senha",
   "/esqueci-senha",
@@ -22,27 +26,21 @@ export const proxy = auth((req) => {
   );
   const isLoggedIn = !!req.auth?.user;
 
-  if (isPublic) {
-    if (path === "/login" && isLoggedIn) {
-      return NextResponse.redirect(
-        new URL(
-          can(req.auth?.user?.role, "analysis:create")
-            ? "/analyses/new"
-            : "/analyses",
-          nextUrl,
-        ),
-      );
-    }
-    return NextResponse.next();
-  }
+  if (isPublic) return NextResponse.next();
 
   if (!isLoggedIn) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
-    const loginUrl = new URL("/login", nextUrl);
+    const loginUrl = new URL(path.startsWith("/portal") ? "/portal/login" : "/login", nextUrl);
     if (path !== "/") loginUrl.searchParams.set("callbackUrl", path);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (req.auth?.user?.role === "STUDENT") {
+    if (path === "/portal" || path.startsWith("/portal/") || path.startsWith("/api/portal/")) return NextResponse.next();
+    if (path.startsWith("/api/")) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+    return NextResponse.redirect(new URL("/portal", nextUrl));
   }
 
   // Primeiro acesso: obriga a definir a própria senha antes de usar o sistema (exceto em impersonação).
@@ -99,6 +97,6 @@ export const proxy = auth((req) => {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:png|svg|jpg|jpeg|ico|webp|woff2?)$).*)",
+    "/((?!brand/|_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:png|svg|jpg|jpeg|ico|webp|woff2?)$).*)",
   ],
 };

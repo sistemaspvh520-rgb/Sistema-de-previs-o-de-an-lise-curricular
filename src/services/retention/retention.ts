@@ -26,8 +26,22 @@ export async function runRetention(now = new Date()): Promise<{ checked: number;
       logger.error("retention.delete_failed", { documentId: d.id, err: String(err) });
     }
   }
-  logger.info("retention.run", { checked: due.length, deleted, failed });
-  return { checked: due.length, deleted, failed };
+  const academicDue = await prisma.academicAnalysisSource.findMany({
+    where: { deletedAt: null, storageKey: { not: null }, deleteAfter: { lte: now } },
+    select: { id: true, storageKey: true }, take: 500,
+  });
+  for (const source of academicDue) {
+    try {
+      await storage.delete(source.storageKey!);
+      await prisma.academicAnalysisSource.update({ where: { id: source.id }, data: { deletedAt: now, storageKey: null } });
+      deleted++;
+    } catch (error) {
+      failed++;
+      logger.error("retention.academic_delete_failed", { sourceId: source.id, errorName: error instanceof Error ? error.name : "unknown" });
+    }
+  }
+  logger.info("retention.run", { checked: due.length + academicDue.length, deleted, failed });
+  return { checked: due.length + academicDue.length, deleted, failed };
 }
 
 /** Exclusão imediata após processamento (política DELETE_AFTER_PROCESSING). */

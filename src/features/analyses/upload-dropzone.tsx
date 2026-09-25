@@ -270,9 +270,10 @@ export function UploadDropzone({
         <div>
           <strong>Documento obrigatório: PDF de resultado do SIAA.</strong>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Antes de iniciar, o sistema confere curso, disciplinas e dados
-            acadêmicos do resultado do SIAA. Boleto, contrato, declaração,
-            diploma ou outros PDFs serão bloqueados.
+            O sistema exige curso, período de ingresso e disciplinas
+            identificáveis. PDFs incompletos ou desatualizados serão recusados;
+            anexe uma nova versão com os dados preenchidos. Outros tipos de
+            documento também não iniciam a análise.
           </p>
         </div>
       </div>
@@ -547,11 +548,12 @@ export function UploadDropzone({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Confirme os dados do atendimento
+              Confirme e inicie a análise curricular
             </AlertDialogTitle>
             <AlertDialogDescription>
-              O período de ingresso será identificado no PDF. Confira os dados
-              do atendimento e quando a previsão deve começar.
+              Confira o atendimento e confirme que o PDF é a versão atualizada,
+              com curso, período de ingresso e grade preenchidos. Se algum dado
+              estiver ausente, feche esta janela e anexe o documento correto.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <dl className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">

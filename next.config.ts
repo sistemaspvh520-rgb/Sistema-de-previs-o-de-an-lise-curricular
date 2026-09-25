@@ -28,6 +28,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Server Action arguments can contain passwords and one-time tokens.
+  logging: { serverFunctions: false, incomingRequests: { ignore: [/definir-senha/] } },
   poweredByHeader: false,
   serverExternalPackages: ["pdfjs-dist", "@node-rs/argon2", "@prisma/client", "pg"],
   // Arquivos lidos em runtime que o rastreamento automático não vê: logo dos e-mails e o worker/fontes do pdf.js

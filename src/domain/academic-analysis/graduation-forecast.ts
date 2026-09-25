@@ -3,8 +3,8 @@ import type { SubjectRow } from "@/domain/curricular-analysis/types";
 import type { AcademicRules } from "@/domain/curricular-analysis/rules/types";
 import { DEFAULT_RULES } from "@/domain/curricular-analysis/rules/types";
 import { academicStatusOutcome } from "@/domain/academic-analysis/rules";
-import { analyzeAcademicGrid } from "@/domain/academic-analysis/analyze";
-import { academicTermAtDate, getCalendarTerm, type AcademicCalendarTerm } from "@/domain/academic-calendar/calendar";
+import { analyzeAcademicGrid, isBlankManualDisciplineDraft, unresolvedAcademicGridRowCount } from "@/domain/academic-analysis/analyze";
+import { academicTermAtDate, advanceAcademicTerm, getCalendarTerm, type AcademicCalendarTerm } from "@/domain/academic-calendar/calendar";
 import type { AcademicDiscipline } from "@/domain/academic-analysis/types";
 
 export interface GraduationPlanStep {
@@ -18,6 +18,8 @@ export interface GraduationPlanStep {
   bonusSlots: number;
   capacity: number;
   previousSubjects: string[];
+  regularSubjectNames: string[];
+  inProgressSubjectNames: string[];
   inProgressFromPrevious: number;
   totalLoad: number;
   remainingBacklog: number;
@@ -44,10 +46,10 @@ export interface GraduationForecast {
 }
 
 export function isGraduationRowUncertain(discipline: AcademicDiscipline): boolean {
-  return discipline.period === null || academicStatusOutcome(discipline.normalizedStatus) === "UNKNOWN";
+  return !isBlankManualDisciplineDraft(discipline) && (discipline.period === null || academicStatusOutcome(discipline.normalizedStatus) === "UNKNOWN");
 }
 
-/** Title ellipses do not change row count or status; every other extraction warning blocks a publishable date. */
+/** Title ellipses do not change row count or status; other warnings mark the automatic estimate as partial. */
 export function isBlockingForecastExtractionWarning(warning: string): boolean {
   return !/(?:título.*(?:reticências|truncad)|reticências.*título)/i.test(warning);
 }
@@ -80,16 +82,21 @@ export function estimateGraduation(input: {
   additionalSemesterCapacityRule?: "SAME_AS_LAST_PERIOD" | { type: "FIXED_VALUE"; value: number } | "UNCONFIGURED";
   maximumSubjectsPerSemester?: number | null;
   extractionWarnings?: string[];
+  sourceDisciplineCount?: number;
+  sourceParsedDisciplineCount?: number;
 }): GraduationForecast | null {
-  const grid = input.disciplines.filter((discipline) => discipline.inMainCurriculum);
+  const grid = input.disciplines.filter((discipline) => discipline.inMainCurriculum && !isBlankManualDisciplineDraft(discipline));
   const validPeriods = grid.flatMap((discipline) => discipline.period === null ? [] : [discipline.period]);
   if (input.currentPeriod === null || validPeriods.length === 0) return null;
 
   const currentPeriod = input.currentPeriod;
   const gradeLastPeriod = Math.max(...validPeriods);
-  const uncertainRows = grid.filter(isGraduationRowUncertain);
+  const uncertainFieldRows = grid.filter(isGraduationRowUncertain).length;
+  const unresolvedSourceRows = unresolvedAcademicGridRowCount(input.disciplines, input.sourceDisciplineCount, input.sourceParsedDisciplineCount);
+  const uncertainRows = uncertainFieldRows + unresolvedSourceRows;
   const reasons: string[] = [];
-  if (uncertainRows.length) reasons.push(`${uncertainRows.length} componente(s) com período ou situação acadêmica a confirmar.`);
+  if (uncertainFieldRows) reasons.push(`${uncertainFieldRows} componente(s) com período ou situação acadêmica não identificada com segurança.`);
+  if (unresolvedSourceRows) reasons.push(`${unresolvedSourceRows} linha(s) do extrato não foram identificadas na grade; a estimativa inclui uma margem automática.`);
   if (currentPeriod > gradeLastPeriod) reasons.push("O período atual confirmado está além do último período identificado na grade; revise a grade antes de projetar a conclusão.");
   const blockingExtractionWarnings = (input.extractionWarnings ?? []).filter(isBlockingForecastExtractionWarning);
   for (const warning of blockingExtractionWarnings) {
@@ -206,9 +213,11 @@ export function estimateGraduation(input: {
       curriculumSubjects: step.subjectsInPeriod,
       exemptions: step.exemptedInPeriod,
       regularSubjects: step.regularSubjectIds.length,
+      regularSubjectNames: step.regularSubjectIds.map((id) => namesById.get(id) ?? id),
       bonusSlots: step.backlogCapacity,
       capacity: step.maximumCapacity,
       previousSubjects,
+      inProgressSubjectNames: (step.alreadyInProgressSubjectIds ?? []).map((id) => namesById.get(id) ?? id),
       inProgressFromPrevious: step.alreadyInProgressSubjectIds?.length ?? 0,
       totalLoad: step.semesterLoad,
       remainingBacklog: step.remainingBacklog,
@@ -220,31 +229,56 @@ export function estimateGraduation(input: {
     reasons.push("Situação não reconhecida: o motor aplicou a configuração de REVISAR como pendente.");
   }
 
-  // A row without a reliable period/status cannot be placed confidently; keep
-  // the semester-by-semester draft visible but withhold the completion term.
-  const completionTerm = reasons.length === 0 ? simulation.estimatedCompletionTerm : null;
-  const completionCalendar = completionTerm && input.calendarTerms ? getCalendarTerm(completionTerm, input.calendarTerms) : null;
+  // Keep a best-effort window available without waiting for tutor input. When
+  // the source has uncertain rows, widen the upper bound by their capacity.
+  const uncertaintySemesterBuffer = uncertainRows
+    ? Math.ceil(uncertainRows / Math.max(1, simulation.semesters.at(-1)?.backlogCapacity ?? 1))
+    : 0;
+  const completionTermMin = simulation.estimatedCompletionTerm;
+  const completionTermMax = completionTermMin
+    ? advanceForecastTerm(completionTermMin, uncertaintySemesterBuffer, rules.periodUnit)
+    : null;
+  const completionCalendarMin = completionTermMin && input.calendarTerms
+    ? getCalendarTerm(calendarTermCode(completionTermMin), input.calendarTerms)
+    : null;
+  const completionCalendarMax = completionTermMax && input.calendarTerms
+    ? getCalendarTerm(calendarTermCode(completionTermMax), input.calendarTerms)
+    : null;
   const semesters = simulation.semestersRemaining;
   const unitCount = rules.periodUnit === "YEAR" ? 1 : 2;
   return {
     semestersMin: semesters,
-    semestersMax: semesters + (uncertainRows.length ? 1 : 0),
+    semestersMax: semesters + uncertaintySemesterBuffer,
     yearsMin: semesters / unitCount,
-    yearsMax: (semesters + (uncertainRows.length ? 1 : 0)) / unitCount,
+    yearsMax: (semesters + uncertaintySemesterBuffer) / unitCount,
     remainingPeriods: Math.max(0, lastRequiredPeriod - currentPeriod),
     knownBacklog,
-    uncertainRows: uncertainRows.length,
+    uncertainRows,
     futureBacklogSlots: simulation.semesters.reduce((sum, step) => sum + step.backlogCapacity, 0),
     currentCalendarTerm: currentCalendarTerm?.term ?? currentTerm,
-    completionTermMin: completionTerm,
-    completionTermMax: completionTerm,
-    completionDateMin: completionCalendar?.endsOn ?? null,
-    completionDateMax: completionCalendar?.endsOn ?? null,
-    calendarConfidence: completionCalendar?.confidence ?? null,
+    completionTermMin,
+    completionTermMax,
+    completionDateMin: completionCalendarMin?.endsOn ?? null,
+    completionDateMax: completionCalendarMax?.endsOn ?? null,
+    calendarConfidence: completionCalendarMin?.confidence === "OFFICIAL" && completionCalendarMax?.confidence === "OFFICIAL"
+      ? "OFFICIAL"
+      : completionCalendarMin || completionCalendarMax
+        ? "ESTIMATED"
+        : null,
     plan: steps,
     incomplete: reasons.length > 0,
     reasons,
   };
+}
+
+function advanceForecastTerm(term: string, count: number, periodUnit: "SEMESTER" | "YEAR"): string {
+  if (count === 0) return term;
+  if (periodUnit === "YEAR" && /^\d{4}$/.test(term)) return String(Number(term) + count);
+  return advanceAcademicTerm(term, count);
+}
+
+function calendarTermCode(term: string): string {
+  return /^\d{4}$/.test(term) ? `${term}.2` : term;
 }
 
 function currentInstitutionDate(): string {

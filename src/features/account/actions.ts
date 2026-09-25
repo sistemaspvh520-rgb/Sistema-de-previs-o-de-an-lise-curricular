@@ -4,7 +4,7 @@ import { z } from "zod";
 import { hash, verify } from "@node-rs/argon2";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, UnauthorizedError } from "@/lib/session";
-import { unstable_update } from "@/lib/auth";
+import { signOut } from "@/lib/auth";
 import { clearTemporaryPassword } from "@/features/users/initial-password";
 import { recordAudit } from "@/services/audit-log/audit-log";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
@@ -20,9 +20,9 @@ const schema = z
   .refine((d) => d.newPassword !== d.currentPassword, { message: "A nova senha deve ser diferente da atual.", path: ["newPassword"] });
 
 /** Troca da própria senha (qualquer perfil autenticado). */
-export async function changeOwnPasswordAction(input: unknown): Promise<ActionResult> {
+export async function changeOwnPasswordAction(input: unknown): Promise<ActionResult<{ loginUrl: string }>> {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser({ allowStudent: true });
     if (!user) throw new UnauthorizedError();
     const limit = rateLimit(`pwchange:${user.id}`, { capacity: 5, refillPerMinute: 5 });
     if (!limit.allowed) return fail(`Muitas tentativas. Aguarde ${limit.retryAfterSeconds}s.`);
@@ -34,8 +34,8 @@ export async function changeOwnPasswordAction(input: unknown): Promise<ActionRes
 
     await clearTemporaryPassword(user.id, await hash(parsed.data.newPassword));
     await recordAudit({ userId: user.id, action: "user.password_changed", entityType: "User", entityId: user.id, metadata: { firstAccess: record.mustChangePassword } });
-    await unstable_update({}); // atualiza o token (mustChangePassword = false) sem novo login
-    return ok(undefined, "Senha alterada com sucesso.");
+    await signOut({ redirect: false });
+    return ok({ loginUrl: user.role === "STUDENT" ? "/portal/login?senha=ok" : "/login?senha=ok" }, "Senha alterada. Entre novamente com sua nova senha.");
   } catch (err) {
     return toActionError(err);
   }

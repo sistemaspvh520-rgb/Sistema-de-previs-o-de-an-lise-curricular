@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { BrandLogo } from "@/components/shared/brand-logo";
 import { LoginForm } from "@/features/auth/login-form";
 
@@ -10,7 +11,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const passwordSet = params.senha === "ok";
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-navy px-4">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-navy px-4 py-10">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-40 -top-40 size-[520px] rounded-full bg-brand-cyan/20 blur-3xl" />
         <div className="absolute -bottom-40 -right-40 size-[520px] rounded-full bg-brand-gold/15 blur-3xl" />
@@ -31,6 +32,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             <LoginForm callbackUrl={callbackUrl} />
           </div>
         </div>
+        <Image src="/brand/escolha-estrela-assinatura.png" alt="Escolha ter estrela. cruzeirodosulvirtual.com.br" width={1230} height={352} sizes="300px" className="mx-auto mt-7 h-auto w-full max-w-[300px]" />
         <p className="mt-6 text-center text-xs text-white/60">
           Sistema interno · Universidade Cruzeiro do Sul Virtual
         </p>

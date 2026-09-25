@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setPasswordWithTokenAction } from "@/features/auth/password-token-actions";
 
-export function SetPasswordForm({ token }: { token: string }) {
+export function SetPasswordForm({ token, loginUrl = "/login" }: { token: string; loginUrl?: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [done, setDone] = useState(false);
@@ -19,7 +19,7 @@ export function SetPasswordForm({ token }: { token: string }) {
       if (res.ok) {
         setDone(true);
         toast.success(res.message);
-        setTimeout(() => router.push("/login?senha=ok"), 1200);
+        setTimeout(() => router.push(`${loginUrl}?senha=ok`), 1200);
       } else toast.error(res.error);
     });
   }

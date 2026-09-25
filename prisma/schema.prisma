@@ -15,6 +15,7 @@ enum Role {
   ADMIN
   ANALYST
   VIEWER
+  STUDENT
 }
 
 enum AnalysisStatus {
@@ -87,14 +88,18 @@ enum AIOperation {
   CONNECTION_TEST
 }
 
-/** Retorno do consultor sobre a matrícula do aluno após a análise. */
+/**
+ * Retorno do consultor sobre a matrícula do aluno após a análise.
+ */
 enum EnrollmentStatus {
   PENDING
   ENROLLED
   NOT_ENROLLED
 }
 
-/** Frequência individual dos resumos de retornos de matrícula. */
+/**
+ * Frequência individual dos resumos de retornos de matrícula.
+ */
 enum FollowUpCadence {
   ONCE_DAILY
   TWICE_DAILY
@@ -165,6 +170,7 @@ model User {
   passwordHash String
   role         Role      @default(ANALYST)
   isActive     Boolean   @default(true)
+  sessionVersion Int @default(0)
   /** Canais individuais para lembretes de retorno de matrícula. Pelo menos um permanece ativo. */
   followUpEmailEnabled Boolean @default(true)
   followUpPushEnabled  Boolean @default(true)
@@ -210,6 +216,11 @@ model User {
   commercialGrades        CommercialGrade[]
   academicGridReviews     AcademicGridReview[]
   academicGridCorrections AcademicGridCorrection[]
+  studentEnrollments StudentEnrollment[] @relation("StudentAccount")
+  managedStudents StudentEnrollment[] @relation("StudentOwner")
+  academicVersions AcademicAnalysisVersion[]
+  academicSources AcademicAnalysisSource[]
+  academicRequests AcademicRequest[]
 }
 
 /// Token de uso único para definir (convite) ou redefinir a senha por link de e-mail. Só o hash é armazenado.
@@ -335,7 +346,9 @@ model CurricularAnalysis {
   @@index([reanalysisOfId])
 }
 
-/** Inscrição Web Push de um navegador do usuário (notificações de retorno de matrícula). */
+/**
+ * Inscrição Web Push de um navegador do usuário (notificações de retorno de matrícula).
+ */
 model PushSubscription {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @db.Uuid
@@ -351,7 +364,9 @@ model PushSubscription {
   @@index([userId])
 }
 
-/** Solicitação de exclusão feita pelo responsável pela análise e decidida por um administrador. */
+/**
+ * Solicitação de exclusão feita pelo responsável pela análise e decidida por um administrador.
+ */
 model AnalysisDeletionRequest {
   id          String                @id @default(uuid()) @db.Uuid
   analysisId  String                @db.Uuid
@@ -628,7 +643,9 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 }
 
-/** Grade curricular em PDF disponibilizada ao time comercial. */
+/**
+ * Grade curricular em PDF disponibilizada ao time comercial.
+ */
 model CommercialGrade {
   id             String   @id @default(uuid()) @db.Uuid
   courseName     String
@@ -669,7 +686,9 @@ model CommercialGrade {
   @@index([createdAt(sort: Desc)])
 }
 
-/** Análise acadêmica independente do fluxo de aproveitamento curricular comercial. */
+/**
+ * Análise acadêmica independente do fluxo de aproveitamento curricular comercial.
+ */
 model AcademicGridReview {
   id                    String                  @id @default(uuid()) @db.Uuid
   createdById           String                  @db.Uuid
@@ -686,16 +705,24 @@ model AcademicGridReview {
   snapshot              Json
   createdAt             DateTime                @default(now()) @db.Timestamptz(6)
   updatedAt             DateTime                @updatedAt @db.Timestamptz(6)
+  completedAt           DateTime?               @db.Timestamptz(6)
 
   createdBy   User                     @relation(fields: [createdById], references: [id], onDelete: Restrict)
   corrections AcademicGridCorrection[]
+  enrollmentId String? @db.Uuid
+  enrollment StudentEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  versions AcademicAnalysisVersion[]
+
+  @@index([enrollmentId])
 
   @@index([createdById, createdAt(sort: Desc)])
   @@index([rgm, createdAt(sort: Desc)])
   @@index([studentName, createdAt(sort: Desc)])
 }
 
-/** Histórico append-only das correções feitas no módulo acadêmico. */
+/**
+ * Histórico append-only das correções feitas no módulo acadêmico.
+ */
 model AcademicGridCorrection {
   id          String   @id @default(uuid()) @db.Uuid
   reviewId    String   @db.Uuid
@@ -712,4 +739,144 @@ model AcademicGridCorrection {
 
   @@index([reviewId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
+}
+
+/// Auth.js remains the identity provider. An account may own multiple enrollments.
+model StudentEnrollment {
+  id               String    @id @default(uuid()) @db.Uuid
+  rgm              String    @unique
+  name             String
+  courseName       String?
+  studentUserId    String?   @db.Uuid
+  ownerId          String    @db.Uuid
+  currentVersionId String?   @unique @db.Uuid
+  welcomedAt       DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+
+  studentUser    User?                     @relation("StudentAccount", fields: [studentUserId], references: [id], onDelete: Restrict)
+  owner          User                      @relation("StudentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  currentVersion AcademicAnalysisVersion?  @relation("CurrentAcademicVersion", fields: [currentVersionId], references: [id], onDelete: Restrict)
+  versions       AcademicAnalysisVersion[] @relation("EnrollmentVersions")
+  reviews        AcademicGridReview[]
+  sources        AcademicAnalysisSource[]
+
+  @@index([studentUserId])
+  @@index([ownerId, createdAt(sort: Desc)])
+}
+
+/// Immutable published snapshots; the existing review is the tutor's workspace.
+model AcademicAnalysisVersion {
+  id                   String   @id @default(uuid()) @db.Uuid
+  enrollmentId         String   @db.Uuid
+  reviewId             String   @db.Uuid
+  version              Int
+  previousVersionId    String?  @db.Uuid
+  preferredSourceId String? @db.Uuid
+  preferredSource AcademicAnalysisSource? @relation("PreferredAcademicSource", fields: [preferredSourceId], references: [id], onDelete: SetNull)
+  academicSnapshotHash String   @db.Char(64)
+  snapshot             Json
+  actorUserId          String   @db.Uuid
+  actorRole            Role
+  origin               String
+  changeSummary        Json
+  createdAt            DateTime @default(now()) @db.Timestamptz(6)
+
+  enrollment      StudentEnrollment         @relation("EnrollmentVersions", fields: [enrollmentId], references: [id], onDelete: Restrict)
+  currentFor      StudentEnrollment?        @relation("CurrentAcademicVersion")
+  review          AcademicGridReview        @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+  actor           User                      @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  previousVersion AcademicAnalysisVersion?  @relation("AcademicVersionChain", fields: [previousVersionId], references: [id], onDelete: Restrict)
+  nextVersions    AcademicAnalysisVersion[] @relation("AcademicVersionChain")
+  sources         AcademicAnalysisSource[]
+
+  @@index([preferredSourceId])
+  @@unique([enrollmentId, version])
+  @@index([enrollmentId, createdAt(sort: Desc)])
+  @@index([reviewId])
+  @@index([actorUserId])
+  @@index([previousVersionId])
+}
+
+/// Persistent upload job and per-enrollment document cache. No cross-student reuse.
+model AcademicAnalysisSource {
+  id                    String   @id @default(uuid()) @db.Uuid
+  enrollmentId          String   @db.Uuid
+  sourceFileHash        String   @db.Char(64)
+  documentType AcademicDocumentType @default(CURRICULAR_EXTRACT)
+  parsedSnapshot Json?
+  parserName String?
+  validationResult String?
+  preferredFor AcademicAnalysisVersion[] @relation("PreferredAcademicSource")
+  requests AcademicRequest[]
+  normalizedContentHash String?  @db.Char(64)
+  deleteAfter DateTime? @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+  storageKey            String?
+  filename              String
+  status                String   @default("PROCESSING")
+  stage                 String   @default("Processando extrato")
+  actorUserId           String   @db.Uuid
+  actorRole             Role
+  versionId             String?  @db.Uuid
+  errorMessage          String?
+  reused                Boolean  @default(false)
+  attempts              Int      @default(1)
+  createdAt             DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(6)
+
+  enrollment StudentEnrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  actor      User                     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  version    AcademicAnalysisVersion? @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@unique([enrollmentId, sourceFileHash])
+  @@index([enrollmentId, normalizedContentHash, status])
+  @@index([enrollmentId, createdAt(sort: Desc)])
+  @@index([actorUserId])
+  @@index([versionId])
+  @@index([deleteAfter])
+}
+
+
+enum AcademicDocumentType {
+  OFFICIAL_ACADEMIC_HISTORY
+  SIMPLE_ACADEMIC_HISTORY
+  CURRICULAR_EXTRACT
+  UNKNOWN_ACADEMIC_DOCUMENT
+}
+
+enum AcademicRequestStatus {
+  RECEIVED
+  PROCESSING
+  UNDER_REVIEW
+  WAITING_NEW_DOCUMENT
+  NO_CHANGES
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+/// One immutable document reference per submission attempt. Reprocessing is a new attempt.
+model AcademicRequest {
+  id String @id @default(uuid()) @db.Uuid
+  protocol Int @unique @default(autoincrement())
+  sourceDocumentId String @db.Uuid
+  attempt Int @default(1)
+  previousRequestId String? @db.Uuid
+  status AcademicRequestStatus @default(RECEIVED)
+  actorUserId String @db.Uuid
+  actorRole Role
+  result String?
+  aiUsed Boolean @default(false)
+  createdVersion Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  sourceDocument AcademicAnalysisSource @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  previousRequest AcademicRequest? @relation("RequestAttempts", fields: [previousRequestId], references: [id], onDelete: SetNull)
+  nextRequests AcademicRequest[] @relation("RequestAttempts")
+  @@unique([sourceDocumentId, attempt])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([actorUserId])
+  @@index([previousRequestId])
 }

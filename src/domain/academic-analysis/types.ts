@@ -12,6 +12,10 @@ export interface AcademicDiscipline {
   sourcePage: number;
   sourceRow: number;
   manualEdited: boolean;
+  academicTerm?: string | null;
+  grade?: string | null;
+  curricularPeriodProvenance?: { source: string; confirmed: boolean };
+
 }
 
 export type AcademicReviewStatus =
@@ -44,6 +48,10 @@ export interface AcademicGridResult {
 }
 
 export interface AcademicGridSnapshot {
+  documentType?: "OFFICIAL_ACADEMIC_HISTORY" | "SIMPLE_ACADEMIC_HISTORY" | "CURRICULAR_EXTRACT" | "UNKNOWN_ACADEMIC_DOCUMENT";
+  plannedWorkload?: number | null;
+  integralizedWorkload?: number | null;
+  mappingRequired?: boolean;
   disciplines: AcademicDiscipline[];
   result: AcademicGridResult;
   projectionRules?: AcademicRules;
@@ -57,6 +65,5 @@ export interface AcademicGridSnapshot {
   /** Rows initially recovered by the coordinate-based parser, before tutor additions. */
   sourceParsedDisciplineCount?: number;
   manuallyEdited: boolean;
-  proceedConfirmed?: boolean;
   message?: string;
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { academicDisciplineNeedsReview, academicGridHasUnresolvedRowCount, analyzeAcademicGrid, buildStudentMessage, normalizeAcademicStatus, parseAcademicPeriod } from "@/domain/academic-analysis/analyze";
+import { academicDisciplineNeedsReview, academicGridCompletionBlockers, academicGridHasUnresolvedRowCount, analyzeAcademicGrid, buildStudentMessage, normalizeAcademicStatus, parseAcademicPeriod } from "@/domain/academic-analysis/analyze";
 import { estimateGraduation, formatGraduationForecast } from "@/domain/academic-analysis/graduation-forecast";
-import type { AcademicDiscipline } from "@/domain/academic-analysis/types";
+import type { AcademicDiscipline, AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import { buildAcademicCalendar, DEFAULT_ACADEMIC_CALENDAR } from "@/domain/academic-calendar/calendar";
-import { extractAcademicGrid } from "@/services/academic-analysis/extract";
+import { extractAcademicGrid, validateAcademicTranscript } from "@/services/academic-analysis/extract";
 import type { LocalExtraction, TextLine, TextPart } from "@/services/pdf/parser";
 
 function discipline(period: number, status: string, name = `Disciplina ${period} ${status}`, overrides: Partial<AcademicDiscipline> = {}): AcademicDiscipline {
@@ -71,6 +71,22 @@ describe("academic grid rules", () => {
     });
   });
 
+  it("ignores empty tutor-added rows until they contain actual discipline data", () => {
+    const emptyDraft = discipline(1, "A CURSAR", "", {
+      rawPeriod: "",
+      period: null,
+      workload: null,
+      sourcePage: 0,
+      sourceRow: 4,
+      manualEdited: true,
+    });
+
+    expect(academicDisciplineNeedsReview(emptyDraft)).toBe(false);
+    expect(academicGridHasUnresolvedRowCount([emptyDraft], 1, 0)).toBe(true);
+    expect(analyzeAcademicGrid({ currentPeriod: 2, disciplines: [emptyDraft] }).previousPending).toBe(0);
+    expect(estimateGraduation({ currentPeriod: 2, disciplines: [emptyDraft] })).toBeNull();
+  });
+
   it("requires manual additions only for source rows missing at extraction", () => {
     const extracted = discipline(1, "A CURSAR", "Extraída", { sourcePage: 1, sourceRow: 1 });
     const tutorAdded = discipline(1, "A CURSAR", "Incluída pelo tutor", { sourcePage: 0, sourceRow: 2 });
@@ -108,6 +124,27 @@ describe("academic grid rules", () => {
     expect(overbooked.warnings.join(" ")).toContain("REVISÃO NECESSÁRIA");
   });
 
+  it("allows completion when the period and extracted rows are confirmed", () => {
+    const blockers = academicGridCompletionBlockers({
+      currentPeriod: 2,
+      currentPeriodConfirmed: true,
+      disciplines: [discipline(2, "APROVADO"), discipline(1, "A CURSAR")],
+    });
+    expect(blockers).toEqual([]);
+  });
+
+  it("explains why completion is blocked when confirmation or rows are missing", () => {
+    const blockers = academicGridCompletionBlockers({
+      currentPeriod: null,
+      currentPeriodConfirmed: false,
+      disciplines: [discipline(1, "A CURSAR")],
+      sourceDisciplineCount: 4,
+      sourceParsedDisciplineCount: 1,
+    });
+    expect(blockers).toContain("Confirme o período atual do aluno.");
+    expect(blockers).toContain("Confira as linhas faltantes do extrato e complete a grade.");
+  });
+
   it("distinguishes current period and excludes courses outside the main curriculum", () => {
     const result = analyzeAcademicGrid({ currentPeriod: 3, disciplines: [
       discipline(3, "APROVADO"), discipline(2, "A CURSAR", "Eletiva extra", { inMainCurriculum: false }),
@@ -124,28 +161,59 @@ describe("academic grid rules", () => {
     expect(parseAcademicPeriod("sem período")).toBeNull();
   });
 
-  it("builds a concise message for a student already in progress and includes the attached transcript", () => {
+  it("builds a direct, concise message to accompany the attached transcript", () => {
     const result = analyzeAcademicGrid({ currentPeriod: 2, disciplines: [discipline(2, "APROVADO"), discipline(1, "A CURSAR")] });
     const forecast = estimateGraduation({ currentPeriod: 2, disciplines: [discipline(2, "APROVADO"), discipline(1, "A CURSAR")] });
-    const message = buildStudentMessage({ studentName: "Ana", courseName: "Pedagogia", result, forecast });
-    expect(message).toContain("Olá, Ana!");
-    expect(message).toContain("já está cursando no curso de Pedagogia");
-    expect(message).toContain("Segue o documento em anexo");
-    expect(message).toContain("previsão preliminar de conclusão");
+    const message = buildStudentMessage({ result, forecast });
+    expect(message).not.toContain("Olá");
+    expect(message).not.toContain("Ana");
+    expect(message).toContain("Resumo da análise do extrato escolar");
+    expect(message).toContain("Período atual identificado: 2º");
+    expect(message).toContain("Previsão estimada de conclusão");
     expect(message).toContain("pré-requisitos");
   });
 
-  it("does not put a graduation term in the student message before tutor review", () => {
+  it("shares the automatic graduation estimate without waiting for tutor review", () => {
     const disciplines = [discipline(1, "A CURSAR")];
     const result = analyzeAcademicGrid({ currentPeriod: 1, disciplines });
-    const forecast = estimateGraduation({ currentPeriod: 1, disciplines });
-    const message = buildStudentMessage({ studentName: "Ana", result, forecast, forecastReviewPending: true });
+    const forecast = estimateGraduation({ currentPeriod: 1, disciplines, extractionWarnings: ["Uma linha do PDF não foi lida com segurança."] });
+    const message = buildStudentMessage({ result, forecast });
 
-    expect(message).toContain("está em conferência pela tutoria");
-    expect(message).not.toContain("no período 2026.2");
+    expect(message).toContain("Previsão estimada de conclusão");
+    expect(message).toContain("no período 2026.2");
+    expect(message).not.toContain("será informada após a conferência");
+    expect(message).not.toContain("pela tutoria");
   });
 
-  it("simulates each curriculum semester and withholds a completion date for uncertain rows", () => {
+  it("rejects a curricular-analysis request instead of treating it as a school transcript", () => {
+    const snapshot = {
+      studentName: "João da Silva",
+      rgm: "12345678",
+      courseName: null,
+      disciplines: [],
+      extractionWarnings: [],
+    } as unknown as AcademicGridSnapshot;
+    const issue = validateAcademicTranscript(snapshot, "Solicitação de Transferência — Análise Curricular");
+    expect(issue).toContain("não um extrato escolar");
+    expect(issue).toContain("A análise não foi iniciada");
+  });
+
+  it("requires identifying data and a usable course grid before creating an analysis", () => {
+    const snapshot = {
+      studentName: null,
+      rgm: null,
+      courseName: null,
+      disciplines: [],
+      extractionWarnings: [],
+    } as unknown as AcademicGridSnapshot;
+    const issue = validateAcademicTranscript(snapshot, "Histórico escolar");
+    expect(issue).toContain("identificação do aluno");
+    expect(issue).toContain("curso");
+    expect(issue).toContain("disciplinas e situações acadêmicas");
+    expect(issue).toContain("confirmação");
+  });
+
+  it("simulates each curriculum semester and widens the automatic completion window for uncertain rows", () => {
     const disciplines = [
       ...Array.from({ length: 12 }, (_, index) => discipline(7, index === 0 ? "APROVADO" : "CURSANDO", `Atual ${index}`)),
       ...Array.from({ length: 23 }, (_, index) => discipline(index % 6 + 1, "A CURSAR", `Pendente ${index}`)),
@@ -157,8 +225,27 @@ describe("academic grid rules", () => {
     expect(forecast).toMatchObject({ semestersMin: 3, knownBacklog: 23, uncertainRows: 2, remainingPeriods: 1, incomplete: true });
     expect(forecast?.plan.map((step) => step.curriculumPeriod)).toEqual([7, 8, 9]);
     expect(forecast?.plan[0]).toMatchObject({ curriculumSubjects: 12, exemptions: 1, regularSubjects: 11, inProgressFromPrevious: 0, previousSubjects: expect.any(Array) });
-    expect(forecast?.reasons.join(" ")).toContain("situação acadêmica a confirmar");
-    expect(formatGraduationForecast(forecast!)).toMatchObject({ completion: "", calendarLabel: "calendário não identificado" });
+    expect(forecast?.plan[0].regularSubjectNames).toContain("Atual 1");
+    expect(forecast?.reasons.join(" ")).toContain("situação acadêmica não identificada");
+    expect(forecast?.completionTermMin).toBeTruthy();
+    expect(forecast?.completionTermMax).not.toBe(forecast?.completionTermMin);
+    expect(formatGraduationForecast(forecast!)).toMatchObject({ calendarLabel: "calendário não identificado" });
+    expect(formatGraduationForecast(forecast!).completion).toContain("–");
+  });
+
+  it("adds an automatic uncertainty margin for source rows the parser did not identify", () => {
+    const disciplines = [discipline(2, "APROVADO"), discipline(1, "A CURSAR")];
+    const forecast = estimateGraduation({
+      currentPeriod: 2,
+      disciplines,
+      sourceDisciplineCount: 5,
+      sourceParsedDisciplineCount: 2,
+      extractionWarnings: ["A conferência encontrou linhas ausentes."],
+    });
+
+    expect(forecast).toMatchObject({ uncertainRows: 3, incomplete: true });
+    expect(forecast?.completionTermMin).toBeTruthy();
+    expect(forecast?.completionTermMax).not.toBe(forecast?.completionTermMin);
   });
 
   it("uses a tutor-confirmable academic plan and marks dates as projected when future calendar data is estimated", () => {
@@ -242,14 +329,14 @@ describe("academic grid rules", () => {
     expect(forecast?.plan.map((step) => [step.curriculumPeriod, step.term])).toEqual([[1, "2026.2"], [3, "2027.1"]]);
   });
 
-  it("withholds the completion term when extraction reports omitted rows", () => {
+  it("keeps an automatic estimate available when extraction reports omitted rows", () => {
     const forecast = estimateGraduation({
       currentPeriod: 1,
       disciplines: [discipline(1, "A CURSAR")],
       extractionWarnings: ["2 linha(s) com situação acadêmica foram preservadas para revisão, mas excluídas dos cálculos por falta de período legível."],
     });
 
-    expect(forecast).toMatchObject({ completionTermMin: null, completionTermMax: null, incomplete: true });
+    expect(forecast).toMatchObject({ completionTermMin: "2026.2", completionTermMax: "2026.2", incomplete: true });
     expect(forecast?.reasons.join(" ")).toContain("excluídas dos cálculos");
   });
 
@@ -291,6 +378,8 @@ describe("academic grid rules", () => {
       ["2027.2", 0, 8, 11, 8, true],
     ]);
     expect(forecast?.plan[2]).toMatchObject({ adaptationSemesterNumber: 1, curriculumPeriod: 9 });
+    expect(forecast?.plan[1].previousSubjects).toContain("Pendente 1");
+    expect(forecast?.plan[0].inProgressSubjectNames).toContain("Já em curso 1");
   });
 
   it("honors an institutional semester ceiling and leaves overflow visible", () => {

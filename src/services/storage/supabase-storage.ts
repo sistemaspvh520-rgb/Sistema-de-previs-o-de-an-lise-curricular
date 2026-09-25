@@ -31,7 +31,10 @@ async function ensureBucket(): Promise<void> {
   bucketReady ??= (async () => {
     const supabase = getClient();
     const { data, error } = await supabase.storage.getBucket(bucketName());
-    if (data) return;
+    if (data) {
+      if (data.public) throw new Error("O bucket de documentos acadêmicos deve ser privado.");
+      return;
+    }
     if (error && !/not found/i.test(error.message)) throw error;
     const { error: createError } = await supabase.storage.createBucket(bucketName(), { public: false, fileSizeLimit: 52_428_800, allowedMimeTypes: ["application/pdf"] });
     if (createError && !/already exists/i.test(createError.message)) throw createError;

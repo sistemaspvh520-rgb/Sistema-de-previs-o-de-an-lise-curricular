@@ -1,6 +1,7 @@
 import type { Role } from "@/generated/prisma/enums";
 
 export type Permission =
+  | "students:manage"
   | "analysis:create"
   | "analysis:read"
   | "analysis:review"
@@ -14,7 +15,9 @@ export type Permission =
   | "privacy:manage";
 
 const MATRIX: Record<Role, ReadonlySet<Permission>> = {
+  STUDENT: new Set<Permission>(),
   ADMIN: new Set<Permission>([
+    "students:manage",
     "analysis:create",
     "analysis:read",
     "analysis:review",
@@ -28,6 +31,7 @@ const MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "privacy:manage",
   ]),
   ANALYST: new Set<Permission>([
+    "students:manage",
     "analysis:create",
     "analysis:read",
     "analysis:review",
@@ -43,6 +47,7 @@ export function can(role: Role | undefined | null, permission: Permission): bool
 }
 
 export const ROLE_LABELS: Record<Role, string> = {
+  STUDENT: "Aluno",
   ADMIN: "Administrador",
   ANALYST: "Analista",
   VIEWER: "Visualizador",

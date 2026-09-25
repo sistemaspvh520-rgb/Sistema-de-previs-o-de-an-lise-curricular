@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { academicDisciplineNeedsReview, academicGridHasUnresolvedRowCount, analyzeAcademicGrid, normalizeAcademicStatus, parseAcademicPeriod } from "@/domain/academic-analysis/analyze";
+import { academicGridCompletionBlockers, analyzeAcademicGrid, normalizeAcademicStatus, parseAcademicPeriod } from "@/domain/academic-analysis/analyze";
 import type { AcademicDiscipline, AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/services/audit-log/audit-log";
+import { logger } from "@/lib/logger";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
+import { lockEnrollment, publishVersion } from "@/services/student-portal/versions";
+import { notifyAcademicUpdate } from "@/services/student-portal/notifications";
 import { Prisma } from "@/generated/prisma/client";
 
 const idSchema = z.string().uuid();
@@ -20,8 +23,8 @@ const changeSchema = z.object({
 });
 
 async function authorizedReview(reviewId: string, userId: string, isAdmin: boolean) {
-  const review = await prisma.academicGridReview.findUnique({ where: { id: reviewId } });
-  if (!review || (!isAdmin && review.createdById !== userId)) throw new Error("Análise acadêmica não encontrada.");
+  const review = await prisma.academicGridReview.findUnique({ where: { id: reviewId }, include: { enrollment: true } });
+  if (!review || (!isAdmin && review.createdById !== userId && review.enrollment?.ownerId !== userId)) throw new Error("Análise acadêmica não encontrada.");
   return review;
 }
 
@@ -43,11 +46,21 @@ async function persistCorrection(input: {
 }) {
   const result = analyzeAcademicGrid({ disciplines: input.snapshot.disciplines, currentPeriod: input.currentPeriod, currentPeriodConfirmed: input.currentPeriod !== null });
   input.snapshot.result = result;
-  input.snapshot.manuallyEdited = true;
-  if (input.disciplineIndex !== null || input.field === "currentPeriod" || input.field === "discipline") {
-    input.snapshot.proceedConfirmed = false;
+  if (input.snapshot.documentType && input.snapshot.documentType !== "CURRICULAR_EXTRACT") {
+    input.snapshot.mappingRequired = input.snapshot.disciplines.some(row => row.inMainCurriculum && row.period === null) || input.currentPeriod === null;
+    if (!input.snapshot.mappingRequired) input.snapshot.extractionWarnings = input.snapshot.extractionWarnings.filter(w => !w.startsWith("MAPEAMENTO CURRICULAR NECESSÁRIO"));
   }
+  if (input.disciplineIndex !== null && input.field === "period") input.snapshot.disciplines[input.disciplineIndex].curricularPeriodProvenance = { source: "TUTOR_CONFIRMED", confirmed: input.snapshot.disciplines[input.disciplineIndex].period !== null };
+  input.snapshot.manuallyEdited = true;
+  const linked = await prisma.academicGridReview.findUniqueOrThrow({ where: { id: input.reviewId }, select: { enrollmentId: true } });
+  let published = false;
   await prisma.$transaction(async (tx) => {
+    if (linked.enrollmentId) {
+      await lockEnrollment(tx, linked.enrollmentId);
+      const enrollment = await tx.studentEnrollment.findUniqueOrThrow({ where: { id: linked.enrollmentId }, include: { currentVersion: true } });
+      if (enrollment.currentVersion?.reviewId !== input.reviewId) throw new Error("Esta análise foi atualizada por outra alteração. Abra a análise atual para corrigir.");
+      if (await tx.academicAnalysisSource.count({ where: { enrollmentId: linked.enrollmentId, status: "PROCESSING" } })) throw new Error("Esta análise foi atualizada por outra alteração. Aguarde o extrato em processamento.");
+    }
     const updated = await tx.academicGridReview.updateMany({
       where: { id: input.reviewId, updatedAt: input.expectedUpdatedAt },
       data: {
@@ -55,6 +68,7 @@ async function persistCorrection(input: {
         currentPeriod: input.currentPeriod,
         currentPeriodRaw: input.currentPeriod?.toString() ?? null,
         currentPeriodConfirmed: input.currentPeriod !== null,
+        completedAt: null,
         studentName: input.snapshot.studentName,
         rgm: input.snapshot.rgm,
         courseName: input.snapshot.courseName,
@@ -73,8 +87,22 @@ async function persistCorrection(input: {
         reason: input.reason || null,
       },
     });
+    if (linked.enrollmentId && result.status !== "MANUAL_REVIEW_REQUIRED") {
+      const actor = await tx.user.findUniqueOrThrow({ where: { id: input.userId }, select: { role: true } });
+      const publication = await publishVersion(tx, { enrollmentId: linked.enrollmentId, reviewId: input.reviewId, snapshot: input.snapshot, actorUserId: input.userId, actorRole: actor.role, origin: "TUTOR_MANUAL_CORRECTION" });
+      published = !publication.reused;
+    }
   });
-  await recordAudit({ userId: input.userId, action: "academic_grid.corrected", entityType: "AcademicGridReview", entityId: input.reviewId, metadata: { field: input.field, disciplineIndex: input.disciplineIndex, reason: input.reason ?? null } });
+  if (linked.enrollmentId && published) await notifyAcademicUpdate(linked.enrollmentId, input.userId);
+  revalidatePath("/portal");
+  revalidatePath("/academic-analysis/students");
+  try {
+    await recordAudit({ userId: input.userId, action: "academic_grid.corrected", entityType: "AcademicGridReview", entityId: input.reviewId, metadata: { field: input.field, disciplineIndex: input.disciplineIndex, reason: input.reason ?? null } });
+  } catch (error) {
+    // A correção e seu histórico específico já foram gravados na transação acima.
+    // Uma falha no log geral não deve fazer a interface apresentar uma gravação concluída como falha.
+    logger.warn("academic_analysis.correction_audit_log.failed", { reviewId: input.reviewId, errorName: error instanceof Error ? error.name : "unknown" });
+  }
   revalidatePath("/academic-analysis");
   revalidatePath(`/academic-analysis/${input.reviewId}`);
 }
@@ -86,6 +114,7 @@ export async function updateAcademicGridFieldAction(input: unknown): Promise<Act
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Dados inválidos.");
     const data = parsed.data;
     const review = await authorizedReview(data.reviewId, user.id, user.role === "ADMIN");
+    if (review.enrollmentId && ["rgm", "courseName", "studentName"].includes(data.field)) return fail("A identidade está vinculada à matrícula e não pode ser alterada nesta análise.");
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
     let previousValue: unknown;
     let newValue: unknown = data.value;
@@ -116,9 +145,11 @@ export async function updateAcademicGridFieldAction(input: unknown): Promise<Act
         if (workload !== null && (!Number.isInteger(workload) || workload < 0 || workload > 2000)) return fail("Carga horária inválida.");
         discipline.workload = workload;
       } else if (data.field === "originalStatus") {
+        discipline.grade = null;
         discipline.originalStatus = String(data.value ?? "");
         discipline.normalizedStatus = normalizeAcademicStatus(discipline.originalStatus);
       } else if (data.field === "rawPeriod") {
+        if (/\b\d{4}\s*\/\s*\d/.test(String(data.value ?? ""))) return fail("Informe o período curricular (1 a 20), não o semestre letivo como 2026/2.");
         discipline.rawPeriod = String(data.value ?? "");
         discipline.period = parseAcademicPeriod(discipline.rawPeriod);
       } else if (data.field === "inMainCurriculum") {
@@ -130,10 +161,14 @@ export async function updateAcademicGridFieldAction(input: unknown): Promise<Act
     }
     await persistCorrection({ reviewId: review.id, userId: user.id, disciplineIndex: data.disciplineIndex ?? null, field: data.field, previousValue, newValue, reason: data.reason, snapshot, currentPeriod, expectedUpdatedAt: review.updatedAt });
     return ok(undefined, "Dado atualizado e cálculos recalculados.");
-  } catch (error) { return toActionError(error); }
+  } catch (error) {
+    logger.warn("academic_analysis.field_update.failed", { errorName: error instanceof Error ? error.name : "unknown", errorCode: error && typeof error === "object" && "code" in error ? String(error.code) : undefined });
+    if (error instanceof Error && error.message.startsWith("Esta análise foi atualizada por outra alteração")) return fail(error.message);
+    return toActionError(error, "Não foi possível salvar esta alteração. Confira sua conexão e tente novamente.");
+  }
 }
 
-export async function addAcademicDisciplineAction(reviewIdInput: unknown): Promise<ActionResult> {
+export async function addAcademicDisciplineAction(reviewIdInput: unknown): Promise<ActionResult<{ disciplineIndex: number; discipline: AcademicDiscipline }>> {
   try {
     const user = await requirePermission("analysis:review");
     const reviewId = idSchema.parse(reviewIdInput);
@@ -142,71 +177,60 @@ export async function addAcademicDisciplineAction(reviewIdInput: unknown): Promi
     const discipline: AcademicDiscipline = { code: null, name: "", rawPeriod: "", period: null, originalStatus: "A CURSAR", normalizedStatus: "A CURSAR", workload: null, inMainCurriculum: true, sourcePage: 0, sourceRow: snapshot.disciplines.length + 1, manualEdited: true };
     const index = snapshot.disciplines.push(discipline) - 1;
     await persistCorrection({ reviewId, userId: user.id, disciplineIndex: index, field: "discipline", previousValue: null, newValue: discipline, snapshot, currentPeriod: review.currentPeriod, expectedUpdatedAt: review.updatedAt, reason: "Disciplina adicionada manualmente" });
-    return ok(undefined, "Disciplina adicionada. Preencha os dados da linha.");
-  } catch (error) { return toActionError(error); }
+    return ok({ disciplineIndex: index, discipline }, "Disciplina adicionada. Preencha os dados da linha.");
+  } catch (error) {
+    logger.warn("academic_analysis.discipline_add.failed", { errorName: error instanceof Error ? error.name : "unknown", errorCode: error && typeof error === "object" && "code" in error ? String(error.code) : undefined });
+    if (error instanceof Error && error.message.startsWith("Esta análise foi atualizada por outra alteração")) return fail(error.message);
+    return toActionError<{ disciplineIndex: number; discipline: AcademicDiscipline }>(error, "Não foi possível adicionar a disciplina. Confira sua conexão e tente novamente.");
+  }
 }
 
-export async function confirmAcademicGridProceedAction(reviewIdInput: unknown): Promise<ActionResult> {
+export async function completeAcademicGridReviewAction(reviewIdInput: unknown): Promise<ActionResult> {
   try {
     const user = await requirePermission("analysis:review");
     const reviewId = idSchema.parse(reviewIdInput);
     const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
+    if (review.completedAt) return ok(undefined, "Esta análise já foi concluída.");
+
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
-    if (snapshot.proceedConfirmed) return ok(undefined, "Prosseguimento já confirmado.");
-    if (review.currentPeriod === null || !review.currentPeriodConfirmed) {
-      return fail("Confirme o período atual do aluno antes de prosseguir.");
-    }
-
-    const currentPeriodRows = snapshot.disciplines.filter((discipline) =>
-      discipline.inMainCurriculum && discipline.period === review.currentPeriod,
-    );
-    if (currentPeriodRows.length === 0) {
-      return fail("Nenhum componente da grade principal foi identificado no período atual. Revise o extrato antes de prosseguir.");
-    }
-
-    const incomplete = snapshot.disciplines.filter(academicDisciplineNeedsReview);
-    if (incomplete.length > 0) {
-      return fail(`Revise nome, período e situação de ${incomplete.length} componente(s) da grade antes de prosseguir. Todas as disciplinas precisam entrar corretamente nos cálculos.`);
-    }
-    if (academicGridHasUnresolvedRowCount(snapshot.disciplines, snapshot.sourceDisciplineCount, snapshot.sourceParsedDisciplineCount)) {
-      return fail(`O PDF contém ${snapshot.sourceDisciplineCount} linhas acadêmicas e a grade tem ${snapshot.disciplines.length}. Inclua ou confira as linhas faltantes antes de prosseguir.`);
-    }
-
-    const currentResult = analyzeAcademicGrid({ disciplines: snapshot.disciplines, currentPeriod: review.currentPeriod, currentPeriodConfirmed: true });
-    if (currentResult.status === "MANUAL_REVIEW_REQUIRED") {
-      return fail(currentResult.warnings[0] ?? "A análise ainda precisa de revisão manual antes de projetar a conclusão.");
-    }
-
-    snapshot.proceedConfirmed = true;
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.academicGridReview.updateMany({
-        where: { id: reviewId, updatedAt: review.updatedAt },
-        data: { snapshot: jsonValue(snapshot) },
-      });
-      if (updated.count !== 1) throw new Error("Esta análise foi atualizada por outra alteração. Recarregue a página antes de confirmar.");
-      await tx.academicGridCorrection.create({
-        data: {
-          reviewId,
-          userId: user.id,
-          disciplineIndex: null,
-          field: "proceedConfirmed",
-          previousValue: jsonValue(false),
-          newValue: jsonValue(true),
-          reason: `Tutor confirmou a conferência do PDF completo e a inclusão de todos os componentes da grade principal (${snapshot.disciplines.length} linha(s) identificada(s)). ${snapshot.extractionWarnings.length} aviso(s) de extração reconhecido(s).`,
-        },
-      });
+    const blockers = academicGridCompletionBlockers({
+      disciplines: snapshot.disciplines,
+      currentPeriod: review.currentPeriod,
+      currentPeriodConfirmed: review.currentPeriodConfirmed,
+      sourceDisciplineCount: snapshot.sourceDisciplineCount,
+      sourceParsedDisciplineCount: snapshot.sourceParsedDisciplineCount,
     });
-    await recordAudit({
-      userId: user.id,
-      action: "academic_grid.proceed_confirmed",
-      entityType: "AcademicGridReview",
-      entityId: reviewId,
-      metadata: { disciplines: snapshot.disciplines.length, acknowledgedExtractionWarnings: snapshot.extractionWarnings.length },
+    if (blockers.length) return fail(blockers[0]);
+    const result = analyzeAcademicGrid({ disciplines: snapshot.disciplines, currentPeriod: review.currentPeriod, currentPeriodConfirmed: true });
+    if (result.status === "MANUAL_REVIEW_REQUIRED") return fail(result.warnings[0] ?? "Resolva as pendências de conferência antes de concluir.");
+
+    const completedAt = new Date();
+    const updated = await prisma.academicGridReview.updateMany({
+      where: { id: reviewId, updatedAt: review.updatedAt, completedAt: null },
+      data: { completedAt },
     });
+    if (updated.count !== 1) return fail("Esta análise foi atualizada em outra sessão. Recarregue a página e tente novamente.");
+
+    try {
+      await recordAudit({
+        userId: user.id,
+        action: "academic_grid.completed",
+        entityType: "AcademicGridReview",
+        entityId: reviewId,
+        metadata: { disciplineCount: snapshot.disciplines.length, currentPeriod: review.currentPeriod },
+      });
+    } catch (error) {
+      // A conclusão já foi gravada; uma falha no log geral não pode impedir o retorno de sucesso.
+      logger.warn("academic_analysis.completion_audit_log.failed", { reviewId, errorName: error instanceof Error ? error.name : "unknown" });
+    }
     revalidatePath("/academic-analysis");
     revalidatePath(`/academic-analysis/${reviewId}`);
-    return ok(undefined, "Análise confirmada. Todos os componentes da grade seguem incluídos nos cálculos.");
-  } catch (error) { return toActionError(error); }
+    return ok(undefined, "Análise concluída e registrada.");
+  } catch (error) {
+    logger.warn("academic_analysis.completion.failed", { errorName: error instanceof Error ? error.name : "unknown", errorCode: error && typeof error === "object" && "code" in error ? String(error.code) : undefined });
+    if (error instanceof Error && error.message.startsWith("Esta análise foi atualizada em outra sessão")) return fail(error.message);
+    return toActionError(error, "Não foi possível concluir a análise. Confira sua conexão e tente novamente.");
+  }
 }
 
 /** Exclui uma análise acadêmica definitivamente; autorização validada no servidor. */
@@ -218,9 +242,10 @@ export async function deleteAcademicGridReviewAction(input: unknown): Promise<Ac
 
     const review = await prisma.academicGridReview.findUnique({
       where: { id: parsed.data.reviewId },
-      select: { id: true, studentName: true, rgm: true, courseName: true, sourceFilename: true },
+      select: { id: true, enrollmentId: true, studentName: true, rgm: true, courseName: true, sourceFilename: true },
     });
     if (!review) return fail("Análise acadêmica não encontrada.");
+    if (review.enrollmentId) return fail("Esta análise compõe o histórico do aluno e não pode ser excluída por esta ação.");
 
     await prisma.$transaction(async (tx) => {
       await tx.academicGridReview.delete({ where: { id: review.id } });

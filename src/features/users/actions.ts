@@ -78,6 +78,7 @@ export async function updateUserAction(input: unknown): Promise<ActionResult> {
     }
     const before = await prisma.user.findUnique({ where: { id: parsed.data.id } });
     if (!before) return fail("Usuário não encontrado.");
+    if (before.role === "STUDENT") return fail("Gerencie este acesso na área Alunos da Análise Acadêmica.");
     if (parsed.data.email !== before.email) {
       const taken = await prisma.user.findUnique({ where: { email: parsed.data.email } });
       if (taken) return fail("Já existe um usuário com este e-mail.");
@@ -198,6 +199,7 @@ export async function deleteUserAction(input: unknown): Promise<ActionResult<{ r
     if (parsed.data.id === admin.id) return fail("Você não pode excluir a própria conta.");
     const target = await prisma.user.findUnique({ where: { id: parsed.data.id } });
     if (!target) return fail("Usuário não encontrado.");
+    if (target.role === "STUDENT") return fail("Desative o acesso na área Alunos para preservar o histórico acadêmico.");
     if (target.role === "ADMIN") {
       const admins = await prisma.user.count({ where: { role: "ADMIN", isActive: true, id: { not: target.id } } });
       if (admins === 0) return fail("Não é possível excluir o único administrador ativo.");

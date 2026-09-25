@@ -8,16 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { loginAction } from "@/features/auth/actions";
 
-export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
+export function LoginForm({ callbackUrl, portal = false }: { callbackUrl?: string; portal?: boolean }) {
   const [state, action, pending] = useActionState(loginAction, undefined);
   const [show, setShow] = useState(false);
 
   return (
     <form action={action} className="space-y-4">
+      {portal && <input type="hidden" name="portal" value="student" />}
       {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
       <div className="space-y-2">
-        <Label htmlFor="email">E-mail</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required placeholder="voce@cruzeirodosul.edu.br" />
+        <Label htmlFor="email">{portal ? "E-mail ou RGM" : "E-mail"}</Label>
+        <Input id="email" name="email" type={portal ? "text" : "email"} autoComplete="username" required placeholder={portal ? "Seu e-mail ou RGM" : "voce@cruzeirodosul.edu.br"} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Senha</Label>
@@ -50,7 +51,8 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
         Entrar
       </Button>
       <p className="text-center text-sm">
-        <Link href="/esqueci-senha" className="text-muted-foreground underline hover:text-foreground">Esqueci minha senha</Link>
+        {portal && <Link href="/portal/primeiro-acesso" className="mb-3 block text-[#003B71] underline">Primeiro acesso</Link>}
+        <Link href={portal ? "/portal/recuperar" : "/esqueci-senha"} className="text-muted-foreground underline hover:text-foreground">Esqueci minha senha</Link>
       </p>
     </form>
   );
