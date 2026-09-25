@@ -9,14 +9,16 @@ export function PortalHeroArtwork({ story = false }: { story?: boolean }) {
       {story ? (
         <>
           <div className="absolute right-[-10%] top-[-6%] h-[78%] w-[84%]">
-            <Image src="/brand/estrela-fita.png" alt="" fill sizes="55vw" className="object-contain mix-blend-multiply" />
+            <Image src="/brand/estrela-fita.png" alt="" fill sizes="55vw" className="object-contain" />
           </div>
+          <div className="portal-hero-contact-shadow absolute bottom-[-4%] left-[43%] z-[5] h-[22%] w-[70%] -translate-x-1/2" />
           <Image src="/brand/formanda-estrela.png" alt="" width={1662} height={3597} sizes="(max-width: 1024px) 100vw, 800px" preload className="portal-hero-portrait absolute bottom-[-18%] left-[43%] z-10 h-[125%] w-auto max-w-none -translate-x-1/2 object-contain" />
         </>
       ) : (
         <div className="absolute inset-y-0 right-0 h-[60%] w-full md:h-full md:w-[55%]">
-          <Image src="/brand/estrela-fita.png" alt="" fill sizes="(max-width: 768px) 100vw, 650px" className="scale-110 object-contain mix-blend-multiply" />
-          <Image src="/brand/formanda-estrela.png" alt="" width={1662} height={3597} sizes="(max-width: 768px) 100vw, 400px" preload className="absolute bottom-[-40%] right-[8%] h-[160%] w-auto max-w-none object-contain md:right-[16%]" />
+          <Image src="/brand/estrela-fita.png" alt="" fill sizes="(max-width: 768px) 100vw, 650px" className="scale-110 object-contain" />
+          <div className="portal-hero-contact-shadow absolute bottom-[-6%] right-[8%] z-[5] h-[26%] w-[85%] md:right-[16%]" />
+          <Image src="/brand/formanda-estrela.png" alt="" width={1662} height={3597} sizes="(max-width: 768px) 100vw, 400px" preload className="portal-hero-portrait absolute bottom-[-40%] right-[8%] h-[160%] w-auto max-w-none object-contain md:right-[16%]" />
         </div>
       )}
     </div>

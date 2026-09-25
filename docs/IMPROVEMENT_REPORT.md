@@ -35,7 +35,7 @@ Pendências externas (não são defeitos): conectar a **API Key** do projeto Ope
 | S4 | | S4 | ✅ **Feito** — `src/lib/request-ip.ts` só confia em `X-Forwarded-For` atrás de proxy (`TRUSTED_PROXY` ou Vercel). (achado original:chave de rate limit de login usava `x-forwarded-for` falsificável) | Médio | P1 | P | Confiar no header apenas quando `TRUSTED_PROXY=1`; caso contrário usar o IP do socket; documentar no deploy |
 | S5 | ✅ Parcial — senha ≥ 12 caracteres, troca obrigatória no 1º acesso, tokens de uso único; pendente lockout progressivo e 2FA. Achado original: Sem bloqueio progressivo de conta nem política de senha além de 8 caracteres; sem 2FA | Médio | P1 | M | Lockout após N falhas (tabela `LoginAttempt`), senha ≥ 12 com verificação contra listas comuns, TOTP opcional para ADMIN |
 | S6 | Documentos em disco local sem criptografia em repouso e sem backup | Médio | P1 | M | `StorageService` S3-compatível com SSE-KMS; política de backup; manter apenas o `sha256` no banco |
-| S7 | LGPD: modo padrão `PDF_FILE` envia o documento inteiro (com `cpfCandidato` no rodapé) à OpenAI | Alto (compliance) | P0 | P | Como a reconstrução local da tabela é agora exata, **avaliar tornar `REDACTED_TEXT` o padrão**; formalizar DPA/Zero Data Retention com a OpenAI; registrar base legal no `PRIVACY` |
+| S7 | | S7 | ✅ **Feito (25/09)** — `aiPrivacyMode` padrão é `REDACTED_TEXT` no seed (`prisma/seed.ts`) e no fallback de `SystemSettings` (`src/repositories/settings-repository.ts`); `PDF_FILE` continua disponível como opção explícita em Configurações. (achado original:LGPD: modo padrão `PDF_FILE` envia o documento inteiro, com `cpfCandidato` no rodapé, à OpenAI) | Alto (compliance) | P0 | P | Formalizar DPA/Zero Data Retention com a OpenAI; registrar base legal no `PRIVACY` |
 | S8 | VIEWER lê **qualquer** análise (`analysis:read` global) — spec fala em "análises autorizadas" | Médio | P1 | M | ACL por análise (`AnalysisAccess` usuário/grupo) ou escopo por campus/curso; aplicar em `document` route e listagens |
 | S9 | | S9 | ✅ **Feito** — upload valida `Origin` contra o host. (achado original:`POST /api/analyses/upload` não validava `Origin`) | Baixo | P2 | P | Rejeitar quando `Origin` ≠ `AUTH_URL` |
 | S10 | Rotação de `APP_ENCRYPTION_KEY`: `keyVersion` é gravado, mas não há rotina de recifragem | Baixo | P2 | P | Script `npm run secrets:rotate` (lê com a versão antiga, grava com a nova) |
@@ -80,14 +80,14 @@ Pendências externas (não são defeitos): conectar a **API Key** do projeto Ope
 | F8 | Orçamento/alerta de custo da OpenAI | P2 | P | Limite mensal em `SystemSetting` + aviso no dashboard e bloqueio opcional |
 | F9 | Dashboard com séries temporais (análises/dia, tempo médio, taxa de revisão) | P3 | M | Consultas agregadas + gráficos |
 | F10 | Regras institucionais ainda **não configuradas** (pré-requisitos, TCC, estágio, extensão, atividades complementares) | P2 | G | Levantar com a coordenação; modelar como `SystemRule` + etapa opcional no motor |
-| F11 | Modo `REDACTED_TEXT` como padrão após validação (ver S7) | P1 | P | Trocar default no seed e na migração |
+| F11 | | F11 | ✅ **Feito (25/09)** — ver S7 (default já é `REDACTED_TEXT` no seed e no repositório de configurações). (achado original:modo `REDACTED_TEXT` como padrão após validação) | P1 | P | — |
 | F12 | Acessibilidade e mobile: PDF lado a lado só no desktop; revisar foco/contraste com auditoria automatizada (axe) | P2 | M | — |
 
 ---
 
 ## 5. Plano de execução sugerido
 
-**Sprint 1 — Produção segura (P0/P1 curtos):** ~~S1, S4, A5, F2, S9~~ (feitos em 21/09) · restam S7/F11 (decisão de privacidade), A2 (documentação), F1 (chave OpenAI), S13.
+**Sprint 1 — Produção segura (P0/P1 curtos):** ~~S1, S4, A5, F2, S9~~ (feitos em 21/09) · ~~S7, F11~~ (feitos em 25/09) · restam A2 (documentação), F1 (chave OpenAI), S13.
 **Sprint 2 — Robustez:** A1 (fila durável), S3, S6, A6, A8, F7, S5.
 **Sprint 3 — Governança e evolução:** S2, S8, A3/A4, A11, F3–F5, F8, A9.
 **Backlog:** S10–S12, S14, A7, A10, F6, F9, F10, F12.
