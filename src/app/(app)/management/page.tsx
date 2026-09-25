@@ -3,6 +3,8 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   BellRing,
+  Clock3,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
@@ -16,6 +18,7 @@ import { PoloReportCard } from "@/features/analyses/components/polo-report";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
 import { DashboardRing } from "@/components/dashboard/dashboard-ring";
 import { countStaleEnrollmentCases } from "@/services/follow-up/management-alerts";
+import { getCommercialInsights } from "@/repositories/commercial-repository";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Gestão" };
@@ -57,6 +60,7 @@ export default async function ManagementPage({
     overdueFollowUps,
     awaitingInitialReturn,
     reanalysesInProgress,
+    commercialInsights,
   ] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
     prisma.user.findMany({
@@ -112,6 +116,10 @@ export default async function ManagementPage({
         enrollmentStatus: "PENDING",
         enrollmentReanalysisAt: { not: null },
       },
+    }),
+    getCommercialInsights({
+      from: from ?? (to ? undefined : monthStart),
+      to,
     }),
   ]);
   const periodByUser = new Map(
@@ -263,6 +271,42 @@ export default async function ManagementPage({
           </CardContent>
         </Card>
       </section>
+      <section className="mt-6 grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+        <Card className="border-brand-cyan/25 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Clock3 className="size-4 text-brand-cyan" /> Eficiência do processo
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">Tempo entre o envio e a conclusão da análise.</p>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-brand-navy">{formatProcessingDuration(commercialInsights.averageProcessingMinutes)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">média no período selecionado</p>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden border-brand-gold/40 shadow-sm [--card-spacing:0px]">
+          <CardHeader className="border-b border-brand-gold/30 bg-brand-gold-50/60 px-5 py-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="size-4 text-brand-gold" /> Oportunidades prioritárias
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">Análises concluídas, sem matrícula confirmada, com 50% ou mais da grade aproveitada.</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            {commercialInsights.highValueLeads.length ? (
+              <ul className="divide-y divide-brand-gold/20">
+                {commercialInsights.highValueLeads.slice(0, 6).map((lead) => (
+                  <li key={lead.id}>
+                    <Link href={`/analyses/${lead.id}`} className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-brand-gold-50/50">
+                      <span className="min-w-0"><span className="block truncate text-sm font-semibold">{lead.studentName ?? "Candidato não identificado"}</span><span className="block truncate text-xs text-muted-foreground">{lead.courseName ?? "Curso não identificado"}{lead.poloName ? ` · ${lead.poloName}` : ""}</span></span>
+                      <span className="shrink-0 rounded-full bg-brand-gold px-2.5 py-1 text-xs font-bold text-brand-navy">{lead.exemptedPercentage}% aproveitado</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="px-5 py-8 text-sm text-muted-foreground">Nenhuma oportunidade prioritária no período.</p>}
+          </CardContent>
+        </Card>
+      </section>
       <PoloReportCard
         className="mt-6 shadow-sm"
         description="Atendimentos por polo no período. Abra a lista ou exporte o CSV."
@@ -271,6 +315,13 @@ export default async function ManagementPage({
       />
     </>
   );
+}
+
+function formatProcessingDuration(minutes: number | null) {
+  if (minutes === null) return "—";
+  return minutes >= 60
+    ? `${Math.floor(minutes / 60)}h ${minutes % 60}min`
+    : `${minutes} min`;
 }
 
 function ManagementMetric({

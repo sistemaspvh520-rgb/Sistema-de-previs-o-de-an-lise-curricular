@@ -39,7 +39,8 @@ export function Timeline({ vm, showDetails = true }: { vm: AnalysisVM; showDetai
         <div className="rounded-xl bg-brand-navy p-4 text-white">
           <div className="text-xs uppercase tracking-wider opacity-70">Previsão estimada de conclusão</div>
           <div className="text-2xl font-semibold">{vm.estimatedCompletionTerm}</div>
-          <div className="text-xs opacity-70">{pluralize(vm.semestersRemaining ?? 0, "semestre previsto", "semestres previstos")}</div>
+          <div className="text-sm">{vm.estimatedCompletionDate ? `Até ${vm.estimatedCompletionDate}` : "Data do calendário não cadastrada"}</div>
+          <div className="text-xs opacity-70">{pluralize(vm.semestersRemaining ?? 0, "semestre previsto", "semestres previstos")} · {vm.completionCalendarConfidence === "OFFICIAL" ? "calendário oficial" : vm.completionCalendarConfidence === "ESTIMATED" ? "calendário projetado" : "calendário não identificado"}</div>
         </div>
       )}
 
@@ -121,6 +122,7 @@ function SemesterCard({ p, byId, onExplain, showDetails }: { p: ProjectionVM; by
         <div className="min-w-[110px]">
           <div className="text-xl font-semibold tracking-tight">{p.term}</div>
           <div className="text-xs text-muted-foreground">{p.isAdditional ? "Semestre adicional" : `${p.periodNumber}º período`}</div>
+          {p.calendarWindow && <div className="mt-1 text-xs text-muted-foreground">{p.calendarWindow}</div>}
         </div>
         <Stat label="Regulares" value={p.regularSubjectsToTake} />
         <Stat label="Adaptações" value={p.subjectsFromBacklog} tone="text-brand-cyan-700" />

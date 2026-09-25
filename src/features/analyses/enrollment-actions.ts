@@ -21,7 +21,11 @@ const schema = z
     reanalysisCompleted: z.boolean().default(false),
   })
   .superRefine((data, ctx) => {
-    if (data.status === "NOT_ENROLLED" && !data.note?.trim()) {
+    if (
+      data.status === "NOT_ENROLLED" &&
+      !data.reanalysisCompleted &&
+      !data.note?.trim()
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["note"],

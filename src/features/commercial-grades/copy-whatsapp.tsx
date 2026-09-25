@@ -1,7 +1,7 @@
 "use client";
 
 import { Copy, MessageCircle, PencilLine } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,8 +56,8 @@ export function CopyWhatsapp({
         : text,
     [courseName, hasTcc, selected, text, totalCourseHours],
   );
-  const [message, setMessage] = useState(suggestedMessage);
-  useEffect(() => setMessage(suggestedMessage), [suggestedMessage]);
+  const [messageOverride, setMessageOverride] = useState<string | null>(null);
+  const message = messageOverride ?? suggestedMessage;
   async function copy() {
     try {
       await navigator.clipboard.writeText(message);
@@ -93,7 +93,7 @@ export function CopyWhatsapp({
                 type="button"
                 size="sm"
                 variant={track.name === selectedTrack ? "default" : "outline"}
-                onClick={() => setSelectedTrack(track.name)}
+                onClick={() => { setSelectedTrack(track.name); setMessageOverride(null); }}
               >
                 {track.name}
               </Button>
@@ -111,7 +111,7 @@ export function CopyWhatsapp({
           <Textarea
             id="whatsapp-message"
             value={message}
-            onChange={(event) => setMessage(event.target.value)}
+            onChange={(event) => setMessageOverride(event.target.value)}
             className="min-h-72 max-h-[50dvh] resize-y bg-muted/30 font-sans leading-6"
           />
           <p className="text-xs text-muted-foreground">

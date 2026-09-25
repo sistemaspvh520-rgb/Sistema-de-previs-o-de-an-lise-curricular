@@ -5,6 +5,7 @@ import { calculateCurriculumTotals } from "@/domain/curricular-analysis/engine/t
 import { calculateAnalysisStatus } from "@/domain/curricular-analysis/validators/status";
 import { detectInconsistencies } from "@/domain/curricular-analysis/validators/inconsistencies";
 import { termSequence, suggestStartTerm } from "@/domain/curricular-analysis/simulation/terms";
+import { buildAcademicCalendar, DEFAULT_ACADEMIC_CALENDAR } from "@/domain/academic-calendar/calendar";
 import { makePeriod, makeSubject, resetCounter, rules } from "../../fixtures/subjects";
 
 beforeEach(() => resetCounter());
@@ -231,6 +232,22 @@ describe("buildProjectionNarrative", () => {
     expect(n.conclusionLine).toContain("*o final de 2028*");
     expect(n.text).toContain("A previsão fica assim:");
   });
+  it("usa a data e a confiança do calendário na conclusão compartilhável", async () => {
+    const { buildProjectionNarrative } = await import("@/domain/curricular-analysis/simulation/narrative");
+    const terms = buildAcademicCalendar(DEFAULT_ACADEMIC_CALENDAR, 2030);
+    const n = buildProjectionNarrative({
+      semesters: [{
+        index: 0, term: "2027.1", periodNumber: 4, isAdditional: false,
+        subjectsInPeriod: 8, exemptedInPeriod: 0, regularSubjectsToTake: 8,
+        maximumCapacity: 11, backlogCapacity: 3, subjectsFromBacklog: 0,
+        semesterLoad: 8, remainingBacklog: 0, regularSubjectIds: [], backlogSubjectIds: [],
+      }],
+      entryPeriod: 4, backlogTotal: 0, backlogPeriodRange: null, maximumCapacity: 11,
+      incomplete: false, remainingBacklog: 0, calendarTerms: terms,
+    });
+    expect(n.conclusionLine).toContain("até 30 de junho de 2027");
+    expect(n.conclusionLine).toContain("calendário projetado");
+  });
   it("cenário de ingresso no 8º com semestres adicionais (mesma capacidade do último período)", async () => {
     const { buildProjectionNarrative } = await import("@/domain/curricular-analysis/simulation/narrative");
     const subjects = [];
@@ -253,5 +270,12 @@ describe("periodUnit = YEAR (cursos anuais)", () => {
     const subjects = [...makePeriod(1, 8, 2), ...makePeriod(2, 8, 0)];
     const sim = simulateCurriculum({ subjects, entryPeriod: 1, startTerm: "2026", rules: rules({ periodUnit: "YEAR" }) });
     expect(sim.semesters.map((s) => s.term)).toEqual(["2026", "2027"]);
+  });
+  it("associa uma previsão anual às datas do segundo semestre daquele ano", async () => {
+    const { buildProjectionNarrative } = await import("@/domain/curricular-analysis/simulation/narrative");
+    const sim = simulateCurriculum({ subjects: makePeriod(1, 8, 0), entryPeriod: 1, startTerm: "2027", rules: rules({ periodUnit: "YEAR" }) });
+    const n = buildProjectionNarrative({ semesters: sim.semesters, entryPeriod: 1, backlogTotal: 0, backlogPeriodRange: null, maximumCapacity: 11, incomplete: false, remainingBacklog: 0, periodUnit: "YEAR", calendarTerms: buildAcademicCalendar(DEFAULT_ACADEMIC_CALENDAR, 2029) });
+    expect(n.conclusionLine).toContain("2027.2");
+    expect(n.conclusionLine).toContain("calendário projetado");
   });
 });

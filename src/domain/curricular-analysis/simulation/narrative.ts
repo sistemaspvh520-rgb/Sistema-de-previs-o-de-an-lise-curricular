@@ -1,5 +1,6 @@
 import type { SemesterSimulation } from "@/domain/curricular-analysis/types";
 import { parseTerm } from "@/domain/curricular-analysis/simulation/terms";
+import { formatCalendarDate, getCalendarTerm, type AcademicCalendarTerm } from "@/domain/academic-calendar/calendar";
 
 export interface NarrativeInput {
   semesters: SemesterSimulation[];
@@ -11,6 +12,8 @@ export interface NarrativeInput {
   maximumCapacity: number;
   incomplete: boolean;
   remainingBacklog: number;
+  periodUnit?: "SEMESTER" | "YEAR";
+  calendarTerms?: AcademicCalendarTerm[];
 }
 
 export interface ProjectionNarrative {
@@ -28,13 +31,15 @@ function adaptationsPhrase(n: number, isLast: boolean): string {
 }
 
 /** "final de 2028" para X.2 e "meados de 2028" para X.1. */
-export function completionPhrase(term: string): string {
+export function completionPhrase(term: string, periodUnit: "SEMESTER" | "YEAR" = "SEMESTER"): string {
   const t = parseTerm(term);
+  if (periodUnit === "YEAR") return `o final de ${t.year}`;
   return t.semester === 2 ? `o final de ${t.year}` : `meados de ${t.year}`;
 }
 
-export function completionMonth(term: string): string {
+export function completionMonth(term: string, periodUnit: "SEMESTER" | "YEAR" = "SEMESTER"): string {
   const t = parseTerm(term);
+  if (periodUnit === "YEAR") return `dezembro de ${t.year}`;
   return t.semester === 2 ? `dezembro de ${t.year}` : `junho de ${t.year}`;
 }
 
@@ -72,7 +77,12 @@ export function buildProjectionNarrative(input: NarrativeInput): ProjectionNarra
     conclusionLine = `⚠️ Restam ${input.remainingBacklog} matéria(s) sem semestre alocado — a regra de semestre adicional precisa ser confirmada.`;
   } else if (lastIndex >= 0) {
     const term = input.semesters[lastIndex].term;
-    conclusionLine = `Então, a previsão de formação fica para *${completionPhrase(term)}* (${completionMonth(term)} — ${term}).`;
+    const calendarCode = input.periodUnit === "YEAR" && !term.includes(".") ? `${term}.2` : term;
+    const calendarTerm = input.calendarTerms ? getCalendarTerm(calendarCode, input.calendarTerms) : null;
+    const calendarDate = calendarTerm
+      ? `até ${formatCalendarDate(calendarTerm.endsOn)} — ${calendarTerm.term}, calendário ${calendarTerm.confidence === "OFFICIAL" ? "oficial" : "projetado"}`
+      : `${completionMonth(term, input.periodUnit)} — ${term}`;
+    conclusionLine = `Então, a previsão de formação fica para *${completionPhrase(term, input.periodUnit)}* (${calendarDate}).`;
   }
 
   const text = [...headerLines, "", "A previsão fica assim:", "", ...bulletLines, "", conclusionLine ?? ""].join("\n").trim();

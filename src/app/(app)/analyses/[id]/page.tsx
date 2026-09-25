@@ -13,6 +13,8 @@ import { AnalysisView } from "@/features/analyses/components/analysis-view";
 import { formatDateTime } from "@/lib/utils";
 import { formatPolo } from "@/domain/polos";
 import { formatCourseFormat } from "@/domain/course-formats";
+import { getAcademicCalendar } from "@/repositories/academic-calendar-repository";
+import { zonedDateParts } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Análise" };
 export const dynamic = "force-dynamic";
@@ -26,7 +28,9 @@ export default async function AnalysisPage({ params }: PageProps<"/analyses/[id]
   const detail = await getAnalysisDetail(id);
   if (!detail) notFound();
   if (user.role !== "ADMIN" && detail.createdById !== user.id) notFound();
-  const vm = buildAnalysisViewModel(detail);
+  const latestProjectionYear = Math.max(0, ...detail.projections.map((projection) => Number(projection.term.slice(0, 4)) || 0));
+  const calendarTerms = await getAcademicCalendar(Math.max(zonedDateParts().year + 10, latestProjectionYear));
+  const vm = buildAnalysisViewModel(detail, calendarTerms);
   const failed = vm.status === "FAILED" || vm.status === "AI_ERROR";
   const hasData = vm.subjects.length > 0;
 

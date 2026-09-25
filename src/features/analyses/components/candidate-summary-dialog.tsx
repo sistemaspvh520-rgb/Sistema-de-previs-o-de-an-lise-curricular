@@ -17,7 +17,7 @@ export function buildCandidateSummary(vm: AnalysisVM): string {
     ? `Você seguirá a partir do ${ingresso}, conforme informado no resultado da análise.`
     : "Ainda estamos confirmando o período de ingresso informado no documento.";
   const conclusao = previsao
-    ? `Mantidas as ofertas regulares e a matrícula nas disciplinas previstas, a conclusão estimada é ${previsao}.`
+    ? `Mantidas as ofertas regulares e a matrícula nas disciplinas previstas, a conclusão estimada é ${vm.estimatedCompletionSummary ?? previsao}.`
     : "A previsão de conclusão será disponibilizada após a confirmação completa da análise.";
   return [
     "Olá! Concluímos a análise do seu aproveitamento curricular 🎓",

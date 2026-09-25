@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CalendarDays,
-  CheckCircle2,
   FileText,
   UserRoundX,
 } from "lucide-react";
@@ -57,7 +56,6 @@ export default async function ReportsPage({
   const monthStart = startOfCurrentMonth();
   const [
     inPeriod,
-    month,
     completed,
     enrolled,
     pendingEnrollment,
@@ -69,9 +67,6 @@ export default async function ReportsPage({
     byPolo,
   ] = await Promise.all([
     prisma.curricularAnalysis.count({ where: base }),
-    prisma.curricularAnalysis.count({
-      where: { createdById: user.id, createdAt: { gte: monthStart } },
-    }),
     prisma.curricularAnalysis.count({
       where: { ...base, status: "COMPLETED" },
     }),

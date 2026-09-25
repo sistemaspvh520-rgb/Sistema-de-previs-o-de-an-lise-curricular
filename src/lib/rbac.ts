@@ -58,6 +58,7 @@ export const ROUTE_PERMISSIONS: Array<{ prefix: string; permission: Permission }
   { prefix: "/settings/security", permission: "privacy:manage" },
   { prefix: "/settings/maintenance", permission: "privacy:manage" },
   { prefix: "/analyses/new", permission: "analysis:create" },
+  { prefix: "/academic-analysis", permission: "analysis:review" },
   { prefix: "/reviews", permission: "analysis:review" },
   { prefix: "/management", permission: "audit:read" },
 ];

@@ -43,6 +43,8 @@ export interface SemesterSimulation {
   semesterLoad: number;
   remainingBacklog: number;
   regularSubjectIds: string[];
+  /** Cursos de períodos anteriores já matriculados neste semestre. */
+  alreadyInProgressSubjectIds?: string[];
   backlogSubjectIds: string[];
 }
 

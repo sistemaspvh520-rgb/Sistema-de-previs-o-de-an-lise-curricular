@@ -14,6 +14,7 @@ import {
 import type { ProcessingStep } from "@/services/pipeline/steps";
 import { parseSteps } from "@/services/pipeline/steps";
 import { PROCESSING_STATUSES } from "@/domain/curricular-analysis/status-groups";
+import { formatCalendarDate, getCalendarTerm, type AcademicCalendarTerm } from "@/domain/academic-calendar/calendar";
 import type {
   AnalysisStatus,
   CourseFormat,
@@ -73,6 +74,8 @@ export interface ProjectionVM {
   remainingBacklog: number;
   regularSubjectIds: string[];
   backlogSubjectIds: string[];
+  calendarWindow: string | null;
+  calendarConfidence: "OFFICIAL" | "ESTIMATED" | null;
   explanation: ProjectionExplanation;
 }
 
@@ -176,6 +179,9 @@ export interface AnalysisVM {
   remainingBacklogCount: number;
   semestersRemaining: number | null;
   estimatedCompletionTerm: string | null;
+  estimatedCompletionDate: string | null;
+  completionCalendarConfidence: "OFFICIAL" | "ESTIMATED" | null;
+  estimatedCompletionSummary: string | null;
   subjects: SubjectVM[];
   projections: ProjectionVM[];
   warnings: WarningVM[];
@@ -199,7 +205,24 @@ export interface AnalysisVM {
   narrative: ProjectionNarrative | null;
 }
 
-export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
+function calendarCode(term: string, periodUnit: AcademicRules["periodUnit"]): string {
+  return periodUnit === "YEAR" && !term.includes(".") ? `${term}.2` : term;
+}
+
+function calendarWindow(term: string, periodUnit: AcademicRules["periodUnit"], terms: AcademicCalendarTerm[]): {
+  window: string | null;
+  confidence: "OFFICIAL" | "ESTIMATED" | null;
+} {
+  const calendarTerm = getCalendarTerm(calendarCode(term, periodUnit), terms);
+  if (!calendarTerm) return { window: null, confidence: null };
+  const status = calendarTerm.confidence === "OFFICIAL" ? "datas oficiais" : "datas projetadas";
+  return {
+    window: `${formatCalendarDate(calendarTerm.startsOn)} a ${formatCalendarDate(calendarTerm.endsOn)} · ${status}`,
+    confidence: calendarTerm.confidence,
+  };
+}
+
+export function buildAnalysisViewModel(a: AnalysisDetail, calendarTerms: AcademicCalendarTerm[] = []): AnalysisVM {
   const rules = buildRulesFromRecords(a.ruleSetVersion.rules);
   const scheduled = new Map<
     string,
@@ -287,7 +310,20 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
           ),
           incomplete: a.projectionIncomplete,
           remainingBacklog: remainingIds.size,
+          periodUnit: rules.periodUnit,
+          calendarTerms,
         });
+  const estimatedCompletionTerm = entryPeriod !== null && !a.projectionIncomplete && last ? last.term : null;
+  const completionCalendar = estimatedCompletionTerm
+    ? calendarWindow(estimatedCompletionTerm, rules.periodUnit, calendarTerms)
+    : { window: null, confidence: null };
+  const completionCalendarTerm = estimatedCompletionTerm
+    ? getCalendarTerm(calendarCode(estimatedCompletionTerm, rules.periodUnit), calendarTerms)
+    : null;
+  const estimatedCompletionDate = completionCalendarTerm ? formatCalendarDate(completionCalendarTerm.endsOn) : null;
+  const estimatedCompletionSummary = estimatedCompletionTerm && estimatedCompletionDate
+    ? `período ${estimatedCompletionTerm}, até ${estimatedCompletionDate} · ${completionCalendar.confidence === "OFFICIAL" ? "datas oficiais" : "datas projetadas"}`
+    : estimatedCompletionTerm;
   const usageTotals = a.usages.reduce(
     (acc, u) => ({
       totalTokens: acc.totalTokens + u.totalTokens,
@@ -373,10 +409,10 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
     previousBacklogCount,
     remainingBacklogCount: remainingIds.size,
     semestersRemaining: entryPeriod === null ? null : a.projections.length,
-    estimatedCompletionTerm:
-      entryPeriod !== null && !a.projectionIncomplete && last
-        ? last.term
-        : null,
+    estimatedCompletionTerm,
+    estimatedCompletionDate,
+    completionCalendarConfidence: completionCalendar.confidence,
+    estimatedCompletionSummary,
     subjects: a.subjects.map((s) => ({
       id: s.id,
       rowHash: s.rowHash,
@@ -397,11 +433,16 @@ export function buildAnalysisViewModel(a: AnalysisDetail): AnalysisVM {
       scheduledKind: scheduled.get(s.id)?.kind ?? null,
       inRemainingBacklog: remainingIds.has(s.id),
     })),
-    projections: a.projections.map((p, i) => ({
-      id: p.id,
-      ...projectionRows[i],
-      explanation: explainProjection(projectionRows[i], rules),
-    })),
+    projections: a.projections.map((p, i) => {
+      const dates = calendarWindow(p.term, rules.periodUnit, calendarTerms);
+      return {
+        id: p.id,
+        ...projectionRows[i],
+        calendarWindow: dates.window,
+        calendarConfidence: dates.confidence,
+        explanation: explainProjection(projectionRows[i], rules),
+      };
+    }),
     warnings: a.warnings.map((w) => ({
       id: w.id,
       code: w.code,

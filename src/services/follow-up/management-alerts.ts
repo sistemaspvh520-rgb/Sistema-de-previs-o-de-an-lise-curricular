@@ -29,11 +29,11 @@ export async function listStaleEnrollmentCases(
       (item) =>
         businessDaysSince(item.enrollmentReanalysisAt ?? item.completedAt) > 2,
     )
-    .sort(
-      (a, b) =>
-        (a.enrollmentReanalysisAt ?? a.completedAt)?.getTime()! -
-        (b.enrollmentReanalysisAt ?? b.completedAt)?.getTime()!,
-    )
+    .sort((a, b) => {
+      const aDate = a.enrollmentReanalysisAt ?? a.completedAt;
+      const bDate = b.enrollmentReanalysisAt ?? b.completedAt;
+      return (aDate?.getTime() ?? 0) - (bDate?.getTime() ?? 0);
+    })
     .slice(0, take);
 }
 

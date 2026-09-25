@@ -146,6 +146,14 @@ enum DeletionRequestStatus {
   REJECTED
 }
 
+enum AcademicGridReviewStatus {
+  NO_PENDING
+  CAN_ADD
+  NEAR_LIMIT
+  LIMIT_REACHED
+  MANUAL_REVIEW_REQUIRED
+}
+
 // ------------------------------------------------------------------
 // Identidade e acesso
 // ------------------------------------------------------------------
@@ -200,6 +208,8 @@ model User {
   enrollmentUpdates       CurricularAnalysis[] @relation("EnrollmentUpdatedBy")
   pushSubscriptions       PushSubscription[]
   commercialGrades        CommercialGrade[]
+  academicGridReviews     AcademicGridReview[]
+  academicGridCorrections AcademicGridCorrection[]
 }
 
 /// Token de uso único para definir (convite) ou redefinir a senha por link de e-mail. Só o hash é armazenado.
@@ -657,4 +667,49 @@ model CommercialGrade {
   @@index([knowledgeArea])
   @@index([durationSemesters])
   @@index([createdAt(sort: Desc)])
+}
+
+/** Análise acadêmica independente do fluxo de aproveitamento curricular comercial. */
+model AcademicGridReview {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  createdById           String                  @db.Uuid
+  studentName           String?
+  rgm                   String?
+  courseName            String?
+  currentPeriod         Int?
+  currentPeriodRaw      String?
+  currentPeriodConfirmed Boolean                @default(false)
+  sourceFilename        String
+  sourceSha256          String                  @db.Char(64)
+  sourcePageCount       Int
+  status                AcademicGridReviewStatus @default(MANUAL_REVIEW_REQUIRED)
+  snapshot              Json
+  createdAt             DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                @updatedAt @db.Timestamptz(6)
+
+  createdBy   User                     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  corrections AcademicGridCorrection[]
+
+  @@index([createdById, createdAt(sort: Desc)])
+  @@index([rgm, createdAt(sort: Desc)])
+  @@index([studentName, createdAt(sort: Desc)])
+}
+
+/** Histórico append-only das correções feitas no módulo acadêmico. */
+model AcademicGridCorrection {
+  id          String   @id @default(uuid()) @db.Uuid
+  reviewId    String   @db.Uuid
+  userId      String   @db.Uuid
+  disciplineIndex Int?
+  field       String
+  previousValue Json?
+  newValue      Json?
+  reason      String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  review AcademicGridReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([reviewId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
 }

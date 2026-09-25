@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   ChartColumnIncreasing,
   BookOpen,
+  GraduationCap,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const ICONS = {
   management: ChartNoAxesCombined,
   reports: ChartColumnIncreasing,
   grades: BookOpen,
+  academic: GraduationCap,
   settings: Settings,
 } as const;
 

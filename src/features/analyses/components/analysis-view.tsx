@@ -26,6 +26,7 @@ import { AuditTab } from "@/features/analyses/components/audit-tab";
 import { HistoryTab } from "@/features/analyses/components/history-tab";
 import { PendingTab } from "@/features/analyses/components/pending-tab";
 import { CandidateSummaryDialog } from "@/features/analyses/components/candidate-summary-dialog";
+import { CommercialProposalActions } from "@/features/analyses/components/commercial-proposal-actions";
 import {
   AdditionalRuleBanner,
   EntryPeriodSimulationDialog,
@@ -139,6 +140,11 @@ export function AnalysisView({
 
       <div className="flex flex-wrap items-center gap-2">
         {vm.subjects.length > 0 && <CandidateSummaryDialog vm={vm} />}
+        {vm.status === "COMPLETED" && (
+          <CommercialProposalActions
+            vm={vm}
+          />
+        )}
         {editable && <StartTermDialog vm={vm} />}
         <EntryPeriodSimulationDialog
           analysisId={vm.id}

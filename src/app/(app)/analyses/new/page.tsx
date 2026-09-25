@@ -5,13 +5,21 @@ import { getSystemSettings } from "@/repositories/settings-repository";
 import { UploadDropzone } from "@/features/analyses/upload-dropzone";
 import { zonedDateParts } from "@/lib/time";
 import { suggestStartTerm } from "@/domain/curricular-analysis/simulation/terms";
+import { resolveDefaultAcademicTerm } from "@/domain/academic-calendar/calendar";
+import { getAcademicCalendar } from "@/repositories/academic-calendar-repository";
 
 export const metadata: Metadata = { title: "Nova análise" };
 export const dynamic = "force-dynamic";
 
 export default async function NewAnalysisPage() {
   await requirePagePermission("analysis:create");
-  const settings = await getSystemSettings();
+  const currentDate = zonedDateParts();
+  const today = `${currentDate.year}-${String(currentDate.month).padStart(2, "0")}-${String(currentDate.day).padStart(2, "0")}`;
+  const [settings, calendarTerms] = await Promise.all([
+    getSystemSettings(),
+    getAcademicCalendar(currentDate.year + 10),
+  ]);
+  const defaultStartTerm = resolveDefaultAcademicTerm(settings.defaultStartTerm, today, calendarTerms) ?? suggestStartTerm();
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -25,7 +33,7 @@ export default async function NewAnalysisPage() {
         </div>
       </section>
       <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6 lg:p-8">
-        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={settings.defaultStartTerm ?? suggestStartTerm()} currentYear={zonedDateParts().year} polos={settings.polos} courseFormats={settings.courseFormats} />
+        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={defaultStartTerm} currentYear={currentDate.year} polos={settings.polos} courseFormats={settings.courseFormats} />
       </section>
     </div>
   );

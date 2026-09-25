@@ -13,6 +13,11 @@ const ENTRY_SOURCE: Record<string, string> = {
 };
 
 export function SummaryCards({ vm, showSources = true }: { vm: AnalysisVM; showSources?: boolean }) {
+  const completionSourceDetail = [
+    `extraSubjectsAllowed = ${vm.rules.extraSubjectsAllowed}`,
+    vm.estimatedCompletionSummary ?? "data não cadastrada",
+    vm.completionCalendarConfidence === "OFFICIAL" ? "calendário oficial" : vm.completionCalendarConfidence === "ESTIMATED" ? "calendário projetado" : null,
+  ].filter(Boolean).join(" · ");
   const cards: Array<{ label: string; value: React.ReactNode; source?: { label: string; detail?: string }; tone?: string; hint?: string }> = [
     { label: "Curso", value: vm.courseName ?? "Não identificado", source: { label: "PDF", detail: "Identificado a partir do documento" } },
     {
@@ -26,7 +31,7 @@ export function SummaryCards({ vm, showSources = true }: { vm: AnalysisVM; showS
     { label: "Pendentes", value: vm.totals.pending + vm.totals.review, hint: vm.totals.review ? `${vm.totals.review} a revisar` : undefined, source: { label: "Disciplina utilizada" }, tone: "text-status-danger" },
     { label: "Pendências anteriores", value: vm.previousBacklogCount ?? "—", source: { label: "Motor", detail: "Pendentes de períodos anteriores ao ingresso" } },
     { label: "Semestres restantes", value: vm.semestersRemaining ?? "—", hint: vm.projectionIncomplete ? "previsão incompleta" : undefined, source: { label: `Motor v${vm.versions.engineVersion}` } },
-    { label: "Previsão estimada", value: vm.estimatedCompletionTerm ?? (vm.projectionIncomplete ? "Regra pendente" : "—"), source: { label: `Regra v${vm.versions.ruleSetVersion}`, detail: `extraSubjectsAllowed = ${vm.rules.extraSubjectsAllowed}` }, tone: vm.estimatedCompletionTerm ? "text-brand-navy" : "text-status-warning" },
+    { label: "Previsão estimada", value: vm.estimatedCompletionTerm ?? (vm.projectionIncomplete ? "Regra pendente" : "—"), source: { label: `Regra v${vm.versions.ruleSetVersion}`, detail: completionSourceDetail }, tone: vm.estimatedCompletionTerm ? "text-brand-navy" : "text-status-warning" },
     { label: "Verificação", value: <ReliabilityBadge level={vm.reliability} />, hint: vm.reviewItemsCount ? pluralize(vm.reviewItemsCount, "observação registrada", "observações registradas") : "Sem observações" },
   ];
 

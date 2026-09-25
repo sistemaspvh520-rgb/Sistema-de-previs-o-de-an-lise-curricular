@@ -30,7 +30,7 @@ const DEFAULTS: SystemSettings = {
   institutionName: "Universidade Cruzeiro do Sul Virtual",
   maxUploadMb: 20,
   maxPdfPages: 60,
-  defaultStartTerm: "2027.1",
+  defaultStartTerm: null,
   aiMonthlyBudgetUsd: 0,
   usdBrlReferenceRate: 5.5,
   polos: [...POLOS],
