@@ -15,7 +15,7 @@ export default async function SetPasswordPage({ searchParams }: PageProps<"/defi
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-navy px-4">
       <div className="relative w-full max-w-md">
-        <div className="mb-8 flex justify-center text-white"><BrandLogo /></div>
+        <div className="mb-8 flex justify-center text-white"><BrandLogo maxWidthClassName="max-w-[300px]" /></div>
         <div className="rounded-2xl border border-white/10 bg-card p-8 shadow-2xl shadow-black/30">
           {check.ok ? (
             <>
