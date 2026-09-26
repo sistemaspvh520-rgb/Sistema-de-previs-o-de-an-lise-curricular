@@ -4,6 +4,7 @@ import type {
 } from "@/domain/academic-analysis/types";
 import { academicStatusOutcome } from "@/domain/academic-analysis/rules";
 import { analyzeAcademicGrid } from "@/domain/academic-analysis/analyze";
+import { applyHistoryPeriodInference } from "@/domain/academic-analysis/history-period-inference";
 import type { LocalExtraction } from "@/services/pdf/parser";
 import { foldDocument, type AcademicDocumentType } from "./classifier";
 
@@ -153,13 +154,29 @@ export function extractAcademicHistory(
     }
   }
   const recoveredCount = disciplines.length;
+  let currentPeriod = previous?.result.currentPeriod ?? null;
+  let currentPeriodConfirmed = previous?.result.currentPeriodConfirmed ?? false;
+  const mapped = applyHistoryPeriodInference({
+    disciplines,
+    result: analyzeAcademicGrid({ disciplines, currentPeriod, currentPeriodConfirmed }),
+    studentName,
+    rgm,
+    courseName,
+    extractionWarnings: [],
+    manuallyEdited: false,
+  });
+  if (mapped.applied) {
+    disciplines.splice(0, disciplines.length, ...mapped.snapshot.disciplines);
+    currentPeriod = mapped.snapshot.result.currentPeriod;
+    currentPeriodConfirmed = mapped.snapshot.result.currentPeriodConfirmed;
+  }
   // Missing rows in a newer document are not evidence that prior curriculum knowledge is wrong.
   for (const row of previous?.disciplines ?? [])
     if (!disciplines.some((r) => r.code && r.code === row.code))
       disciplines.push(row);
   const mappingRequired =
-    disciplines.some((r) => r.period === null) ||
-    !previous?.result.currentPeriodConfirmed;
+    disciplines.some((r) => r.inMainCurriculum && r.period === null) ||
+    !currentPeriodConfirmed;
   if (mappingRequired)
     warnings.push(
       "MAPEAMENTO CURRICULAR NECESSÁRIO: o tutor deve confirmar a posição curricular e o período atual. Semestre letivo não é período curricular.",
@@ -170,8 +187,8 @@ export function extractAcademicHistory(
     );
   const result = analyzeAcademicGrid({
     disciplines,
-    currentPeriod: previous?.result.currentPeriod ?? null,
-    currentPeriodConfirmed: previous?.result.currentPeriodConfirmed ?? false,
+    currentPeriod,
+    currentPeriodConfirmed,
   });
   return {
     documentType: type,

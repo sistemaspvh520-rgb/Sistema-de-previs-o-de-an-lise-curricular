@@ -6,6 +6,7 @@ import type { SessionUser } from "@/lib/session";
 import { parsePdf } from "@/services/pdf/parser";
 import type { AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import { extractAcademicDocument } from "@/services/academic-documents/adapters";
+import { autoMapHistorySnapshot } from "@/services/academic-analysis/history-mapping";
 import {
   classifyAcademicDocument,
   sourcePriority,
@@ -273,13 +274,18 @@ export async function processUpload(
       where: { id: sourceId, attempts: attempt, status: "PROCESSING" },
       data: { storageKey: savedKey },
     });
-    const snapshot = extractAcademicDocument(
-      local,
-      source.filename,
-      source.enrollment.currentVersion
-        ? presentAcademicSnapshot(source.enrollment.currentVersion)
-        : undefined,
-    );
+    const snapshot = (
+      await autoMapHistorySnapshot(
+        extractAcademicDocument(
+          local,
+          source.filename,
+          source.enrollment.currentVersion
+            ? presentAcademicSnapshot(source.enrollment.currentVersion)
+            : undefined,
+        ),
+        { allowAI: true },
+      )
+    ).snapshot;
     if (!snapshot.rgm || canonicalRgm(snapshot.rgm) !== source.enrollment.rgm)
       throw new PortalInputError(
         "O RGM do documento não corresponde à sua matrícula. Confira o documento enviado.",

@@ -21,7 +21,10 @@ describe.skipIf(!dir)("user-provided history references", () => {
     const a = extractAcademicHistory(simple, "SIMPLE_ACADEMIC_HISTORY");
     const b = extractAcademicHistory(official, "OFFICIAL_ACADEMIC_HISTORY");
     expect(a.disciplines).toHaveLength(42);
-    expect(a.disciplines.every((r) => r.period === null)).toBe(true);
+    expect(a.disciplines.every((r) => r.period !== null)).toBe(true);
+    expect(Math.max(...a.disciplines.map((r) => r.period!))).toBe(4);
+    expect(a.result.currentPeriod).toBe(4);
+    expect(a.mappingRequired).toBe(false);
     expect(
       a.disciplines.filter((r) => r.academicTerm === "2026/2").length,
     ).toBeGreaterThan(20);

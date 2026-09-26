@@ -12,6 +12,7 @@ import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result"
 import { lockEnrollment, publishVersion } from "@/services/student-portal/versions";
 import { notifyAcademicUpdate } from "@/services/student-portal/notifications";
 import { Prisma } from "@/generated/prisma/client";
+import { autoMapHistorySnapshot, type HistoryMappingMethod } from "@/services/academic-analysis/history-mapping";
 
 const idSchema = z.string().uuid();
 const changeSchema = z.object({
@@ -165,6 +166,25 @@ export async function updateAcademicGridFieldAction(input: unknown): Promise<Act
     logger.warn("academic_analysis.field_update.failed", { errorName: error instanceof Error ? error.name : "unknown", errorCode: error && typeof error === "object" && "code" in error ? String(error.code) : undefined });
     if (error instanceof Error && error.message.startsWith("Esta análise foi atualizada por outra alteração")) return fail(error.message);
     return toActionError(error, "Não foi possível salvar esta alteração. Confira sua conexão e tente novamente.");
+  }
+}
+
+/** Identifica automaticamente os períodos curriculares de um histórico já salvo (estrutura do documento + IA). */
+export async function autoMapAcademicGridAction(reviewIdInput: unknown): Promise<ActionResult<{ mappedRows: number; method: HistoryMappingMethod; snapshot: AcademicGridSnapshot; currentPeriod: number | null }>> {
+  try {
+    const user = await requirePermission("analysis:review");
+    const reviewId = idSchema.parse(reviewIdInput);
+    const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
+    const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
+    snapshot.result = { ...snapshot.result, currentPeriod: review.currentPeriod, currentPeriodConfirmed: review.currentPeriodConfirmed };
+    const mapped = await autoMapHistorySnapshot(snapshot, { allowAI: true });
+    if (mapped.method === "NONE") return fail("Não foi possível identificar os períodos com segurança. Confira as disciplinas manualmente.");
+    await persistCorrection({ reviewId, userId: user.id, disciplineIndex: null, field: "autoMapping", previousValue: null, newValue: { method: mapped.method, mappedRows: mapped.mappedRows }, snapshot: mapped.snapshot, currentPeriod: mapped.snapshot.result.currentPeriod, expectedUpdatedAt: review.updatedAt, reason: mapped.method === "AI" ? "Períodos identificados com apoio de IA" : "Períodos identificados pela estrutura do histórico" });
+    return ok({ mappedRows: mapped.mappedRows, method: mapped.method, snapshot: mapped.snapshot, currentPeriod: mapped.snapshot.result.currentPeriod }, `${mapped.mappedRows} disciplina(s) mapeadas automaticamente. Previsão recalculada.`);
+  } catch (error) {
+    logger.warn("academic_analysis.auto_mapping.failed", { errorName: error instanceof Error ? error.name : "unknown" });
+    if (error instanceof Error && error.message.startsWith("Esta análise foi atualizada por outra alteração")) return fail(error.message);
+    return toActionError<{ mappedRows: number; method: HistoryMappingMethod; snapshot: AcademicGridSnapshot; currentPeriod: number | null }>(error, "Não foi possível mapear automaticamente. Tente novamente.");
   }
 }
 

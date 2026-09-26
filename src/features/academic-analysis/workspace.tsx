@@ -1,7 +1,7 @@
 "use client";
 import { SourceAttribution } from "@/features/student-portal/source-attribution";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -13,7 +13,7 @@ import { estimateGraduation, formatGraduationForecast, isBlockingForecastExtract
 import type { AcademicDiscipline, AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import type { AcademicCalendarTerm } from "@/domain/academic-calendar/calendar";
 import type { AcademicRules } from "@/domain/curricular-analysis/rules/types";
-import { updateAcademicGridFieldAction, addAcademicDisciplineAction, completeAcademicGridReviewAction } from "@/features/academic-analysis/actions";
+import { updateAcademicGridFieldAction, addAcademicDisciplineAction, completeAcademicGridReviewAction, autoMapAcademicGridAction } from "@/features/academic-analysis/actions";
 import { DeleteAcademicGridReviewButton } from "@/features/academic-analysis/delete-review-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +89,36 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }:
       ? [{ rowRef: `${item.sourcePage}-${item.sourceRow}`, code: item.code, name: item.name, rawPeriod: item.rawPeriod, period: item.period, status: item.originalStatus }]
       : [];
   }).slice(0, 12);
+
+  const isHistoryDocument = snapshot.documentType === "SIMPLE_ACADEMIC_HISTORY" || snapshot.documentType === "OFFICIAL_ACADEMIC_HISTORY";
+  const [autoMapping, setAutoMapping] = useState(false);
+  const autoMapTried = useRef(false);
+  async function runAutoMapping(silent = false) {
+    if (autoMapping) return;
+    setAutoMapping(true);
+    try {
+      const res = await autoMapAcademicGridAction(review.id);
+      if (!res.ok) { if (!silent) toast.error(res.error); return; }
+      setSnapshot(res.data.snapshot);
+      setCurrentPeriodValue(res.data.currentPeriod);
+      setPeriodText(res.data.currentPeriod?.toString() ?? "");
+      setPeriodConfirmed(res.data.currentPeriod !== null);
+      setCompletedAt(null);
+      setMessageOverride(null);
+      toast.success(res.message ?? "Períodos identificados automaticamente.");
+      router.refresh();
+    } catch {
+      if (!silent) toast.error("Não foi possível mapear automaticamente. Tente novamente.");
+    } finally {
+      setAutoMapping(false);
+    }
+  }
+  useEffect(() => {
+    if (autoMapTried.current || !isHistoryDocument || !historyMappingRequired) return;
+    autoMapTried.current = true;
+    void runAutoMapping(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- executa uma única vez ao abrir a análise
+  }, []);
 
   async function requestAiReview() {
     if (!ambiguousRows.length) { toast.info("Não há linhas ambíguas identificadas para priorizar."); return; }
@@ -250,6 +280,7 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }:
           {unmappedDisciplines > 0 && <li>{unmappedDisciplines} disciplina(s) da grade principal sem período mapeado.</li>}
         </ul>
         <p className="mt-2 text-xs leading-5 text-amber-900/80">Enquanto essas pendências existirem, vagas e prazo de conclusão não são calculados.</p>
+        {isHistoryDocument && <Button type="button" size="sm" className="no-print mt-3 h-9 bg-brand-cyan text-white hover:bg-brand-cyan/90" onClick={() => void runAutoMapping()} disabled={autoMapping}>{autoMapping ? "Identificando períodos pelo histórico…" : "Mapear períodos automaticamente"}</Button>}
       </div>}
       <div className="no-print">
         <header className="mb-6 grid min-w-0 gap-5 border-b border-slate-200/80 pb-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -293,7 +324,10 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }:
           <div className="min-w-0 flex-1">
             <p id="confirm-mapping-title" className="text-sm font-semibold text-slate-900">{unmappedDisciplines} disciplina(s) sem período mapeado</p>
             <p className="mt-1 text-xs leading-5 text-slate-600">O período foi confirmado, mas ainda faltam disciplinas da grade principal sem posição no currículo. Enquanto isso não for resolvido, vagas e prazo de conclusão não são calculados.</p>
-            <Button type="button" size="sm" className="mt-3 h-9" onClick={openDisciplineReview}>Revisar disciplinas</Button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {isHistoryDocument && <Button type="button" size="sm" className="h-9 bg-brand-cyan text-white hover:bg-brand-cyan/90" onClick={() => void runAutoMapping()} disabled={autoMapping}>{autoMapping ? "Identificando períodos…" : "Mapear automaticamente"}</Button>}
+              <Button type="button" size="sm" variant="outline" className="h-9" onClick={openDisciplineReview}>Revisar disciplinas</Button>
+            </div>
           </div>
         </div>
       </aside>}
