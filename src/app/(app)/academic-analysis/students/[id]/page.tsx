@@ -3,7 +3,9 @@ import { StudentRequestsList } from "@/features/student-portal/requests-list";
 import { isProcessingFresh } from "@/services/student-portal/processing";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Eye, FilePenLine, UploadCloud, Sparkles, CalendarClock } from "lucide-react";
+import { ArrowLeft, Eye, FilePenLine, UploadCloud, Sparkles, CalendarClock, MapPin } from "lucide-react";
+import { findPolo } from "@/domain/polos";
+import { can } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { requirePagePermission } from "@/lib/session";
 import { requireEnrollment, accessStatus } from "@/services/student-portal/access";
@@ -86,6 +88,19 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
                     <span className="rounded-full bg-brand-gold/15 px-2.5 py-1 text-brand-gold ring-1 ring-brand-gold/30">{documentLabels[snapshot.documentType]}</span>
                   )}
                 </div>
+                {student.owner && (
+                  <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-white/75">
+                    <MapPin className="size-3.5 shrink-0" />
+                    Responsável: {student.owner.name}
+                    {student.owner.poloCode ? (
+                      <> · Polo {findPolo(student.owner.poloCode)?.name ?? student.owner.poloCode}</>
+                    ) : can(user.role, "users:manage") ? (
+                      <Link href="/settings/users" className="text-brand-gold underline-offset-2 hover:underline">· sem polo — o aluno vê os contatos de todos os polos (definir polo)</Link>
+                    ) : (
+                      <span className="text-brand-gold">· sem polo — o aluno vê os contatos de todos os polos</span>
+                    )}
+                  </p>
+                )}
               </div>
             </div>
 

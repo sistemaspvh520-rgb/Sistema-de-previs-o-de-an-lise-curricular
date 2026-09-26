@@ -20,7 +20,7 @@ import { getSystemSettings } from "@/repositories/settings-repository";
 import type { PoloContactEntry } from "@/repositories/settings-repository";
 import { isProcessingFresh } from "@/services/student-portal/processing";
 import { SettingsSheet } from "@/features/student-portal/settings-sheet";
-import { findPolo } from "@/domain/polos";
+import { findPolo, POLOS } from "@/domain/polos";
 import { ContactCard, SettingsSection } from "@/features/student-portal/settings-sections";
 import { ChevronDown, FileText, Headset, KeyRound, MapPin, UserRound } from "lucide-react";
 
@@ -118,6 +118,20 @@ export default async function StudentPortalPage({
       ]
     : [];
   const filledContacts = contactRoles.filter(([, entry]) => entry?.nome);
+  // Responsável sem polo: o aluno escolhe o próprio polo entre todos os que têm contatos cadastrados.
+  const contactsByPolo = poloContacts
+    ? []
+    : POLOS.map((item) => {
+        const entries = settings.poloContacts[item.code];
+        const roles: Array<[string, PoloContactEntry | undefined]> = entries
+          ? [
+              ["Mantenedor", entries.mantenedor],
+              ...(coordinators.length ? [] : [["Coordenação acadêmica", entries.coordAcademico] as [string, PoloContactEntry]]),
+              ["Coordenação comercial", entries.coordComercial],
+            ]
+          : [];
+        return { polo: item, contacts: roles.filter(([, entry]) => entry?.nome) };
+      }).filter((item) => item.contacts.length);
   const contactMessage = `Olá! Sou ${enrollment.name}, RGM ${enrollment.rgm}, e estou entrando em contato pelo Portal Acadêmico.`;
   return (
     <PortalEffects>
@@ -193,12 +207,37 @@ export default async function StudentPortalPage({
                         message={contactMessage}
                       />
                     ))}
+                    {contactsByPolo.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="pt-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">Contatos por polo</p>
+                        {contactsByPolo.map(({ polo: item, contacts }) => (
+                          <details key={item.code} className="group rounded-2xl border border-slate-200 bg-white open:border-brand-cyan/30 open:bg-slate-50/60">
+                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[#003B71] [&::-webkit-details-marker]:hidden">
+                              <span className="flex min-w-0 items-center gap-2"><MapPin className="size-4 shrink-0 text-brand-cyan-700" /><span className="truncate">{item.name}</span></span>
+                              <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                            </summary>
+                            <div className="space-y-2 px-3 pb-3">
+                              {contacts.map(([label, entry]) => (
+                                <ContactCard
+                                  key={label}
+                                  role={label}
+                                  name={entry!.nome}
+                                  email={entry!.email || null}
+                                  phone={entry!.telefone || null}
+                                  message={contactMessage}
+                                />
+                              ))}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    )}
                     {polo && (
                       <p className="flex items-center gap-1.5 text-xs text-slate-500">
                         <MapPin className="size-3.5" /> Polo {polo.name}
                       </p>
                     )}
-                    {!enrollment.owner && !filledContacts.length && !coordinators.length && (
+                    {!enrollment.owner && !filledContacts.length && !coordinators.length && !contactsByPolo.length && (
                       <p className="text-sm text-slate-500">
                         Nenhum contato disponível no momento.
                       </p>

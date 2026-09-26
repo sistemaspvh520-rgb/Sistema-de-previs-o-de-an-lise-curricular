@@ -8,7 +8,8 @@ const NAVY = "#003b71";
 const CYAN = "#0693e3";
 const TEXT = "#17212B";
 const MUTED = "#5B6B7B";
-const BG = "#F5F7FA";
+const BG = "#EEF3F9";
+const SOFT = "#F3F8FD";
 
 function escape(s: string): string {
   return s
@@ -16,6 +17,12 @@ function escape(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** "JOÃO VITOR" → "João": nomes cadastrados em maiúsculas não "gritam" na saudação. */
+function firstName(name: string): string {
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  return first.charAt(0).toLocaleUpperCase("pt-BR") + first.slice(1).toLocaleLowerCase("pt-BR");
 }
 
 function layout(opts: {
@@ -28,36 +35,39 @@ function layout(opts: {
   institution: string;
 }): string {
   const details = opts.details?.length
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border:1px solid #DFE5EC;border-radius:8px;border-collapse:separate;">
-        ${opts.details.map(([k, v]) => `<tr><td style="padding:10px 14px;color:${MUTED};font-size:13px;border-bottom:1px solid #EEF1F5;">${escape(k)}</td><td style="padding:10px 14px;color:${TEXT};font-size:13px;font-weight:600;border-bottom:1px solid #EEF1F5;">${escape(v)}</td></tr>`).join("")}
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${SOFT}" style="margin:22px 0 4px;background:${SOFT};border:1px solid #D6E6F5;border-radius:12px;border-collapse:separate;">
+        ${opts.details.map(([k, v], i) => `<tr><td style="padding:12px 16px;color:${MUTED};font-size:13px;${i ? "border-top:1px solid #E1ECF6;" : ""}">${escape(k)}</td><td align="right" style="padding:12px 16px;color:${NAVY};font-size:14px;font-weight:700;${i ? "border-top:1px solid #E1ECF6;" : ""}">${escape(v)}</td></tr>`).join("")}
       </table>`
     : "";
   const button = opts.button
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td style="background:${NAVY};border-radius:8px;">
-        <a href="${escape(opts.button.url)}" style="display:inline-block;padding:13px 24px;color:#ffffff;font-weight:600;font-size:15px;text-decoration:none;font-family:Arial,Helvetica,sans-serif;">${escape(opts.button.label)}</a>
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 18px;"><tr><td bgcolor="${NAVY}" style="background:${NAVY};border-radius:10px;box-shadow:0 8px 18px -10px rgba(0,59,113,.6);">
+        <a href="${escape(opts.button.url)}" style="display:inline-block;padding:15px 30px;color:#ffffff;font-weight:700;font-size:15px;line-height:1;text-decoration:none;font-family:Arial,Helvetica,sans-serif;border-radius:10px;">${escape(opts.button.label)} &rarr;</a>
       </td></tr></table>
-      <p style="margin:0 0 8px;font-size:12px;color:${MUTED};">Se o botão não funcionar, copie e cole este endereço no navegador:<br><a href="${escape(opts.button.url)}" style="color:${NAVY};word-break:break-all;">${escape(opts.button.url)}</a></p>`
+      <p style="margin:0 0 8px;font-size:12px;line-height:1.6;color:${MUTED};">Se o botão não funcionar, copie e cole este endereço no navegador:<br><a href="${escape(opts.button.url)}" style="color:${CYAN};word-break:break-all;">${escape(opts.button.url)}</a></p>`
     : "";
   return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escape(opts.title)}</title></head>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${escape(opts.title)}</title></head>
 <body style="margin:0;padding:0;background:${BG};font-family:Arial,Helvetica,sans-serif;color:${TEXT};">
-<span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;">${escape(opts.preheader)}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:32px 12px;"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #DFE5EC;">
-  <tr><td style="background:${CYAN};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
-  <tr><td style="background:${NAVY};padding:22px 28px 18px;">
-    <img src="${appUrl("/brand/logo-cruzeiro-do-sul-virtual.png")}" alt="Cruzeiro do Sul Virtual" width="220" height="53" style="display:block;width:220px;max-width:100%;height:auto;border:0;" />
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.18);color:#ffffff;font-size:14px;font-weight:600;letter-spacing:.01em;">Sistema de Análise Curricular Inteligente</div>
+<span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${escape(opts.preheader)}</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${BG}" style="background:${BG};padding:32px 12px;"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #DCE5EE;box-shadow:0 18px 40px -30px rgba(0,59,113,.55);">
+  <tr><td bgcolor="${NAVY}" style="background:${NAVY};padding:26px 32px 22px;">
+    <img src="${appUrl("/brand/logo-email.png")}" alt="Cruzeiro do Sul Virtual · Educação a distância" width="220" height="52" style="display:block;width:220px;max-width:100%;height:auto;border:0;outline:none;" />
+    <p style="margin:18px 0 0;padding-top:14px;border-top:1px solid rgba(255,255,255,.16);color:#9FD8FF;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Sistema de Análise Curricular Inteligente</p>
   </td></tr>
-  <tr><td style="padding:28px 28px 8px;">
-    <h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;color:${TEXT};">${escape(opts.title)}</h1>
-    <p style="margin:0;font-size:15px;line-height:1.6;color:${TEXT};">${opts.intro}</p>
+  <tr><td bgcolor="${CYAN}" style="background:${CYAN};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
+  <tr><td style="padding:32px 32px 10px;">
+    <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;color:${NAVY};">${escape(opts.title)}</h1>
+    <p style="margin:0;font-size:15px;line-height:1.65;color:${TEXT};">${opts.intro}</p>
     ${details}
     ${button}
-    ${opts.note ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.6;color:${MUTED};">${opts.note}</p>` : ""}
+    ${opts.note ? `<p style="margin:18px 0 0;padding:12px 14px;border-left:3px solid ${CYAN};background:#F7FAFD;font-size:13px;line-height:1.6;color:${MUTED};">${opts.note}</p>` : ""}
   </td></tr>
-  <tr><td style="padding:18px 28px 24px;border-top:1px solid #EEF1F5;font-size:12px;line-height:1.6;color:${MUTED};">
+  <tr><td style="padding:22px 32px 26px;font-size:12px;line-height:1.6;color:${MUTED};">
     Mensagem automática do <strong style="color:${TEXT};">Sistema de Análise Curricular Inteligente</strong> · ${escape(opts.institution)}.<br>Se você não esperava esta mensagem, ignore-a — nenhuma ação será feita na sua conta.
+  </td></tr>
+  <tr><td bgcolor="${NAVY}" style="background:${NAVY};padding:20px 32px;">
+    <a href="https://cruzeirodosulvirtual.com.br" style="text-decoration:none;"><img src="${appUrl("/brand/escolha-estrela-assinatura.png")}" alt="Escolha ter estrela · cruzeirodosulvirtual.com.br" width="170" height="49" style="display:block;width:170px;height:auto;border:0;outline:none;" /></a>
   </td></tr>
 </table>
 </td></tr></table>
@@ -80,7 +90,7 @@ export function inviteEmail(p: {
   validDays: number;
   institution: string;
 }): EmailContent {
-  const first = p.name.split(" ")[0];
+  const first = firstName(p.name);
   return {
     subject:
       "Sua conta no Sistema de Análise Curricular Inteligente foi criada",
@@ -107,7 +117,7 @@ export function resetEmail(p: {
   validMinutes: number;
   institution: string;
 }): EmailContent {
-  const first = p.name.split(" ")[0];
+  const first = firstName(p.name);
   return {
     subject: "Redefinição de senha — Sistema de Análise Curricular Inteligente",
     html: layout({
@@ -134,7 +144,7 @@ export function temporaryPasswordEmail(p: {
   loginUrl: string;
   institution: string;
 }): EmailContent {
-  const first = p.name.split(" ")[0];
+  const first = firstName(p.name);
   return {
     subject: "Senha temporária — Sistema de Análise Curricular Inteligente",
     html: layout({
