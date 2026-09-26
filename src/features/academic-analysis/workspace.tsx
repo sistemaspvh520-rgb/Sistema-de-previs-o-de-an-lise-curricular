@@ -38,7 +38,7 @@ type ReviewRecord = {
   previous: { id: string; previousPending: number } | null;
 };
 
-export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }: { review: ReviewRecord; calendarTerms: AcademicCalendarTerm[]; rules: AcademicRules; isAdmin: boolean }) {
+export function AcademicGridWorkspace({ review, calendarTerms, rules }: { review: ReviewRecord; calendarTerms: AcademicCalendarTerm[]; rules: AcademicRules }) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState(review.snapshot);
   const [newDisciplineIndex, setNewDisciplineIndex] = useState<number | null>(null);
@@ -297,7 +297,7 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules, isAdmin }:
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <Button size="lg" onClick={() => window.print()}>Gerar relatório do aluno</Button>
-            {isAdmin && <DeleteAcademicGridReviewButton reviewId={review.id} />}
+            <DeleteAcademicGridReviewButton reviewId={review.id} />
           </div>
         </header>
       </div>

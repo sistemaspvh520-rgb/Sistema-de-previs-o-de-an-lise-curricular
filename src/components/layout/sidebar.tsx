@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
@@ -23,6 +22,7 @@ import { can, type Permission } from "@/lib/rbac";
 import type { Role } from "@/generated/prisma/enums";
 import { MAIN_NAV, SETTINGS_NAV } from "@/components/layout/nav-items";
 import { BrandLogo } from "@/components/shared/brand-logo";
+import { CampaignSignature } from "@/components/shared/campaign-signature";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -159,7 +159,7 @@ export function Sidebar({ role, onNavigate, onClose, variant = "rail" }: { role:
         )}
       </nav>
       <div className={cn("shrink-0 border-t border-white/10 px-5 py-5", settingsVisibility)}>
-        <Image src="/brand/escolha-estrela-selo.png" alt="Escolha ter estrela" width={147} height={40} className="mx-auto h-10 w-[147px]" />
+        <CampaignSignature showSite={false} align="center" className="text-[1.35rem] sm:text-[1.35rem]" />
       </div>
     </aside>
   );

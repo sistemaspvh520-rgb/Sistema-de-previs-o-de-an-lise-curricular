@@ -3,6 +3,8 @@ import { requirePermission } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { reviewAcademicRequest } from "@/services/academic-documents/requests";
+import { deleteAcademicRequest, DeletionBlockedError } from "@/services/student-portal/deletion";
+import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
 export async function academicRequestAction(
   _state: { error?: string; success?: string },
   form: FormData,
@@ -32,5 +34,23 @@ export async function academicRequestAction(
     return {
       error: e instanceof Error ? e.message : "Não foi possível atualizar.",
     };
+  }
+}
+
+/** Exclui a solicitação, o documento enviado e a versão da análise que ele gerou. */
+export async function deleteAcademicRequestAction(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("students:manage");
+    const parsed = z.object({ requestId: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return fail("Solicitação inválida.");
+    const result = await deleteAcademicRequest(user, parsed.data.requestId);
+    revalidatePath("/academic-analysis");
+    revalidatePath("/academic-analysis/requests");
+    revalidatePath(`/academic-analysis/students/${result.enrollmentId}`);
+    revalidatePath("/portal");
+    return ok(undefined, `Solicitação #${result.protocol} excluída.`);
+  } catch (error) {
+    if (error instanceof DeletionBlockedError) return fail(error.message);
+    return toActionError(error, "Não foi possível excluir a solicitação.");
   }
 }

@@ -13,6 +13,7 @@ import { lockEnrollment, publishVersion } from "@/services/student-portal/versio
 import { notifyAcademicUpdate } from "@/services/student-portal/notifications";
 import { Prisma } from "@/generated/prisma/client";
 import { autoMapHistorySnapshot, type HistoryMappingMethod } from "@/services/academic-analysis/history-mapping";
+import { deleteAcademicGridReview, DeletionBlockedError } from "@/services/student-portal/deletion";
 
 const idSchema = z.string().uuid();
 const changeSchema = z.object({
@@ -256,37 +257,18 @@ export async function completeAcademicGridReviewAction(reviewIdInput: unknown): 
 /** Exclui uma análise acadêmica definitivamente; autorização validada no servidor. */
 export async function deleteAcademicGridReviewAction(input: unknown): Promise<ActionResult> {
   try {
-    const admin = await requirePermission("analysis:delete");
+    const user = await requirePermission("academic:manage");
     const parsed = z.object({ reviewId: idSchema }).safeParse(input);
     if (!parsed.success) return fail("Análise inválida.");
-
-    const review = await prisma.academicGridReview.findUnique({
-      where: { id: parsed.data.reviewId },
-      select: { id: true, enrollmentId: true, studentName: true, rgm: true, courseName: true, sourceFilename: true },
-    });
-    if (!review) return fail("Análise acadêmica não encontrada.");
-    if (review.enrollmentId) return fail("Esta análise compõe o histórico do aluno e não pode ser excluída por esta ação.");
-
-    await prisma.$transaction(async (tx) => {
-      await tx.academicGridReview.delete({ where: { id: review.id } });
-      await tx.auditLog.create({
-        data: {
-          userId: admin.id,
-          action: "academic_grid.delete",
-          entityType: "AcademicGridReview",
-          entityId: review.id,
-          metadata: {
-            studentName: review.studentName,
-            rgm: review.rgm,
-            courseName: review.courseName,
-            sourceFilename: review.sourceFilename,
-          },
-        },
-      });
-    });
-
+    const result = await deleteAcademicGridReview(user, parsed.data.reviewId);
     revalidatePath("/academic-analysis");
-    revalidatePath(`/academic-analysis/${review.id}`);
+    revalidatePath("/academic-analysis/requests");
+    revalidatePath("/academic-analysis/students");
+    if (result.enrollmentId) revalidatePath(`/academic-analysis/students/${result.enrollmentId}`);
+    revalidatePath("/portal");
     return ok(undefined, "Análise acadêmica excluída definitivamente.");
-  } catch (error) { return toActionError(error); }
+  } catch (error) {
+    if (error instanceof DeletionBlockedError) return fail(error.message);
+    return toActionError(error, "Não foi possível excluir a análise.");
+  }
 }

@@ -1,5 +1,6 @@
 import { RequestLiveUpdates } from "@/features/student-portal/request-live-updates";
 import { BlurFade } from "@/components/magic/blur-fade";
+import { DeleteRequestButton } from "@/features/student-portal/delete-request-button";
 import { SpotlightCard } from "@/components/magic/spotlight-card";
 import { NumberTicker } from "@/components/magic/number-ticker";
 import Link from "next/link";
@@ -249,16 +250,17 @@ export default async function AcademicRequestsPage({
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>
-              {[
-                "Protocolo",
-                "Aluno / RGM",
-                "Documento / tipo",
-                "Status",
-                "Tutor",
-                "Enviado / última atividade",
-              ].map((s) => (
-                <th key={s} className="p-4">
-                  {s}
+              {([
+                ["Protocolo", ""],
+                ["Aluno / RGM", ""],
+                ["Documento / tipo", "hidden md:table-cell"],
+                ["Status", ""],
+                ["Tutor", "hidden lg:table-cell"],
+                ["Enviado / última atividade", "hidden xl:table-cell"],
+                ["", "w-12"],
+              ] as const).map(([label, cls]) => (
+                <th key={label || "acoes"} className={`p-4 ${cls}`}>
+                  {label || <span className="sr-only">Ações</span>}
                 </th>
               ))}
             </tr>
@@ -280,7 +282,7 @@ export default async function AcademicRequestsPage({
                     {r.sourceDocument.enrollment.rgm}
                   </small>
                 </td>
-                <td className="max-w-64 p-4">
+                <td className="hidden max-w-64 p-4 md:table-cell">
                   <p className="truncate">{r.sourceDocument.filename}</p>
                   <small className="text-sky-700">
                     {documentLabels[r.sourceDocument.documentType]}
@@ -294,10 +296,10 @@ export default async function AcademicRequestsPage({
                       : "Processamento local"}
                   </small>
                 </td>
-                <td className="p-4">
+                <td className="hidden p-4 lg:table-cell">
                   {r.sourceDocument.enrollment.owner.name}
                 </td>
-                <td className="whitespace-nowrap p-4 text-xs">
+                <td className="hidden whitespace-nowrap p-4 text-xs xl:table-cell">
                   {r.createdAt.toLocaleString("pt-BR", {
                     timeZone: "America/Porto_Velho",
                   })}
@@ -306,6 +308,9 @@ export default async function AcademicRequestsPage({
                       timeZone: "America/Porto_Velho",
                     })}
                   </span>
+                </td>
+                <td className="p-4 text-right">
+                  <DeleteRequestButton requestId={r.id} protocol={r.protocol} iconOnly />
                 </td>
               </tr>
             ))}
@@ -318,7 +323,7 @@ export default async function AcademicRequestsPage({
         )}
       </div>
       <nav className="flex justify-between text-sm">
-        <span>{count} solicitações</span>
+        <span>{count} {count === 1 ? "solicitação" : "solicitações"}</span>
         {page > 1 && <Link href={href(page - 1)}>Anterior</Link>}
         {page * 30 < count && <Link href={href(page + 1)}>Próxima</Link>}
       </nav>

@@ -1,3 +1,4 @@
+import { DeleteRequestButton } from "@/features/student-portal/delete-request-button";
 import { RequestLiveUpdates } from "@/features/student-portal/request-live-updates";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -124,6 +125,9 @@ export default async function AcademicRequestPage({
         >
           Enviar novo documento
         </Link>
+        <span className="ml-auto self-center">
+          <DeleteRequestButton requestId={request.id} protocol={request.protocol} redirectTo="/academic-analysis/requests" />
+        </span>
       </nav>
       <section className="rounded-2xl border bg-white p-6">
         <h2 className="font-semibold text-[#003B71]">Resultado e alterações</h2>

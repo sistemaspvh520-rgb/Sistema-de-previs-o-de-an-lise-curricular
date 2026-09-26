@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             <LoginForm callbackUrl={callbackUrl} />
           </div>
         </div>
-        <CampaignSignature className="mt-7 text-center" />
+        <CampaignSignature align="center" className="mt-7" />
         <p className="mt-6 text-center text-xs text-white/60">
           Sistema interno · Universidade Cruzeiro do Sul Virtual
         </p>

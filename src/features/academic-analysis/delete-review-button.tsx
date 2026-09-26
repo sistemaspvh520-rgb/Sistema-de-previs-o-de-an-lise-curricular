@@ -43,7 +43,7 @@ export function DeleteAcademicGridReviewButton({ reviewId, compact = false }: { 
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir esta análise acadêmica?</AlertDialogTitle>
-          <AlertDialogDescription>Esta ação remove a análise e seu histórico de correções permanentemente. Ela não pode ser desfeita.</AlertDialogDescription>
+          <AlertDialogDescription>Remove a análise e o histórico de correções. Se ela faz parte do histórico de um aluno, a versão publicada e o documento que a gerou também são removidos, e a versão anterior volta a ser exibida no portal. Esta ação não pode ser desfeita.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancelar</AlertDialogCancel>

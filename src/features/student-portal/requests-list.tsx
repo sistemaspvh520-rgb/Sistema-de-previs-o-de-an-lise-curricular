@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { requestLabels } from "./request-labels";
+import { DeleteRequestButton } from "./delete-request-button";
 import { documentLabels } from "@/services/academic-documents/classifier";
 /** Caller must first authorize enrollment through requireEnrollment. */
 export async function StudentRequestsList({
@@ -79,6 +80,11 @@ export async function StudentRequestsList({
               >
                 Abrir solicitação
               </Link>
+            )}
+            {support && (
+              <span className="ml-3 inline-block align-middle">
+                <DeleteRequestButton requestId={r.id} protocol={r.protocol} iconOnly />
+              </span>
             )}
           </li>
         ))}

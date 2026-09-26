@@ -52,5 +52,5 @@ export default async function AcademicGridReviewPage({ params }: PageProps<"/aca
       id: previousRecord.id,
       previousPending: previousSnapshot.result.previousPending,
     } : null,
-  }} calendarTerms={calendarTerms} rules={projectionRules} isAdmin={user.role === "ADMIN"} />;
+  }} calendarTerms={calendarTerms} rules={projectionRules} />;
 }

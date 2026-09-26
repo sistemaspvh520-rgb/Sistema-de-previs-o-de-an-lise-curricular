@@ -650,4 +650,28 @@ describe("Portal Acadêmico — banco real", () => {
     expect(flags[0].relrowsecurity).toBe(true);
   });
 
+
+  it("tutor exclui solicitação e análise dos próprios alunos, com a versão anterior voltando a ser a atual", async () => {
+    const { claimUpload, processUpload } = await import("@/services/student-portal/processing");
+    const { deleteAcademicRequest, deleteAcademicGridReview } = await import("@/services/student-portal/deletion");
+    const code = `${rgm}41`;
+    const enrollment = await prisma.studentEnrollment.create({ data: { rgm: code, name: student.name, ownerId: tutor.id, courseName: "Administracao" } });
+    enrollments.push(enrollment.id);
+    for (const pdf of [academicPdf(code), academicPdf(code, "CURSANDO")]) {
+      const claim = await claimUpload(tutor, enrollment.id, pdf, "extrato.pdf");
+      await processUpload(claim.source.id, claim.source.attempts, pdf);
+    }
+    const [v1, v2] = await prisma.academicAnalysisVersion.findMany({ where: { enrollmentId: enrollment.id }, orderBy: { version: "asc" } });
+    expect((await prisma.studentEnrollment.findUniqueOrThrow({ where: { id: enrollment.id } })).currentVersionId).toBe(v2.id);
+    const latest = await prisma.academicRequest.findFirstOrThrow({ where: { sourceDocument: { versionId: v2.id } } });
+    await expect(deleteAcademicRequest(otherTutor, latest.id)).rejects.toThrow("seus alunos");
+    await deleteAcademicRequest(tutor, latest.id);
+    expect((await prisma.studentEnrollment.findUniqueOrThrow({ where: { id: enrollment.id } })).currentVersionId).toBe(v1.id);
+    expect(await prisma.academicAnalysisVersion.count({ where: { id: v2.id } })).toBe(0);
+    expect(await prisma.academicGridReview.count({ where: { id: v2.reviewId } })).toBe(0);
+    await deleteAcademicGridReview(tutor, v1.reviewId);
+    expect((await prisma.studentEnrollment.findUniqueOrThrow({ where: { id: enrollment.id } })).currentVersionId).toBeNull();
+    expect(await prisma.academicAnalysisSource.count({ where: { enrollmentId: enrollment.id } })).toBe(0);
+    expect(await prisma.auditLog.count({ where: { userId: tutor.id, action: { in: ["academic_request.delete", "academic_grid.delete"] } } })).toBe(2);
+  }, 30000);
 });
