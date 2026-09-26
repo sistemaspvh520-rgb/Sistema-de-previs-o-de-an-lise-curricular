@@ -9,11 +9,25 @@ export function CampaignSignature({
   className,
   showSite = true,
   align = "left",
+  variant = "inline",
 }: {
   className?: string;
   showSite?: boolean;
   align?: "left" | "center";
+  /** "stacked" reproduz o selo do menu lateral: "Escolha" em cima e "ter estrela" laranja abaixo, deslocado. */
+  variant?: "inline" | "stacked";
 }) {
+  if (variant === "stacked")
+    return (
+      <div className={cn("text-[1.25rem]", align === "center" && "flex justify-center", className)}>
+        <p aria-label="Escolha ter estrela" className="inline-flex flex-col leading-none">
+          <span aria-hidden="true" className="font-sans font-bold tracking-tight text-white">Escolha</span>
+          <span aria-hidden="true" className="-mt-[0.18em] ml-[1.05em] -rotate-2 whitespace-nowrap font-script text-[1.3em] font-bold text-[#FFB828]">
+            ter estrela
+          </span>
+        </p>
+      </div>
+    );
   return (
     <div className={cn("text-[1.35rem] sm:text-[1.6rem]", align === "center" && "text-center", className)}>
       <p aria-label="Escolha ter estrela." className="whitespace-nowrap leading-none">
