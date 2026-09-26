@@ -15,6 +15,8 @@ import {
   ChartColumnIncreasing,
   BookOpen,
   GraduationCap,
+  Inbox,
+  Users,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,8 @@ const ICONS = {
   reports: ChartColumnIncreasing,
   grades: BookOpen,
   academic: GraduationCap,
+  requests: Inbox,
+  students: Users,
   settings: Settings,
 } as const;
 

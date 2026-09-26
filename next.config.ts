@@ -28,6 +28,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Identifica cada publicação: quando uma aba aberta antes de um deploy navega para o servidor
+  // novo, o Next.js detecta a diferença e recarrega a página em vez de mostrar "This page couldn't load".
+  deploymentId: process.env.NEXT_DEPLOYMENT_ID || process.env.VERCEL_DEPLOYMENT_ID || undefined,
   // Server Action arguments can contain passwords and one-time tokens.
   logging: { serverFunctions: false, incomingRequests: { ignore: [/definir-senha/] } },
   poweredByHeader: false,
