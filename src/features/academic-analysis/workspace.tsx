@@ -1,9 +1,10 @@
 "use client";
 import { SourceAttribution } from "@/features/student-portal/source-attribution";
+import { sourceReportText } from "@/services/academic-documents/classifier";
+import { CampaignSignature } from "@/components/shared/campaign-signature";
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { BorderBeam } from "@/components/ui/border-beam";
@@ -514,76 +515,164 @@ function StudentAcademicPrintReport({ sourceSnapshot, studentName, courseName, r
   const reportDisciplines = disciplines.filter((item) => !isBlankManualDisciplineDraft(item));
   const included = reportDisciplines.filter((item) => item.inMainCurriculum);
   const completed = included.filter((item) => ["COMPLETED", "EXEMPT"].includes(academicStatusOutcome(item.normalizedStatus))).length;
-  const inProgress = included.filter((item) => academicStatusOutcome(item.normalizedStatus) === "IN_PROGRESS").length;
   const needsReview = included.filter(academicDisciplineNeedsReview).length;
   const completion = forecast ? formatGraduationForecast(forecast).completion : "";
   const pendingByPeriod = Object.entries(result.pendingByPeriod).sort(([periodA], [periodB]) => Number(periodA) - Number(periodB));
   const reportStatus = getAcademicReportStatus(result.status);
   const nextStep = getAcademicReportNextStep(result, needsReview);
+  const documentType = sourceSnapshot.documentType ?? "CURRICULAR_EXTRACT";
   const mappingMissing = Boolean(sourceSnapshot.documentType && sourceSnapshot.documentType !== "CURRICULAR_EXTRACT" && (currentPeriod === null || disciplines.some(row => row.inMainCurriculum && row.period === null)));
+  const workload = documentType !== "CURRICULAR_EXTRACT" && sourceSnapshot.plannedWorkload && sourceSnapshot.integralizedWorkload != null ? { planned: sourceSnapshot.plannedWorkload, integralized: sourceSnapshot.integralizedWorkload } : null;
+  const progress = workload ? Math.min(100, Math.round(workload.integralized / workload.planned * 100)) : included.length ? Math.round(completed / included.length * 100) : 0;
+  const pending = forecast?.knownBacklog ?? result.previousPending;
+  const ring = 2 * Math.PI * 49;
+  const periods = [...new Set(included.filter((item) => item.period !== null).map((item) => item.period as number))].sort((a, b) => a - b);
+  const steps = forecast?.plan.slice(0, 6) ?? [];
+  const maxPending = Math.max(1, ...pendingByPeriod.map(([, count]) => count));
+  const ready = forecastCalculated && !forecast?.incomplete;
 
   return <article className="print-report" aria-label="Relatório acadêmico para o aluno">
-    <SourceAttribution type={sourceSnapshot.documentType} report />
-    {sourceSnapshot.plannedWorkload && sourceSnapshot.integralizedWorkload != null && <p className="report-source-footer">Curso integralizado: {Math.round(sourceSnapshot.integralizedWorkload / sourceSnapshot.plannedWorkload * 100)}% · {sourceSnapshot.integralizedWorkload.toLocaleString("pt-BR")}h de {sourceSnapshot.plannedWorkload.toLocaleString("pt-BR")}h</p>}
-    <div className="report-brand-row">
-      <Image src="/brand/logo-cruzeiro-do-sul-virtual.png" alt="Cruzeiro do Sul Virtual" width={221} height={53} className="report-logo" unoptimized />
-      <div className="report-title"><p>ACOMPANHAMENTO ACADÊMICO</p><h1>Resumo da análise</h1><span>Indicadores e próximos passos</span></div>
-    </div>
-    <div className="report-student">
-      <h2>{studentName ?? "Estudante"}</h2>
-      <p>{courseName ?? "Curso não identificado"}{rgm ? ` · RGM ${rgm}` : ""}</p>
-      <p className="report-date">Análise de {formatDate(analysisDate)}</p>
-    </div>
+    {documentType === "SIMPLE_ACADEMIC_HISTORY" && <div className="academic-source-watermark" aria-hidden="true">SIMPLES CONFERÊNCIA</div>}
 
-    <section className="report-forecast">
-      <div className="report-forecast-heading"><div><p className="report-kicker">RESULTADO</p><h2>{reportStatus.title}</h2></div><span className={forecastCalculated ? "report-status report-status-ready" : "report-status report-status-review"}>{forecastCalculated ? forecast?.incomplete ? "Faixa estimada" : "Cálculo automático" : "Dados insuficientes"}</span></div>
-      <div className="report-completion"><span>Previsão estimada de conclusão</span><strong>{forecastCalculated && completion ? completion : "Indisponível com os dados atuais"}</strong></div>
-      <p>{forecastCalculated ? forecast?.incomplete ? forecast.uncertainRows > 0 ? `Projeção automática com margem para ${forecast.uncertainRows} linha(s) incerta(s) do extrato.` : "Projeção automática com ressalvas nas regras acadêmicas cadastradas." : "Estimativa calculada automaticamente com base na grade e nas regras acadêmicas." : "O extrato não trouxe dados suficientes para calcular um prazo confiável."}</p>
-      <p className="report-assumption">Estimativa sujeita à aprovação, rematrícula no prazo, oferta de disciplinas e pré-requisitos.</p>
-    </section>
-
-    <section className="report-summary">
-      <div><strong>{completed}</strong><span>aprovadas ou dispensadas</span></div>
-      <div><strong>{inProgress}</strong><span>em andamento</span></div>
-      <div><strong>{result.previousPending}</strong><span>pendências anteriores</span></div>
-      <div><strong>{result.status === "MANUAL_REVIEW_REQUIRED" ? "—" : result.canAddNow}</strong><span>pendências que cabem no limite atual*</span></div>
-    </section>
-
-    {mappingMissing ? <p className="report-empty-state">Mapeamento curricular necessário. Vagas e pendências por período aguardam confirmação do tutor.</p> : <>
-    <section className="report-section report-capacity">
-      <div className="report-section-heading"><p className="report-kicker">PERÍODO ATUAL</p><h2>{currentPeriod ? `${currentPeriod}º período` : "Período não identificado"}</h2><p>Capacidade estimada para inclusão de disciplinas anteriores.</p></div>
-      <div className="report-capacity-grid">
-        <div><span>Componentes do período</span><strong>{result.currentPeriodComponents}</strong></div>
-        <div><span>Limite total calculado</span><strong>{result.semesterMaximum}</strong></div>
-        <div><span>Vagas extras livres</span><strong>{result.remainingExtraSlots}</strong></div>
-        <div><span>Dispensas AE/AE* no período</span><strong>{result.currentPeriodAE}</strong></div>
+    <div className="report-card relative overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#002b55_0%,#003B71_55%,#07558f_100%)] px-6 py-4 text-white">
+      <span aria-hidden="true" className="absolute -right-10 -top-16 size-56 rounded-full bg-[#0693E3]/25" />
+      <span aria-hidden="true" className="absolute -bottom-20 right-40 size-40 rounded-full bg-cyan-300/10" />
+      <div className="relative flex items-center justify-between gap-6">
+        {/* eslint-disable-next-line @next/next/no-img-element -- SVG vetorial: nítido na impressão */}
+        <img src="/brand/logo-cruzeiro-do-sul.svg" alt="Cruzeiro do Sul Virtual" className="h-11 w-auto" />
+        <div className="text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-100">Acompanhamento acadêmico</p>
+          <p className="mt-0.5 text-lg font-semibold tracking-tight">Resultado da análise</p>
+        </div>
       </div>
-      <p className="report-muted">*O número de pendências que cabem no limite é uma simulação; a inclusão depende da conferência da grade e da oferta acadêmica.</p>
+      <div className="relative mt-3 border-t border-white/15 pt-3">
+        <h1 className="text-[22px] font-semibold leading-tight tracking-tight">{studentName ?? "Estudante"}</h1>
+        <p className="mt-0.5 text-[13px] text-blue-50/85">{courseName ?? "Curso não identificado"}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium">
+          {rgm && <span className="rounded-full bg-white/12 px-2.5 py-0.5 ring-1 ring-white/20">RGM {rgm}</span>}
+          <span className="rounded-full bg-white/12 px-2.5 py-0.5 ring-1 ring-white/20">Análise de {formatDate(analysisDate)}</span>
+          <span className="ml-1 text-[10px] font-normal text-blue-100/80">{sourceReportText(documentType)}</span>
+        </div>
+      </div>
+    </div>
+
+    <section className="mt-2.5 grid grid-cols-[1.35fr_1fr] gap-2.5">
+      <div className="report-card relative overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#003B71_0%,#07558f_64%,#087db0_100%)] p-4 text-white">
+        <span aria-hidden="true" className="absolute -right-12 -top-20 size-56 rounded-full bg-cyan-200/10" />
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">Visão da jornada</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">{reportStatus.title}</h2>
+            <p className="mt-1 text-[11px] leading-4 text-blue-50/85">{workload ? "Curso integralizado conforme a carga horária do histórico escolar." : "Componentes da grade principal concluídos ou dispensados."}</p>
+          </div>
+          <div className="relative grid size-[88px] shrink-0 place-items-center" role="img" aria-label={`${progress}% concluído`}>
+            <svg viewBox="0 0 120 120" className="size-full -rotate-90" aria-hidden="true">
+              <circle cx="60" cy="60" r="49" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="10" />
+              <circle cx="60" cy="60" r="49" fill="none" stroke="#FEF84C" strokeWidth="10" strokeLinecap="round" strokeDasharray={ring} strokeDashoffset={ring * (1 - progress / 100)} />
+            </svg>
+            <span className="absolute text-xl font-semibold tabular-nums">{progress}<span className="text-xs">%</span></span>
+          </div>
+        </div>
+        <div className="relative mt-3 flex items-end justify-between gap-3 border-t border-white/15 pt-3">
+          <div><p className="text-[10px] text-blue-100/80">{workload ? "Carga horária integralizada" : "Concluídas ou dispensadas"}</p><p className="mt-0.5 text-base font-semibold tabular-nums">{workload ? `${workload.integralized.toLocaleString("pt-BR")}h` : completed} <span className="text-[11px] font-normal text-blue-100/80">de {workload ? `${workload.planned.toLocaleString("pt-BR")}h` : included.length}</span></p></div>
+          <div className="shrink-0 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-right">
+            <p className="text-[9px] font-medium uppercase tracking-wide text-blue-100/80">Conclusão estimada</p>
+            <p className="mt-0.5 whitespace-nowrap text-[15px] font-semibold tabular-nums">{forecastCalculated && completion ? completion : "Sem prazo calculado"}</p>
+            <p className="text-[9px] text-blue-100/75">{forecastCalculated ? forecast?.incomplete ? "Faixa automática · dados parciais" : "Estimativa automática" : "Dados insuficientes"}</p>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <ReportStat label="Período atual" value={currentPeriod ? `${currentPeriod}º` : "—"} note={`${result.currentPeriodComponents} componentes no período`} tone="border-t-[#0693E3]" />
+        <ReportStat label="Pendências anteriores" value={mappingMissing ? "—" : pending} note="Inclui reprovações registradas" tone="border-t-[#d6ce23]" />
+        <ReportStat label="Em andamento" value={mappingMissing ? "—" : result.previousAlreadyAdded} note="Já ocupam vagas adicionais" tone="border-t-[#1ca9b4]" />
+        <ReportStat label="Vagas adicionais" value={mappingMissing ? "—" : result.remainingExtraSlots} note={`Limite de ${result.semesterMaximum} · ${result.currentPeriodAE} AE/AE*`} tone="border-t-slate-400" />
+      </div>
     </section>
 
-    <section className="report-section">
-      <div className="report-section-heading"><p className="report-kicker">PENDÊNCIAS</p><h2>Distribuição por período</h2><p>Resumo das disciplinas anteriores que ainda constam como A CURSAR.</p></div>
-      {pendingByPeriod.length ? <div className="report-pending-grid">{pendingByPeriod.map(([period, count]) => <div key={period}><span>{period}º período</span><strong>{count}</strong><small>{count === 1 ? "pendência" : "pendências"}</small></div>)}</div> : <p className="report-empty-state">Não há pendências anteriores classificadas como A CURSAR.</p>}
-    </section>
-
-    </>}
-    {forecast?.plan.length ? <section className="report-section">
-      <div className="report-section-heading"><p className="report-kicker">PROJEÇÃO</p><h2>Etapas acadêmicas previstas</h2><p>Estimativa por semestre, sem repetir a relação completa de disciplinas.</p></div>
-      <ol className="report-plan">
-        {forecast.plan.slice(0, 6).map((step, index) => {
-          const plannedCount = new Set([...step.regularSubjectNames, ...step.inProgressSubjectNames, ...step.previousSubjects]).size;
-          return <li key={`${step.curriculumPeriod}-${step.term}-${index}`} className="report-plan-step">
-            <div><span>{step.isAdditional ? `Adaptação ${step.adaptationSemesterNumber}` : `${step.curriculumPeriod}º período`}{!step.isAdditional && step.curriculumPeriod === currentPeriod ? " · atual" : ""}</span><strong>{step.term ?? "Calendário indisponível"}</strong></div>
-            <b>{plannedCount} {plannedCount === 1 ? "componente" : "componentes"}</b>
+    {mappingMissing ? <p className="report-card mt-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">Mapeamento curricular necessário. Vagas e pendências por período aguardam confirmação do tutor.</p> : periods.length > 0 && <section className="report-card mt-2.5 rounded-2xl border border-slate-200 bg-white p-4">
+      <ReportHeading kicker="Mapa curricular" title="Jornada por período" note="Situação das disciplinas em cada período curricular." />
+      <ol className="mt-3 grid grid-cols-5 gap-2">
+        {periods.map((period) => {
+          const rows = included.filter((item) => item.period === period);
+          const done = rows.filter((item) => ["COMPLETED", "EXEMPT"].includes(academicStatusOutcome(item.normalizedStatus))).length;
+          const pendingRows = rows.filter((item) => academicStatusOutcome(item.normalizedStatus) === "PENDING").length;
+          const underway = rows.filter((item) => academicStatusOutcome(item.normalizedStatus) === "IN_PROGRESS").length;
+          const isCurrent = period === currentPeriod;
+          const isFuture = currentPeriod !== null && period > currentPeriod;
+          const state = isCurrent ? "current" : isFuture ? "future" : pendingRows ? "attention" : underway ? "underway" : "completed";
+          const label = { current: "Período atual", future: "Futuro", attention: "Com pendências", underway: "Em andamento", completed: "Concluído" }[state];
+          return <li key={period} className={cn("rounded-xl border p-2.5", state === "current" ? "border-[#0693E3]/60 bg-sky-50" : state === "attention" ? "border-amber-200 bg-amber-50/70" : state === "underway" ? "border-cyan-200 bg-cyan-50/60" : state === "completed" ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white")}>
+            <div className="flex items-center justify-between"><span className="text-[11px] font-semibold text-slate-900">{period}º período</span><span className={cn("size-1.5 rounded-full", state === "current" ? "bg-[#0693E3]" : state === "attention" ? "bg-amber-500" : state === "underway" ? "bg-cyan-500" : state === "completed" ? "bg-emerald-500" : "bg-slate-300")} /></div>
+            <p className={cn("mt-0.5 text-[9.5px] font-medium", state === "current" ? "text-sky-800" : state === "attention" ? "text-amber-800" : state === "underway" ? "text-cyan-800" : "text-slate-500")}>{label}</p>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-200"><div className={cn("h-full rounded-full", state === "current" ? "bg-[#0693E3]" : state === "underway" ? "bg-cyan-500" : "bg-emerald-500")} style={{ width: `${rows.length ? Math.round(done / rows.length * 100) : 0}%` }} /></div>
+            <p className="mt-1 text-[9px] text-slate-600">{done} de {rows.length}{pendingRows ? ` · ${pendingRows} pend.` : ""}{underway ? ` · ${underway} cursando` : ""}</p>
           </li>;
         })}
       </ol>
-      {forecast.plan.length > 6 && <p className="report-muted">A projeção continua nas etapas seguintes do plano acadêmico.</p>}
-    </section> : <section className="report-section"><div className="report-section-heading"><p className="report-kicker">PROJEÇÃO</p><h2>Etapas acadêmicas</h2></div><p className="report-empty-state">Não foi possível simular etapas com os dados disponíveis no extrato.</p></section>}
+    </section>}
 
-    <section className={forecastCalculated ? "report-next-step report-next-step-ready" : "report-next-step report-next-step-review"}><div><p className="report-kicker">PRÓXIMO PASSO</p><h2>{nextStep.title}</h2></div><p>{nextStep.description}</p></section>
-    <footer className="report-footer"><p>Resumo informativo para apoiar o planejamento acadêmico. A confirmação final depende dos registros e das regras oficiais da instituição.</p><span>{formatDate(analysisDate)}</span></footer>
+    <section className="report-card mt-2.5 rounded-2xl border border-slate-200 bg-white p-4">
+      <ReportHeading kicker="Projeção" title="Previsão de conclusão por semestre" note="Estimativa sujeita à aprovação, rematrícula no prazo, oferta e pré-requisitos." />
+      {steps.length ? <ol className="mt-3 grid grid-cols-2 gap-2">
+        {steps.map((step, index) => {
+          const load = step.capacity > 0 ? Math.min(100, Math.round(step.totalLoad / step.capacity * 100)) : 0;
+          const isCurrentStep = !step.isAdditional && step.curriculumPeriod === currentPeriod;
+          return <li key={`${step.curriculumPeriod}-${step.term}-${index}`} className={cn("relative rounded-xl border py-2.5 pl-8 pr-3", isCurrentStep ? "border-[#0693E3]/50 bg-sky-50/70" : "border-slate-200 bg-white")}>
+            <span aria-hidden="true" className={cn("absolute left-3 top-3.5 size-2.5 rounded-full ring-4", step.isAdditional ? "bg-[#FEF84C] ring-amber-100" : "bg-[#0693E3] ring-sky-100")} />
+            <div className="flex items-start justify-between gap-2">
+              <div><p className="text-[9.5px] font-semibold uppercase tracking-wide text-slate-500">{step.isAdditional ? `Adaptação ${step.adaptationSemesterNumber}` : `${step.curriculumPeriod}º período`}{isCurrentStep ? " · atual" : ""}</p><p className="text-sm font-semibold tabular-nums text-slate-900">{step.term ?? "Calendário indisponível"}</p></div>
+              <p className="text-right text-[9.5px] text-slate-500">Carga / capacidade<span className="block text-xs font-semibold tabular-nums text-slate-900">{step.totalLoad} / {step.capacity}</span></p>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={cn("h-full rounded-full", load >= 100 ? "bg-amber-400" : "bg-[#0693E3]")} style={{ width: `${load}%` }} /></div>
+            <p className="mt-1 text-[9.5px] text-slate-600">{[plural(step.regularSubjects, "regular", "regulares"), `${step.inProgressFromPrevious} em andamento`, plural(step.exemptions, "dispensa", "dispensas"), step.previousSubjects.length ? plural(step.previousSubjects.length, "adaptação", "adaptações") : null].filter(Boolean).join(" · ")}</p>
+          </li>;
+        })}
+      </ol> : <p className="mt-2 text-xs text-slate-500">Não foi possível simular etapas com os dados disponíveis no documento.</p>}
+      {(forecast?.plan.length ?? 0) > 6 && <p className="mt-2 text-[10px] text-slate-500">A projeção continua nas etapas seguintes do plano acadêmico.</p>}
+    </section>
+
+    <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+      {mappingMissing ? <div /> : <section className="report-card rounded-2xl border border-slate-200 bg-white p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-cyan-700">Pendências anteriores</p>
+        <h2 className="mt-0.5 text-sm font-semibold tracking-tight text-slate-900">{pendingByPeriod.length ? `${plural(result.previousPending, "disciplina", "disciplinas")} a cursar` : "Nenhuma pendência anterior"}</h2>
+        {pendingByPeriod.length ? <div className="mt-2 grid grid-cols-2 gap-1.5">{pendingByPeriod.map(([period, count]) => <div key={period} className="rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-1.5">
+          <div className="flex items-baseline justify-between"><span className="text-[10.5px] font-semibold text-slate-800">{period}º período</span><span className="text-[10px] font-semibold tabular-nums text-sky-800">{count}</span></div>
+          <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0693E3]" style={{ width: `${Math.max(6, Math.round(count / maxPending * 100))}%` }} /></div>
+        </div>)}</div> : <p className="mt-1 text-[11px] leading-4 text-slate-600">Não há disciplinas “A CURSAR” em períodos anteriores.</p>}
+        <p className="mt-2 text-[9.5px] leading-[1.35] text-slate-500">Cabem {result.status === "MANUAL_REVIEW_REQUIRED" ? "—" : result.canAddNow} pendência(s) no limite atual — simulação sujeita à conferência da grade e à oferta acadêmica.</p>
+      </section>}
+      <section className={cn("report-card rounded-2xl border p-4", ready ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
+        <p className={cn("text-[10px] font-semibold uppercase tracking-[0.14em]", ready ? "text-emerald-700" : "text-amber-700")}>Próximo passo</p>
+        <h2 className={cn("mt-0.5 text-sm font-semibold", ready ? "text-emerald-950" : "text-amber-950")}>{nextStep.title}</h2>
+        <p className="mt-1 text-[11px] leading-4 text-slate-700">{nextStep.description}</p>
+      </section>
+    </div>
+
+    <footer className="report-card mt-2.5 flex items-center justify-between gap-6 rounded-2xl bg-[#003B71] px-5 py-3 text-white">
+      <CampaignSignature className="text-[1.05rem] sm:text-[1.05rem]" />
+      <p className="max-w-[58%] text-right text-[9px] leading-[1.35] text-blue-100/85">Resumo informativo para apoiar o planejamento acadêmico. A confirmação final depende dos registros e das regras oficiais da instituição. Emitido em {formatDate(analysisDate)}.</p>
+    </footer>
   </article>;
+}
+
+function plural(count: number, one: string, many: string) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+function ReportHeading({ kicker, title, note }: { kicker: string; title: string; note: string }) {
+  return <div className="flex items-end justify-between gap-4">
+    <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-cyan-700">{kicker}</p><h2 className="mt-0.5 text-sm font-semibold tracking-tight text-slate-900">{title}</h2></div>
+    <p className="max-w-[50%] text-right text-[9.5px] leading-[1.35] text-slate-500">{note}</p>
+  </div>;
+}
+
+function ReportStat({ label, value, note, tone }: { label: string; value: number | string; note: string; tone: string }) {
+  return <div className={cn("report-card rounded-xl border border-slate-200 border-t-[3px] bg-white p-3", tone)}>
+    <p className="text-[10px] font-medium text-slate-500">{label}</p>
+    <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">{value}</p>
+    <p className="mt-0.5 text-[9.5px] leading-[1.3] text-slate-500">{note}</p>
+  </div>;
 }
 
 function getAcademicReportStatus(status: AcademicGridSnapshot["result"]["status"]): { title: string } {
