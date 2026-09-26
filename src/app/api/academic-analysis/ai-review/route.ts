@@ -25,7 +25,7 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   let userId: string;
   try {
-    userId = (await requirePermission("analysis:review")).id;
+    userId = (await requirePermission("academic:manage")).id;
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
     return NextResponse.json({ error: name === "UnauthorizedError" ? "Faça login para continuar." : "Você não tem permissão para revisar análises acadêmicas." }, { status: name === "UnauthorizedError" ? 401 : 403 });

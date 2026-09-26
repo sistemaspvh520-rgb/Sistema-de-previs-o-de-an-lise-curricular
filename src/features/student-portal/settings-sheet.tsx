@@ -22,14 +22,19 @@ export function SettingsSheet({ children }: { children: ReactNode }) {
           <span className="hidden sm:inline">Configurações</span>
         </button>
       </SheetTrigger>
-      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-md">
-        <SheetHeader className="border-b border-slate-100">
-          <SheetTitle className="text-[#003B71]">Configurações</SheetTitle>
-          <SheetDescription>
-            Contatos, solicitações e dados da sua conta.
-          </SheetDescription>
+      <SheetContent className="w-full gap-0 bg-slate-50 sm:max-w-md">
+        <SheetHeader className="border-b border-slate-200 bg-gradient-to-br from-brand-cyan-50 via-white to-white px-5 py-5">
+          <div className="flex items-center gap-3 pr-8">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#003B71] text-white shadow-[0_10px_24px_-14px_#003B71]">
+              <Settings className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <SheetTitle className="text-lg text-[#003B71]">Configurações</SheetTitle>
+              <SheetDescription>Contatos, solicitações e sua conta.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
-        <div className="flex flex-col gap-6 overflow-y-auto p-4">
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain scroll-smooth px-5 py-6">
           {children}
         </div>
       </SheetContent>

@@ -48,7 +48,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ROLE_LABELS } from "@/lib/rbac";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, STAFF_ROLES, isStudentFacingRole } from "@/lib/rbac";
+import { formatWhatsapp } from "@/lib/whatsapp";
 import { POLOS } from "@/domain/polos";
 import {
   deleteUserAction,
@@ -73,6 +74,7 @@ interface UserRow {
   mustChangePassword: boolean;
   inviteSentAt: string | null;
   poloCode: string | null;
+  phone: string | null;
 }
 
 export function UserRowActions({
@@ -93,6 +95,7 @@ export function UserRowActions({
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState<Role>(user.role);
   const [polo, setPolo] = useState(user.poloCode ?? NO_POLO);
+  const [phone, setPhone] = useState(formatWhatsapp(user.phone) ?? "");
   const [pending, start] = useTransition();
 
   function saveEdit() {
@@ -103,7 +106,8 @@ export function UserRowActions({
         email,
         role,
         isActive: user.isActive,
-        poloCode: polo === NO_POLO ? null : polo,
+        poloCode: isStudentFacingRole(role) && polo !== NO_POLO ? polo : null,
+        phone: isStudentFacingRole(role) ? phone : null,
       });
       if (res.ok) {
         toast.success(res.message);
@@ -284,28 +288,46 @@ export function UserRowActions({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                  {STAFF_ROLES.map((r) => (
                     <SelectItem key={r} value={r}>
                       {ROLE_LABELS[r]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {role !== "STUDENT" && (
+                <p className="text-xs text-muted-foreground">{ROLE_DESCRIPTIONS[role]}</p>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Polo</Label>
-              <Select value={polo} onValueChange={setPolo}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_POLO}>Sem polo definido</SelectItem>
-                  {POLOS.map((p) => (
-                    <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isStudentFacingRole(role) && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="min-w-0 space-y-2">
+                  <Label>Polo</Label>
+                  <Select value={polo} onValueChange={setPolo}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_POLO}>Sem polo definido</SelectItem>
+                      {POLOS.map((p) => (
+                        <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor={`phone-${user.id}`}>WhatsApp</Label>
+                  <Input
+                    id={`phone-${user.id}`}
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="(69) 99999-0000"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>

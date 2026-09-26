@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { requireUser } from "@/lib/session";
+import { requirePagePermission } from "@/lib/session";
 import { getAcademicGridReview, findPreviousAcademicGridReview } from "@/repositories/academic-analysis-repository";
 import type { AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import { AcademicGridWorkspace } from "@/features/academic-analysis/workspace";
@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Resultado da análise acadêmica" };
 export const dynamic = "force-dynamic";
 
 export default async function AcademicGridReviewPage({ params }: PageProps<"/academic-analysis/[id]">) {
-  const user = await requireUser();
+  const user = await requirePagePermission("academic:manage");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const review = await getAcademicGridReview(id);

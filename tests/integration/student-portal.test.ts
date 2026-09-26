@@ -46,7 +46,7 @@ beforeAll(async () => {
     throw new Error("Portal integration tests require a local database.");
   prisma = (await import("@/lib/prisma")).prisma;
   await prisma.$queryRaw`SELECT 1`;
-  const make = async (role: "ANALYST" | "STUDENT") => {
+  const make = async (role: "TUTOR" | "STUDENT") => {
     const user = await prisma.user.create({
       data: {
         role,
@@ -65,8 +65,8 @@ beforeAll(async () => {
       impersonator: null,
     } satisfies SessionUser;
   };
-  tutor = await make("ANALYST");
-  otherTutor = await make("ANALYST");
+  tutor = await make("TUTOR");
+  otherTutor = await make("TUTOR");
   student = await make("STUDENT");
   const enrollment = await prisma.studentEnrollment.create({
     data: {
@@ -547,7 +547,7 @@ describe("Portal Acadêmico — banco real", () => {
         sourceFileHash: "b".repeat(64),
         filename: "index-test.pdf",
         actorUserId: tutor.id,
-        actorRole: "ANALYST",
+        actorRole: "TUTOR",
       },
     });
     await expect(

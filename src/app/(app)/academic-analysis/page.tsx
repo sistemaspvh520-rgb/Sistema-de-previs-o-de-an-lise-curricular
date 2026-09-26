@@ -34,7 +34,7 @@ function firstParam(value: string | string[] | undefined) {
 }
 
 export default async function AcademicAnalysisPage({ searchParams }: PageProps<"/academic-analysis">) {
-  const user = await requirePagePermission("analysis:review");
+  const user = await requirePagePermission("academic:manage");
   const params = await searchParams;
   const query = firstParam(params.q)?.trim().slice(0, 100) ?? "";
   const responsibleCandidate = firstParam(params.responsavel) ?? "";

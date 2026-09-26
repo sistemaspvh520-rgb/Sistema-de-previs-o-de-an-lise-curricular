@@ -93,7 +93,7 @@ export default async function UsersPage() {
                 </TableCell>
                 <TableCell className="text-muted-foreground" title={u.lastActiveAt ? formatDateTime(u.lastActiveAt) : undefined}>{u.lastActiveAt ? formatRelativeTime(u.lastActiveAt) : "nunca acessou"}</TableCell>
                 <TableCell>
-                  <UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null, poloCode: u.poloCode }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} />
+                  <UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null, poloCode: u.poloCode, phone: u.phone }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} />
                 </TableCell>
               </TableRow>
             ))}
@@ -119,7 +119,7 @@ export default async function UsersPage() {
                 <span>{u.mustChangePassword ? (u.inviteSentAt ? `Convite enviado em ${formatDateTime(u.inviteSentAt)}` : "Convite ainda não enviado") : "Senha definida pelo usuário"}</span>
                 <span>Último acesso: {u.lastActiveAt ? `${formatRelativeTime(u.lastActiveAt)} · ${formatDateTime(u.lastActiveAt)}` : "nunca acessou"}</span>
               </div>
-              <div className="border-t pt-2"><UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null, poloCode: u.poloCode }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} /></div>
+              <div className="border-t pt-2"><UserRowActions user={{ id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword, inviteSentAt: u.inviteSentAt?.toISOString() ?? null, poloCode: u.poloCode, phone: u.phone }} isSelf={u.id === admin.id} emailEnabled={emailEnabled} /></div>
             </article>
           ))}
         </div>

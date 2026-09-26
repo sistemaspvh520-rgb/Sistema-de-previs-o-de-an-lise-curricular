@@ -21,6 +21,8 @@ import type { PoloContactEntry } from "@/repositories/settings-repository";
 import { isProcessingFresh } from "@/services/student-portal/processing";
 import { SettingsSheet } from "@/features/student-portal/settings-sheet";
 import { findPolo } from "@/domain/polos";
+import { ContactCard, SettingsSection } from "@/features/student-portal/settings-sections";
+import { ChevronDown, FileText, Headset, KeyRound, MapPin, UserRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -109,6 +111,7 @@ export default async function StudentPortalPage({
       ]
     : [];
   const filledContacts = contactRoles.filter(([, entry]) => entry?.nome);
+  const contactMessage = `Olá! Sou ${enrollment.name}, RGM ${enrollment.rgm}, e estou entrando em contato pelo Portal Acadêmico.`;
   return (
     <PortalEffects>
       <div className="portal-dashboard min-h-dvh bg-[#f5f8fc] text-slate-900">
@@ -129,11 +132,11 @@ export default async function StudentPortalPage({
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
             <Link href={base}>
               <Image
-                src="/brand/logo-cruzeiro-do-sul-virtual.png"
+                src="/brand/logo-cruzeiro-do-sul-virtual.svg"
                 alt="Cruzeiro do Sul Virtual"
-                width={200}
-                height={67}
-                className="h-auto w-36 sm:w-48"
+                width={276}
+                height={65}
+                className="h-auto w-40 sm:w-52"
                 priority
               />
             </Link>
@@ -147,86 +150,88 @@ export default async function StudentPortalPage({
                 </span>
               </span>
               <SettingsSheet>
-                <section>
-                  <h3 className="font-semibold text-[#003B71]">Contatos</h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Fale com quem acompanha sua jornada acadêmica.
-                  </p>
-                  <div className="mt-4 space-y-3">
+                <SettingsSection
+                  icon={Headset}
+                  title="Contatos"
+                  description="Fale com quem acompanha sua jornada acadêmica."
+                >
+                  <div className="space-y-3">
                     {enrollment.owner && (
-                      <div className="rounded-xl border border-brand-cyan/20 bg-brand-cyan-50/60 p-4 text-sm">
-                        <p className="text-xs font-semibold tracking-wide text-brand-cyan-700 uppercase">
-                          Seu tutor
-                        </p>
-                        <p className="mt-1 font-medium text-slate-900">
-                          {enrollment.owner.name}
-                        </p>
-                        <p className="break-all text-slate-600">
-                          {enrollment.owner.email}
-                        </p>
-                      </div>
-                    )}
-                    {polo && (
-                      <p className="text-xs text-slate-500">
-                        Polo {polo.code} · {polo.name}
-                      </p>
+                      <ContactCard
+                        highlight
+                        role="Seu tutor"
+                        name={enrollment.owner.name}
+                        email={enrollment.owner.email}
+                        phone={enrollment.owner.phone}
+                        message={contactMessage}
+                      />
                     )}
                     {filledContacts.map(([label, entry]) => (
-                      <div
+                      <ContactCard
                         key={label}
-                        className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm"
-                      >
-                        <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                          {label}
-                        </p>
-                        <p className="mt-1 font-medium text-slate-900">
-                          {entry!.nome}
-                        </p>
-                        {entry!.email && (
-                          <p className="break-all text-slate-600">
-                            {entry!.email}
-                          </p>
-                        )}
-                        {entry!.telefone && (
-                          <p className="text-slate-600">{entry!.telefone}</p>
-                        )}
-                      </div>
+                        role={label}
+                        name={entry!.nome}
+                        email={entry!.email || null}
+                        phone={entry!.telefone || null}
+                        message={contactMessage}
+                      />
                     ))}
+                    {polo && (
+                      <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <MapPin className="size-3.5" /> Polo {polo.name}
+                      </p>
+                    )}
                     {!enrollment.owner && !filledContacts.length && (
                       <p className="text-sm text-slate-500">
-                        Nenhum contato institucional disponível no momento.
+                        Nenhum contato disponível no momento.
                       </p>
                     )}
                   </div>
-                </section>
-                <StudentRequestsList
-                  enrollmentId={enrollment.id}
-                  support={support}
-                  page={Math.max(
-                    1,
-                    Math.min(10000, Math.floor(Number(params.requests) || 1)),
-                  )}
-                />
-                <section>
-                  <h3 className="font-semibold text-[#003B71]">
-                    Minha conta
-                  </h3>
-                  <p className="my-4 break-all text-sm text-slate-600">
-                    {enrollment.name}
-                    <br />
-                    {enrollment.studentUser?.email ?? "Acesso ainda não criado"}
-                    <br />
-                    RGM {enrollment.rgm}
-                  </p>
+                </SettingsSection>
+                <SettingsSection
+                  icon={FileText}
+                  title="Minhas solicitações"
+                  description="Cada documento enviado e o resultado da conferência."
+                >
+                  <StudentRequestsList
+                    compact
+                    enrollmentId={enrollment.id}
+                    support={support}
+                    page={Math.max(
+                      1,
+                      Math.min(10000, Math.floor(Number(params.requests) || 1)),
+                    )}
+                  />
+                </SettingsSection>
+                <SettingsSection icon={UserRound} title="Minha conta">
+                  <dl className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white px-4 text-sm">
+                    {[
+                      ["Nome", enrollment.name],
+                      ["E-mail", enrollment.studentUser?.email ?? "Acesso ainda não criado"],
+                      ["RGM", enrollment.rgm],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-4 py-3">
+                        <dt className="shrink-0 text-slate-500">{label}</dt>
+                        <dd className="min-w-0 truncate text-right font-medium text-slate-900" title={value}>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                   {support ? (
-                    <p className="text-sm text-slate-500">
-                      A senha é pessoal. Envie um link de recuperação pelo
-                      perfil do aluno.
+                    <p className="mt-3 text-sm text-slate-500">
+                      A senha é pessoal. Envie um link de recuperação pelo perfil do aluno.
                     </p>
                   ) : (
-                    <ChangePasswordForm />
+                    <details className="group mt-3 rounded-2xl border border-slate-200 bg-white">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-[#003B71] [&::-webkit-details-marker]:hidden">
+                        <span className="flex items-center gap-2"><KeyRound className="size-4" /> Alterar senha</span>
+                        <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="border-t border-slate-100 p-4">
+                        <ChangePasswordForm />
+                      </div>
+                    </details>
                   )}
-                </section>
+                </SettingsSection>
               </SettingsSheet>
               {!support && (
                 <form action={portalLogoutAction}>

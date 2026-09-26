@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "Role" ADD VALUE 'TUTOR' BEFORE 'ANALYST';
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "phone" TEXT;

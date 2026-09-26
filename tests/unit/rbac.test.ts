@@ -17,6 +17,21 @@ describe("RBAC", () => {
     expect(can("ANALYST", "users:manage")).toBe(false);
     expect(can("ANALYST", "analysis:delete")).toBe(false);
   });
+  it("ANALYST não acessa a área acadêmica", () => {
+    expect(can("ANALYST", "academic:manage")).toBe(false);
+    expect(can("ANALYST", "students:manage")).toBe(false);
+    const academic = ROUTE_PERMISSIONS.find((r) => r.prefix === "/academic-analysis");
+    expect(can("ANALYST", academic!.permission)).toBe(false);
+    const reviews = ROUTE_PERMISSIONS.find((r) => r.prefix === "/reviews");
+    expect(can("ANALYST", reviews!.permission)).toBe(true);
+  });
+  it("TUTOR tem o acesso do analista e a área acadêmica", () => {
+    for (const permission of ["analysis:create", "analysis:review", "analysis:summary", "academic:manage", "students:manage"] as const)
+      expect(can("TUTOR", permission)).toBe(true);
+    expect(can("TUTOR", "users:manage")).toBe(false);
+    expect(can("TUTOR", "analysis:delete")).toBe(false);
+    expect(can("ADMIN", "academic:manage")).toBe(true);
+  });
   it("VIEWER só lê", () => {
     expect(can("VIEWER", "analysis:read")).toBe(true);
     expect(can("VIEWER", "analysis:create")).toBe(false);

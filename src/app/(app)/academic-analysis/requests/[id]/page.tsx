@@ -95,7 +95,7 @@ export default async function AcademicRequestPage({
             target="_blank"
             rel="noreferrer"
           >
-            Visualizar PDF
+            Visualizar documento
           </a>
         ) : (
           <p className="p-3 text-slate-500">
@@ -122,7 +122,7 @@ export default async function AcademicRequestPage({
           className="rounded-xl border bg-white p-3"
           href={`/academic-analysis/students/${student.id}#atualizar`}
         >
-          Enviar novo PDF
+          Enviar novo documento
         </Link>
       </nav>
       <section className="rounded-2xl border bg-white p-6">

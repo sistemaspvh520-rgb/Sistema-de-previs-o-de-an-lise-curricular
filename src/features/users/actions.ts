@@ -14,14 +14,25 @@ import { sendInvite, sendReset } from "@/features/users/password-tokens";
 import { isEmailConfigured } from "@/services/email/mailer";
 import { issueImpersonationToken } from "@/features/users/impersonation";
 import { signIn, unstable_update } from "@/lib/auth";
+import { STAFF_ROLES } from "@/lib/rbac";
+import { normalizeWhatsapp } from "@/lib/whatsapp";
 
-const roleSchema = z.enum(["ADMIN", "ANALYST", "VIEWER"]);
+const roleSchema = z.enum(STAFF_ROLES);
+const phoneSchema = z
+  .string()
+  .trim()
+  .max(30)
+  .nullable()
+  .optional()
+  .refine((value) => !value || normalizeWhatsapp(value) !== null, "Informe o WhatsApp com DDD, ex.: (69) 99999-0000.")
+  .transform((value) => normalizeWhatsapp(value));
 
 const createSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome.").max(120),
   email: z.string().trim().email("E-mail inválido.").transform((v) => v.toLowerCase()),
   role: roleSchema,
   poloCode: z.string().trim().max(20).nullable().optional(),
+  phone: phoneSchema,
 });
 
 /** Cria o usuário com senha temporária gerada automaticamente (troca obrigatória no primeiro acesso). */
@@ -35,7 +46,7 @@ export async function createUserAction(input: unknown): Promise<ActionResult<{ i
     if (exists) return fail("Já existe um usuário com este e-mail.");
 
     const user = await prisma.user.create({
-      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, poloCode: parsed.data.poloCode || null, passwordHash: await hash(crypto.randomUUID()) },
+      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, poloCode: parsed.data.poloCode || null, phone: parsed.data.phone, passwordHash: await hash(crypto.randomUUID()) },
     });
     const temporaryPassword = await assignTemporaryPassword(user.id);
     await recordAudit({ userId: admin.id, action: "user.create", entityType: "User", entityId: user.id, metadata: { email: user.email, role: user.role } });
@@ -67,6 +78,7 @@ const updateSchema = z.object({
   role: roleSchema,
   isActive: z.boolean(),
   poloCode: z.string().trim().max(20).nullable().optional(),
+  phone: phoneSchema,
 });
 
 export async function updateUserAction(input: unknown): Promise<ActionResult> {
@@ -88,7 +100,7 @@ export async function updateUserAction(input: unknown): Promise<ActionResult> {
 
     await prisma.user.update({
       where: { id: parsed.data.id },
-      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, isActive: parsed.data.isActive, poloCode: parsed.data.poloCode || null },
+      data: { name: parsed.data.name, email: parsed.data.email, role: parsed.data.role, isActive: parsed.data.isActive, poloCode: parsed.data.poloCode || null, phone: parsed.data.phone },
     });
     await recordAudit({
       userId: admin.id,

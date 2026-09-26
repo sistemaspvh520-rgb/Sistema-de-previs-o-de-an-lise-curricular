@@ -17,7 +17,7 @@ export function AcademicGridUploadForm({ maxMb }: { maxMb: number }) {
   function choose(candidate?: File) {
     if (!candidate || sending) return;
     if (candidate.type !== "application/pdf" && !candidate.name.toLowerCase().endsWith(".pdf")) {
-      toast.error("Selecione um documento PDF.");
+      toast.error("Selecione um documento em PDF.");
       return;
     }
     if (candidate.size > maxMb * 1024 * 1024) {
@@ -59,7 +59,7 @@ export function AcademicGridUploadForm({ maxMb }: { maxMb: number }) {
       <div
         role="button"
         tabIndex={0}
-        aria-label="Selecionar ou arrastar extrato acadêmico em PDF"
+        aria-label="Selecionar ou arrastar documento acadêmico"
         aria-busy={sending}
         aria-disabled={sending}
         onClick={() => { if (!sending) inputRef.current?.click(); }}
@@ -71,16 +71,16 @@ export function AcademicGridUploadForm({ maxMb }: { maxMb: number }) {
         }}
         onDragOver={(event) => { event.preventDefault(); if (!sending) setDragging(true); }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(event) => { event.preventDefault(); setDragging(false); if (event.dataTransfer.files.length !== 1) toast.error("Envie apenas 1 arquivo PDF."); else choose(event.dataTransfer.files[0]); }}
+        onDrop={(event) => { event.preventDefault(); setDragging(false); if (event.dataTransfer.files.length !== 1) toast.error("Envie apenas 1 documento."); else choose(event.dataTransfer.files[0]); }}
         className={cn("flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center shadow-inner transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 motion-reduce:transition-none sm:min-h-64 sm:p-10", dragging ? "scale-[1.01] border-brand-cyan bg-gradient-to-br from-brand-cyan-50 to-white" : "border-slate-300 bg-gradient-to-br from-white via-slate-50 to-cyan-50/70 hover:border-brand-cyan/70 hover:from-white hover:to-cyan-50")}
       >
-        <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(event) => { if (event.target.files?.length !== 1) toast.error("Envie apenas 1 arquivo PDF."); else choose(event.target.files[0]); }} />
+        <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(event) => { if (event.target.files?.length !== 1) toast.error("Envie apenas 1 documento."); else choose(event.target.files[0]); }} />
         <span className="rounded-lg border bg-brand-navy-50 px-3 py-1 text-xs font-bold tracking-[0.16em] text-brand-navy">PDF</span>
         <strong className="mt-3 max-w-full break-all text-base">{file?.name ?? "Envie 1 documento acadêmico"}</strong>
-        <span aria-live="polite" className="mt-1 text-sm text-muted-foreground">{sending ? "PDF recebido · extraindo e analisando as páginas…" : file ? `${(file.size / 1024 / 1024).toFixed(2)} MB · clique para trocar` : `Arraste o PDF para cá ou selecione um arquivo · até ${maxMb} MB`}</span>
-        {sending && <div className="mt-5 w-full max-w-sm text-left" role="status" aria-live="polite" aria-label="Análise do PDF em andamento">
+        <span aria-live="polite" className="mt-1 text-sm text-muted-foreground">{sending ? "Documento recebido · extraindo e analisando as páginas…" : file ? `${(file.size / 1024 / 1024).toFixed(2)} MB · clique para trocar` : `Arraste o documento para cá ou selecione um arquivo · até ${maxMb} MB`}</span>
+        {sending && <div className="mt-5 w-full max-w-sm text-left" role="status" aria-live="polite" aria-label="Análise do documento em andamento">
           <div className="flex items-center justify-between text-xs font-medium text-slate-600"><span>Leitura do extrato</span><span>Processando páginas</span></div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Processamento do PDF em andamento"><div className="h-full w-2/5 rounded-full bg-gradient-to-r from-[#003B71] to-[#0693E3] motion-safe:animate-pulse" /></div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Processamento do documento em andamento"><div className="h-full w-2/5 rounded-full bg-gradient-to-r from-[#003B71] to-[#0693E3] motion-safe:animate-pulse" /></div>
           <p className="mt-2 text-center text-xs text-slate-500">Isso pode levar alguns instantes. Após o envio, o processamento continua mesmo que você saia.</p>
         </div>}
       </div>
@@ -99,7 +99,7 @@ export function AcademicGridUploadForm({ maxMb }: { maxMb: number }) {
         </span>
       </label>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="max-w-2xl text-xs leading-5 text-slate-600">Envie apenas 1 PDF: Histórico Oficial, Histórico Simples para Conferência ou Extrato/Grade Curricular · até {maxMb} MB.</p>
+        <p className="max-w-2xl text-xs leading-5 text-slate-600">Envie 1 documento em PDF: Histórico Oficial, Histórico Simples para Conferência ou Extrato/Grade Curricular · até {maxMb} MB.</p>
         <Button onClick={submit} disabled={!file || !confirmed || sending} className="w-full sm:w-auto">
           {sending ? "Lendo documento…" : "Analisar documento"}
         </Button>

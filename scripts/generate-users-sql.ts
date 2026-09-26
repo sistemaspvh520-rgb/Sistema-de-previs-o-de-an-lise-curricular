@@ -1,6 +1,6 @@
 /**
  * Gera SQL idempotente para criar usuários (com hash argon2id) a partir de um JSON:
- *   [{ "name": "...", "email": "...", "role": "ADMIN|ANALYST|VIEWER", "password": "..." }]
+ *   [{ "name": "...", "email": "...", "role": "ADMIN|TUTOR|ANALYST|VIEWER", "password": "..." }]
  * Uso: npx tsx scripts/generate-users-sql.ts users.json > users.sql
  * As senhas NÃO vão para o SQL em texto puro; apenas o hash.
  */
@@ -13,7 +13,7 @@ async function main() {
   const users = JSON.parse(readFileSync(process.argv[2], "utf8")) as Array<{ name: string; email: string; role: string; password: string }>;
   const lines = ["BEGIN;"];
   for (const u of users) {
-    if (!["ADMIN", "ANALYST", "VIEWER"].includes(u.role)) throw new Error(`Perfil inválido: ${u.role}`);
+    if (!["ADMIN", "TUTOR", "ANALYST", "VIEWER"].includes(u.role)) throw new Error(`Perfil inválido: ${u.role}`);
     if (u.password.length < 12) throw new Error(`Senha curta para ${u.email}`);
     const h = await hash(u.password);
     lines.push(

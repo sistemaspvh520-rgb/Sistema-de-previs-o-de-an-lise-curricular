@@ -11,7 +11,7 @@ export const MAIN_NAV: NavItem[] = [
   { href: "/analyses/new", label: "Nova análise", icon: "new", permission: "analysis:create" },
   { href: "/analyses", label: "Análises", icon: "list" },
   { href: "/reviews", label: "Revisões", icon: "review", permission: "analysis:review" },
-  { href: "/academic-analysis", label: "Análise acadêmica", icon: "academic", permission: "analysis:review" },
+  { href: "/academic-analysis", label: "Análise acadêmica", icon: "academic", permission: "academic:manage" },
   { href: "/academic-analysis/requests", label: "Solicitações acadêmicas", icon: "academic", permission: "students:manage" },
   { href: "/academic-analysis/students", label: "Alunos", icon: "academic", permission: "students:manage" },
   { href: "/reports", label: "Meus relatórios", icon: "reports" },

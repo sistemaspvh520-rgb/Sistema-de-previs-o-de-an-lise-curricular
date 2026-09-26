@@ -28,7 +28,7 @@ export async function requireEnrollment(user: SessionUser, id?: string) {
         },
       },
       currentVersion: { include: { preferredSource: true } },
-      owner: { select: { name: true, email: true, poloCode: true } },
+      owner: { select: { name: true, email: true, poloCode: true, phone: true } },
     },
   });
   if (!enrollment || (!id && user.role !== "STUDENT"))

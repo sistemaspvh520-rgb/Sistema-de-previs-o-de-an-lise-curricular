@@ -17,7 +17,7 @@
 - Manutenção de dados (ADMIN): limpeza de auditoria, uso de IA e análises (tudo ou mais antigos que N dias), com confirmação digitada ("LIMPAR"); arquivos no storage são removidos junto com as análises.
 
 ## Autorização (RBAC)
-- Perfis ADMIN / ANALYST / VIEWER. Matriz de permissões em `src/lib/rbac.ts`.
+- Perfis ADMIN / TUTOR / ANALYST / VIEWER. TUTOR = análise curricular + área acadêmica (`academic:manage`, `students:manage`); ANALYST = só análise curricular, grades comerciais e relatórios. Matriz de permissões em `src/lib/rbac.ts`.
 - Verificação em `src/proxy.ts` (rotas, `ROUTE_PERMISSIONS`), em cada server action/route handler (`requirePermission`) e na UI.
 
 ## Segredos

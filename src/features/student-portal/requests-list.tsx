@@ -7,10 +7,13 @@ export async function StudentRequestsList({
   enrollmentId,
   support,
   page = 1,
+  compact = false,
 }: {
   enrollmentId: string;
   support: boolean;
   page?: number;
+  /** Sem cartão nem título próprio, para uso dentro de outra seção (gaveta de Configurações). */
+  compact?: boolean;
 }) {
   const where = { sourceDocument: { enrollmentId } };
   const [requests, count] = await Promise.all([
@@ -27,15 +30,19 @@ export async function StudentRequestsList({
   return (
     <section
       id="minhas-solicitacoes"
-      className="rounded-2xl border bg-white p-5 sm:p-6"
+      className={compact ? "" : "rounded-2xl border bg-white p-5 sm:p-6"}
     >
-      <h2 className="text-lg font-semibold text-[#003B71]">
-        Minhas solicitações
-      </h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Acompanhe cada documento enviado e o resultado da conferência.
-      </p>
-      <ol className="mt-4 divide-y">
+      {!compact && (
+        <>
+          <h2 className="text-lg font-semibold text-[#003B71]">
+            Minhas solicitações
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Acompanhe cada documento enviado e o resultado da conferência.
+          </p>
+        </>
+      )}
+      <ol className={compact ? (requests.length ? "divide-y rounded-2xl border border-slate-200 bg-white px-4" : "hidden") : "mt-4 divide-y"}>
         {requests.map((r) => (
           <li key={r.id} className="py-4">
             <div className="flex flex-wrap justify-between gap-2">
@@ -62,7 +69,7 @@ export async function StudentRequestsList({
                 href="#atualizar-analise"
                 className="mt-3 inline-block text-sm font-semibold text-brand-cyan-700 underline"
               >
-                Enviar novo PDF
+                Enviar novo documento
               </a>
             )}
             {support && (
@@ -77,7 +84,7 @@ export async function StudentRequestsList({
         ))}
       </ol>
       {!count && (
-        <p className="mt-4 text-sm text-slate-500">
+        <p className={compact ? "rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500" : "mt-4 text-sm text-slate-500"}>
           Seus envios aparecerão aqui.
         </p>
       )}

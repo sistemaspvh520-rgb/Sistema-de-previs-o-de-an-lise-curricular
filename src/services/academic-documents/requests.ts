@@ -1,6 +1,7 @@
 import "server-only";
 import type { SessionUser } from "@/lib/session";
 import { ForbiddenError } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { enrollmentScope } from "@/services/student-portal/access";
 import { lockEnrollment } from "@/services/student-portal/versions";
@@ -12,7 +13,7 @@ export async function reviewAcademicRequest(
   action: "CONCLUDE" | "REJECT" | "REVIEW",
   reason?: string,
 ) {
-  if (!["ADMIN", "ANALYST"].includes(user.role)) throw new ForbiddenError();
+  if (!can(user.role, "students:manage")) throw new ForbiddenError();
   const request = await prisma.academicRequest.findFirst({
     where: { id, sourceDocument: { enrollment: enrollmentScope(user) } },
     include: { sourceDocument: true },

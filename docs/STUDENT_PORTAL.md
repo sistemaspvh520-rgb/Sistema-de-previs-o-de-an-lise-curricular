@@ -9,7 +9,7 @@
 - `/academic-analysis/students`: alunos, pesquisa, filtros e criação de acesso.
 - `/academic-analysis/students/[id]`: contato, convite, recuperação, bloqueio, upload, correção e histórico com autoria.
 
-O perfil existente `ANALYST` atende à função de tutor, mantendo o escopo por responsável; `ADMIN` acompanha toda a equipe. `VIEWER` não administra alunos. O novo perfil `STUDENT` não tem nenhuma permissão interna.
+O perfil `TUTOR` (desde 26/09/2026) atende à função de tutor, com escopo por responsável — `ANALYST` não acessa mais a área acadêmica; `ADMIN` acompanha toda a equipe. `VIEWER` não administra alunos. O novo perfil `STUDENT` não tem nenhuma permissão interna.
 
 ## Instalação
 

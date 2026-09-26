@@ -340,7 +340,7 @@ export function StudentAccessPanel({
       router.refresh();
     });
   }
-  const action = "h-9 justify-start gap-2 border-white/15 bg-white/5 text-white hover:bg-white/15 hover:text-white";
+  const action = "h-10 w-full min-w-0 justify-start gap-2.5 border-white/15 bg-white/5 px-3.5 text-white hover:bg-white/15 hover:text-white";
   return (
     <div>
       <AlertDialog
@@ -385,7 +385,7 @@ export function StudentAccessPanel({
           </form>
         </DialogContent>
       </Dialog>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+      <div className="grid gap-2">
         {active && (
           <Button disabled={pending} variant="outline" className={action} onClick={() => run(invited ? "INVITE" : "RESET")}>
             {invited ? <Send className="size-4" /> : <KeyRound className="size-4" />}
@@ -398,7 +398,7 @@ export function StudentAccessPanel({
         <Button
           disabled={pending}
           variant="outline"
-          className={cn(action, active ? "text-rose-200 hover:text-rose-100" : "text-emerald-200 hover:text-emerald-100", "sm:col-span-2 lg:col-span-1 xl:col-span-2")}
+          className={cn(action, active ? "text-rose-200 hover:text-rose-100" : "text-emerald-200 hover:text-emerald-100")}
           onClick={() => run(active ? "BLOCK" : "ACTIVATE")}
         >
           {active ? <Ban className="size-4" /> : <ShieldCheck className="size-4" />}

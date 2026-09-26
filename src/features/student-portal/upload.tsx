@@ -33,7 +33,7 @@ export function StudentUpload({
   async function choose(files: FileList | null) {
     if (processing || sending) return;
     if (!files || files.length !== 1) {
-      toast.error("Envie apenas 1 arquivo PDF.");
+      toast.error("Envie apenas 1 documento em PDF.");
       return;
     }
     const candidate = files[0];
@@ -41,7 +41,7 @@ export function StudentUpload({
       !/\.pdf$/i.test(candidate.name) ||
       candidate.size > maxMb * 1024 * 1024
     ) {
-      toast.error(`Selecione um PDF de até ${maxMb} MB.`);
+      toast.error(`Selecione um documento em PDF de até ${maxMb} MB.`);
       return;
     }
     const selected = ++selection.current;
@@ -71,7 +71,7 @@ export function StudentUpload({
       }
       if (result.rejected) {
         setMessage(
-          "Este documento foi recusado. Selecione um novo PDF válido.",
+          "Este documento foi recusado. Selecione um novo documento válido.",
         );
         setFile(null);
       }
@@ -258,16 +258,16 @@ export function StudentUpload({
           >
             <UploadCloud className="mx-auto size-8 text-brand-cyan-700" />
             <p className="mt-3 font-semibold text-[#003B71]">
-              Arraste seu PDF aqui
+              Arraste seu documento aqui
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              Envie apenas 1 arquivo PDF · até {maxMb} MB
+              1 documento em PDF · até {maxMb} MB
             </p>
             <input
               ref={inputRef}
               type="file"
               accept="application/pdf,.pdf"
-              aria-label="Selecionar PDF"
+              aria-label="Selecionar documento"
               disabled={processing || sending}
               className="mt-4 block w-full min-w-0 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-white file:p-3 file:text-[#003B71]"
               onChange={(e) => {
@@ -334,7 +334,7 @@ export function StudentUpload({
             disabled={!file || !confirmed || duplicate || processing || sending}
             className="min-h-11 w-full bg-brand-cyan text-white hover:bg-brand-cyan/90 sm:w-auto"
           >
-            Enviar PDF
+            Enviar documento
           </Button>
         </form>
       )}

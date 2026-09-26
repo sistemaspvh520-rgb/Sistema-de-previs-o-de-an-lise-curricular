@@ -13,6 +13,7 @@ datasource db {
 
 enum Role {
   ADMIN
+  TUTOR
   ANALYST
   VIEWER
   STUDENT
@@ -173,6 +174,8 @@ model User {
   sessionVersion Int @default(0)
   /** Polo de atendimento do tutor (código de src/domain/polos.ts); alunos herdam o polo do seu responsável. */
   poloCode     String?
+  /** WhatsApp do tutor exibido aos alunos (apenas dígitos, com DDI). */
+  phone        String?
   /** Canais individuais para lembretes de retorno de matrícula. Pelo menos um permanece ativo. */
   followUpEmailEnabled Boolean @default(true)
   followUpPushEnabled  Boolean @default(true)

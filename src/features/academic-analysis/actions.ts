@@ -110,7 +110,7 @@ async function persistCorrection(input: {
 
 export async function updateAcademicGridFieldAction(input: unknown): Promise<ActionResult> {
   try {
-    const user = await requirePermission("analysis:review");
+    const user = await requirePermission("academic:manage");
     const parsed = changeSchema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Dados inválidos.");
     const data = parsed.data;
@@ -172,7 +172,7 @@ export async function updateAcademicGridFieldAction(input: unknown): Promise<Act
 /** Identifica automaticamente os períodos curriculares de um histórico já salvo (estrutura do documento + IA). */
 export async function autoMapAcademicGridAction(reviewIdInput: unknown): Promise<ActionResult<{ mappedRows: number; method: HistoryMappingMethod; snapshot: AcademicGridSnapshot; currentPeriod: number | null }>> {
   try {
-    const user = await requirePermission("analysis:review");
+    const user = await requirePermission("academic:manage");
     const reviewId = idSchema.parse(reviewIdInput);
     const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
@@ -190,7 +190,7 @@ export async function autoMapAcademicGridAction(reviewIdInput: unknown): Promise
 
 export async function addAcademicDisciplineAction(reviewIdInput: unknown): Promise<ActionResult<{ disciplineIndex: number; discipline: AcademicDiscipline }>> {
   try {
-    const user = await requirePermission("analysis:review");
+    const user = await requirePermission("academic:manage");
     const reviewId = idSchema.parse(reviewIdInput);
     const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
@@ -207,7 +207,7 @@ export async function addAcademicDisciplineAction(reviewIdInput: unknown): Promi
 
 export async function completeAcademicGridReviewAction(reviewIdInput: unknown): Promise<ActionResult> {
   try {
-    const user = await requirePermission("analysis:review");
+    const user = await requirePermission("academic:manage");
     const reviewId = idSchema.parse(reviewIdInput);
     const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
     if (review.completedAt) return ok(undefined, "Esta análise já foi concluída.");

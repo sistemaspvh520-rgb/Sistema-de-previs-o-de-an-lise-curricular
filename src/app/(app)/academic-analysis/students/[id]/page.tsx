@@ -131,7 +131,7 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
               )}
               <Button asChild variant="outline" className="h-10 border-white/25 bg-white/5 text-white hover:bg-white/15 hover:text-white">
                 <a href="#atualizar">
-                  <UploadCloud className="size-4" /> Enviar novo PDF
+                  <UploadCloud className="size-4" /> Enviar novo documento
                 </a>
               </Button>
             </div>
