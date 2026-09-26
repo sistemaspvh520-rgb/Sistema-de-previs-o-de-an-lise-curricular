@@ -159,7 +159,7 @@ export function Sidebar({ role, onNavigate, onClose, variant = "rail" }: { role:
         )}
       </nav>
       <div className={cn("shrink-0 border-t border-white/10 px-5 py-5", settingsVisibility)}>
-        <CampaignSignature showSite={false} align="center" className="text-[1.35rem] sm:text-[1.35rem]" />
+        <CampaignSignature showSite={false} align="center" className="text-[1.15rem] sm:text-[1.15rem]" />
       </div>
     </aside>
   );
