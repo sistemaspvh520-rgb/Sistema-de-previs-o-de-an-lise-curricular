@@ -57,13 +57,13 @@ export default async function AcademicAnalysisPage({ searchParams }: PageProps<"
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,rgba(7,53,99,0.9)_0%,rgba(7,53,99,0.52)_42%,rgba(7,53,99,0.08)_100%)] md:bg-[linear-gradient(90deg,rgba(7,53,99,0.98)_0%,rgba(7,53,99,0.96)_28%,rgba(7,53,99,0.86)_38%,rgba(7,53,99,0.68)_48%,rgba(7,53,99,0.42)_58%,rgba(7,53,99,0.16)_68%,rgba(7,53,99,0.04)_76%,transparent_84%)]" />
       <div className="flex min-h-[240px] items-end px-6 py-6 text-white md:items-center sm:px-10 md:py-10 lg:min-h-[280px] lg:px-14">
         <div className="w-full max-w-xl text-left">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Acompanhamento acadêmico</p>
+          <p className="shimmer-text text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Acompanhamento acadêmico</p>
           <h1 className="mt-3 max-w-lg text-3xl font-semibold leading-[1.08] tracking-tight sm:text-4xl"><span className="block">Uma jornada mais clara</span><span className="block">até a formatura.</span></h1>
           <p className="mt-4 max-w-lg text-sm leading-6 text-white/85 sm:text-base">Organize a trajetória do aluno com uma leitura objetiva do documento acadêmico, das disciplinas e das próximas etapas.</p>
         </div>
       </div>
     </section>
-    <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6 lg:p-8">
+    <section className="shine-border animate-blur-fade rounded-2xl border bg-card p-4 shadow-[0_24px_50px_-36px_rgba(0,59,113,0.55)] sm:p-6 lg:p-8">
       <div className="mb-4">
         <h2 className="text-base font-semibold tracking-tight text-slate-900">Nova análise acadêmica</h2>
         <p className="mt-1 text-sm text-slate-600">Envie um Histórico Oficial, Histórico Simples ou Extrato/Grade Curricular em PDF para organizar as disciplinas, identificar pendências e estimar os próximos passos do aluno.</p>

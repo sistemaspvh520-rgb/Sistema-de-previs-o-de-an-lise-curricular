@@ -96,14 +96,14 @@ export function Sidebar({ role, onNavigate, onClose, variant = "rail" }: { role:
               onClick={onNavigate}
               title={item.label}
               className={cn(
-                "flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "group/nav relative flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                 expanded ? "justify-start" : mode === "auto" && "xl:justify-start",
                 active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-white",
+                  ? "bg-gradient-to-r from-sidebar-primary to-[#38b6f5] text-sidebar-primary-foreground shadow-[0_8px_24px_-10px_rgb(6_147_227/0.9)]"
+                  : "text-sidebar-foreground/85 hover:translate-x-0.5 hover:bg-sidebar-accent hover:text-white",
               )}
             >
-              <Icon className="size-4" />
+              <Icon className="size-4 transition-transform duration-200 group-hover/nav:scale-110" />
               <span className={labels}>{item.label}</span>
             </Link>
           );

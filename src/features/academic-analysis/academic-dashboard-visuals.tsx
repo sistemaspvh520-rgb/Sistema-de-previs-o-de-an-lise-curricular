@@ -2,6 +2,9 @@ import { academicStatusOutcome } from "@/domain/academic-analysis/rules";
 import type { AcademicDiscipline } from "@/domain/academic-analysis/types";
 import type { GraduationPlanStep } from "@/domain/academic-analysis/graduation-forecast";
 import { cn } from "@/lib/utils";
+import { SpotlightCard } from "@/components/magic/spotlight-card";
+import { NumberTicker } from "@/components/magic/number-ticker";
+import { DotPattern } from "@/components/magic/dot-pattern";
 
 type JourneyState = "completed" | "attention" | "underway" | "current" | "future";
 
@@ -41,6 +44,7 @@ export function AcademicDashboardOverview({
     <section aria-label="Resumo da trajetória acadêmica" className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.9fr)]">
       <article className="relative isolate overflow-hidden rounded-2xl border border-[#003B71]/15 bg-[linear-gradient(135deg,#003B71_0%,#07558f_64%,#087db0_100%)] p-5 text-white shadow-[0_20px_48px_-32px_rgba(0,59,113,0.78)] sm:p-7">
         <div aria-hidden="true" className="pointer-events-none absolute -right-14 -top-24 -z-10 size-72 rounded-full bg-cyan-200/10 blur-3xl" />
+        <DotPattern className="-z-10 text-white/10" />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">Visão da jornada</p>
@@ -84,7 +88,7 @@ export function AcademicPeriodJourney({ disciplines, currentPeriod }: { discipli
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_16px_40px_-36px_rgba(15,42,66,0.62)] sm:p-5" aria-labelledby="period-journey-title">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div><p className="text-xs font-semibold uppercase tracking-[0.13em] text-brand-cyan-700">Mapa curricular</p><h2 id="period-journey-title" className="mt-1 text-lg font-semibold tracking-tight text-slate-900">Jornada por período</h2></div>
-        <p className="text-xs text-slate-500">Situações lidas no extrato; períodos sem componentes não são inferidos.</p>
+        <p className="text-xs text-slate-500">Situações lidas do documento acadêmico, organizadas por período curricular.</p>
       </div>
       <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6" aria-label="Situação das disciplinas em cada período">
         {periods.map((period) => {
@@ -175,7 +179,8 @@ export function PendingDistribution({ byPeriod, totalPending, disciplines }: { b
 
 function CompactStat({ label, value, note, tone }: { label: string; value: number | string; note: string; tone: "blue" | "gold" | "cyan" | "slate" }) {
   const top = { blue: "border-t-[#0693E3]", gold: "border-t-[#d6ce23]", cyan: "border-t-[#1ca9b4]", slate: "border-t-slate-400" }[tone];
-  return <article className={cn("min-w-0 rounded-xl border border-slate-200 border-t-[3px] bg-white p-3.5 shadow-[0_12px_30px_-28px_rgba(15,42,66,0.6)] sm:p-4", top)}><p className="truncate text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">{value}</p><p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{note}</p></article>;
+  const numeric = typeof value === "number" ? value : /^(\d+)º$/.exec(value);
+  return <SpotlightCard className={cn("min-w-0 rounded-xl border border-slate-200 border-t-[3px] bg-white p-3.5 shadow-[0_12px_30px_-28px_rgba(15,42,66,0.6)] sm:p-4", top)}><p className="truncate text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">{typeof numeric === "number" ? <NumberTicker value={numeric} /> : numeric ? <NumberTicker value={Number(numeric[1])} suffix="º" /> : value}</p><p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{note}</p></SpotlightCard>;
 }
 
 function ForecastFact({ label, value }: { label: string; value: number }) {

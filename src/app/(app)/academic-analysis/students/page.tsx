@@ -93,7 +93,7 @@ export default async function StudentsPage({
     `/academic-analysis/students?${new URLSearchParams({ q: query, status: params.status ?? "", lpage: String(number) })}#analises-sem-acesso`;
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex animate-blur-fade flex-wrap items-end justify-between gap-4">
         <div>
           <Link
             href="/academic-analysis"
@@ -101,7 +101,7 @@ export default async function StudentsPage({
           >
             Análise Acadêmica
           </Link>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#003B71]">
+          <h1 className="mt-2 bg-gradient-to-r from-[#003B71] via-[#0a5a9a] to-[#0693e3] bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
             Alunos
           </h1>
           <p className="mt-2 text-sm text-slate-600">
@@ -110,7 +110,7 @@ export default async function StudentsPage({
         </div>
         <CreateStudentDialog />
       </div>
-      <form className="flex flex-wrap gap-3 rounded-2xl border bg-white p-4">
+      <form className="flex animate-blur-fade flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-[0_14px_36px_-30px_rgba(15,42,66,0.5)] backdrop-blur [animation-delay:60ms]">
         <label className="min-w-40 flex-1 text-xs font-medium">
           Buscar aluno
           <Input
@@ -136,14 +136,14 @@ export default async function StudentsPage({
         </label>
         <Button className="self-end">Pesquisar</Button>
       </form>
-      <section className="overflow-hidden rounded-2xl border bg-white">
+      <section className="animate-blur-fade overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_44px_-34px_rgba(15,42,66,0.55)] [animation-delay:120ms]">
         <div className="flex items-center justify-between border-b p-5">
           <h2 className="font-semibold">Acessos dos alunos</h2>
-          <span className="text-sm text-slate-500">{count} aluno(s)</span>
+          <span className="rounded-full bg-brand-cyan-50 px-3 py-1 text-xs font-semibold text-brand-cyan-700">{count.toLocaleString("pt-BR")} aluno(s)</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+            <thead className="bg-gradient-to-r from-slate-50 to-sky-50/60 text-xs text-slate-500">
               <tr>
                 <th className="whitespace-nowrap px-5 py-3 font-medium">Aluno / RGM</th>
                 <th className="hidden whitespace-nowrap px-5 py-3 font-medium md:table-cell">Curso</th>
@@ -159,11 +159,18 @@ export default async function StudentsPage({
                 const snapshot = student.currentVersion?.snapshot as unknown as
                   AcademicGridSnapshot | undefined;
                 return (
-                  <tr key={student.id} className="hover:bg-sky-50/40">
+                  <tr key={student.id} className="group transition-colors hover:bg-sky-50/60">
                     <td className="min-w-48 px-5 py-4 font-medium">
-                      {student.name}
-                      <span className="mt-1 block text-xs font-normal text-slate-500">
-                        {student.rgm}
+                      <span className="flex items-center gap-3">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#003B71] to-[#0693e3] text-xs font-semibold text-white shadow-sm transition-transform group-hover:scale-105">
+                          {student.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+                        </span>
+                        <span className="min-w-0">
+                          {student.name}
+                          <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                            RGM {student.rgm}
+                          </span>
+                        </span>
                       </span>
                     </td>
                     <td className="hidden min-w-40 px-5 py-4 md:table-cell">
@@ -173,9 +180,7 @@ export default async function StudentsPage({
                       {student.studentUser?.email ?? "—"}
                     </td>
                     <td className="px-5 py-4">
-                      <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-xs font-medium">
-                        {accessStatus(student.studentUser)}
-                      </span>
+                      <AccessPill status={accessStatus(student.studentUser)} />
                     </td>
                     <td className="hidden whitespace-nowrap px-5 py-4 lg:table-cell">
                       {student.currentVersion?.createdAt.toLocaleDateString(
@@ -190,7 +195,7 @@ export default async function StudentsPage({
                     </td>
                     <td className="px-5 py-4">
                       <Link
-                        className="inline-block whitespace-nowrap rounded-lg border px-3 py-2 font-medium text-[#003B71]"
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-brand-cyan/25 px-3 py-2 font-medium text-[#003B71] transition-all hover:border-brand-cyan hover:bg-brand-cyan hover:text-white hover:shadow-[0_8px_20px_-10px_rgb(6_147_227)]"
                         href={`/academic-analysis/students/${student.id}`}
                       >
                         Abrir aluno
@@ -254,5 +259,21 @@ export default async function StudentsPage({
         </section>
       )}
     </div>
+  );
+}
+
+const ACCESS_PILL: Record<string, string> = {
+  ATIVO: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  "CONVITE PENDENTE": "bg-amber-50 text-amber-700 ring-amber-200",
+  BLOQUEADO: "bg-rose-50 text-rose-700 ring-rose-200",
+  "SEM ACESSO": "bg-slate-100 text-slate-600 ring-slate-200",
+};
+
+function AccessPill({ status }: { status: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${ACCESS_PILL[status] ?? ACCESS_PILL["SEM ACESSO"]}`}>
+      <span className="size-1.5 rounded-full bg-current" />
+      {status.charAt(0) + status.slice(1).toLowerCase()}
+    </span>
   );
 }

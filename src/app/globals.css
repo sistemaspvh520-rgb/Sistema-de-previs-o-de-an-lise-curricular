@@ -5,6 +5,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --animate-blur-fade: blur-fade 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  --animate-shimmer-text: shimmer-text 3.2s linear infinite;
+  --animate-shine: shine 6s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2.2s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+
+  @keyframes blur-fade {
+    from { opacity: 0; filter: blur(6px); transform: translateY(10px); }
+    to { opacity: 1; filter: blur(0); transform: translateY(0); }
+  }
+  @keyframes shimmer-text {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes shine {
+    from { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    to { background-position: 0% 0%; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgb(6 147 227 / 0.45); }
+    70% { box-shadow: 0 0 0 8px rgb(6 147 227 / 0); }
+    100% { box-shadow: 0 0 0 0 rgb(6 147 227 / 0); }
+  }
+}
+
 @theme inline {
   --color-brand-navy: var(--brand-navy);
   --color-brand-blue: var(--brand-blue);
@@ -324,4 +355,69 @@
 @media print {
   .academic-source-watermark { display: block; position: fixed; top: 45%; left: 0; width: 100%; transform: rotate(-30deg); text-align: center; font-size: 46pt; font-weight: 700; color: rgb(0 59 113 / 10%); pointer-events: none; z-index: 0; }
   .report-source-footer { font-size: 8pt; color: #64748b; margin: 8pt 0; }
+}
+
+/* Efeitos de interface (inspirados em Magic UI / Aceternity), nas cores da marca. */
+.magic-card {
+  position: relative;
+  isolation: isolate;
+  transition: transform .3s cubic-bezier(.2,.7,.2,1), box-shadow .3s cubic-bezier(.2,.7,.2,1), border-color .3s;
+}
+.magic-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgb(6 147 227 / .13), transparent 42%);
+  transition: opacity .3s;
+  pointer-events: none;
+}
+.magic-card:hover::before { opacity: 1; }
+@media (hover: hover) {
+  .magic-card:hover { transform: translateY(-2px); box-shadow: 0 22px 44px -30px rgb(0 59 113 / .55); border-color: rgb(6 147 227 / .35); }
+}
+.shine-border {
+  position: relative;
+  isolation: isolate;
+}
+.shine-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, transparent 20%, rgb(6 147 227 / .75), rgb(254 248 76 / .7), transparent 80%);
+  background-size: 300% 300%;
+  animation: var(--animate-shine);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.shimmer-text {
+  background: linear-gradient(90deg, currentColor 40%, rgb(255 255 255 / .95) 50%, currentColor 60%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: var(--animate-shimmer-text);
+}
+.glass-surface {
+  background: rgb(255 255 255 / .1);
+  border: 1px solid rgb(255 255 255 / .16);
+  backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .14), 0 18px 40px -30px rgb(0 0 0 / .6);
+}
+.app-canvas {
+  background:
+    radial-gradient(900px 420px at 100% -10%, rgb(6 147 227 / .07), transparent 60%),
+    radial-gradient(700px 360px at -10% 20%, rgb(0 59 113 / .05), transparent 60%),
+    var(--brand-bg);
+}
+[data-slot="card"] { transition: box-shadow .3s cubic-bezier(.2,.7,.2,1), transform .3s cubic-bezier(.2,.7,.2,1); }
+@media (prefers-reduced-motion: reduce) {
+  .animate-blur-fade, .shimmer-text, .shine-border::after, .animate-float, .animate-pulse-ring { animation: none !important; }
+  .magic-card, [data-slot="card"] { transition: none !important; transform: none !important; }
 }

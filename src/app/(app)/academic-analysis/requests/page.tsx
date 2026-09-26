@@ -1,4 +1,7 @@
 import { RequestLiveUpdates } from "@/features/student-portal/request-live-updates";
+import { BlurFade } from "@/components/magic/blur-fade";
+import { SpotlightCard } from "@/components/magic/spotlight-card";
+import { NumberTicker } from "@/components/magic/number-ticker";
 import Link from "next/link";
 import {
   Inbox,
@@ -159,19 +162,18 @@ export default async function AcademicRequestsPage({
               accent: "text-emerald-700 bg-emerald-50",
             },
           ] satisfies { label: string; value: number; icon: LucideIcon; accent: string }[]
-        ).map(({ label, value, icon: Icon, accent }) => (
-          <article
-            key={label}
-            className="rounded-xl border bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
-          >
-            <div className={`inline-flex size-8 items-center justify-center rounded-lg ${accent}`}>
-              <Icon className="size-4" aria-hidden="true" />
-            </div>
-            <p className="mt-3 text-xs text-slate-500">{label}</p>
-            <p className="mt-1 text-2xl font-semibold text-[#003B71]">
-              {value}
-            </p>
-          </article>
+        ).map(({ label, value, icon: Icon, accent }, index) => (
+          <BlurFade key={label} delay={index * 0.05}>
+            <SpotlightCard className="h-full rounded-xl border border-slate-200 bg-white p-4 shadow-[0_14px_36px_-30px_rgba(15,42,66,0.55)]">
+              <div className={`inline-flex size-9 items-center justify-center rounded-xl ${accent}`}>
+                <Icon className="size-4" aria-hidden="true" />
+              </div>
+              <p className="mt-3 text-xs font-medium text-slate-500">{label}</p>
+              <p className="mt-1 text-2xl font-semibold text-[#003B71]">
+                <NumberTicker value={value} />
+              </p>
+            </SpotlightCard>
+          </BlurFade>
         ))}
       </section>
       <section className="rounded-2xl border bg-white p-5">
