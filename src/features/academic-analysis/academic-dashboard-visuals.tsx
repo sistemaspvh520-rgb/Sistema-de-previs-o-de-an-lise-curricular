@@ -2,6 +2,7 @@ import { academicStatusOutcome } from "@/domain/academic-analysis/rules";
 import type { AcademicDiscipline } from "@/domain/academic-analysis/types";
 import type { GraduationPlanStep } from "@/domain/academic-analysis/graduation-forecast";
 import { cn } from "@/lib/utils";
+import { readableName } from "@/lib/text";
 import { SpotlightCard } from "@/components/magic/spotlight-card";
 import { NumberTicker } from "@/components/magic/number-ticker";
 import { DotPattern } from "@/components/magic/dot-pattern";
@@ -20,6 +21,7 @@ export function AcademicDashboardOverview({
   needsReview,
   workloadProgress,
   mappingRequired = false,
+  audience = "staff",
 }: {
   disciplines: AcademicDiscipline[];
   currentPeriod: number | null;
@@ -32,6 +34,8 @@ export function AcademicDashboardOverview({
   needsReview: boolean;
   workloadProgress?: { planned: number; integralized: number };
   mappingRequired?: boolean;
+  /** "student": indicadores em linguagem do aluno, sem termos internos como vagas adicionais. */
+  audience?: "staff" | "student";
 }) {
   const mainGrid = disciplines.filter((discipline) => discipline.inMainCurriculum);
   const completed = mainGrid.filter((discipline) => {
@@ -70,12 +74,21 @@ export function AcademicDashboardOverview({
         <p className="mt-3 text-xs text-blue-100/70">Projeção automática; pode variar conforme aprovação, oferta e rematrícula no prazo.</p>
       </article>
 
-      <div className="grid grid-cols-2 gap-3">
-        <CompactStat label="Período atual" value={currentPeriod ? `${currentPeriod}º` : "—"} note={currentPeriodConfirmed ? "Mapeamento confirmado" : "Não identificado · conferir se necessário"} tone="blue" />
-        <CompactStat label="Pendências anteriores" value={mappingRequired ? "—" : pending} note="Inclui reprovações registradas" tone="gold" />
-        <CompactStat label="Em andamento" value={mappingRequired ? "—" : inProgress} note="Já ocupam vagas adicionais" tone="cyan" />
-        <CompactStat label="Vagas adicionais" value={mappingRequired ? "—" : availableSlots} note={`${currentAE} AE/AE* no período atual`} tone="slate" />
-      </div>
+      {audience === "student" ? (
+        <div className="grid grid-cols-2 gap-3">
+          <CompactStat label="Período atual" value={currentPeriod ? `${currentPeriod}º` : "—"} note={currentPeriodConfirmed ? "Seu período no curso" : "Em conferência pela equipe"} tone="blue" />
+          <CompactStat label="Concluídas" value={completed} note={`de ${mainGrid.length} disciplinas do curso`} tone="cyan" />
+          <CompactStat label="Pendências" value={mappingRequired ? "—" : pending} note="De períodos anteriores, a cursar" tone="gold" />
+          <CompactStat label="Em andamento" value={mappingRequired ? "—" : inProgress} note="Disciplinas anteriores que você já cursa" tone="slate" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <CompactStat label="Período atual" value={currentPeriod ? `${currentPeriod}º` : "—"} note={currentPeriodConfirmed ? "Mapeamento confirmado" : "Não identificado · conferir se necessário"} tone="blue" />
+          <CompactStat label="Pendências anteriores" value={mappingRequired ? "—" : pending} note="Inclui reprovações registradas" tone="gold" />
+          <CompactStat label="Em andamento" value={mappingRequired ? "—" : inProgress} note="Já ocupam vagas adicionais" tone="cyan" />
+          <CompactStat label="Vagas adicionais" value={mappingRequired ? "—" : availableSlots} note={`${currentAE} AE/AE* no período atual`} tone="slate" />
+        </div>
+      )}
     </section>
   );
 }
@@ -171,7 +184,7 @@ export function PendingDistribution({ byPeriod, totalPending, disciplines }: { b
             </div>
           </div>
         </summary>
-        <div className="divide-y border-t border-slate-200 bg-slate-50/40">{rows.map((item) => <div key={`${item.sourcePage}-${item.sourceRow}-${item.code}-${item.name}`} className="grid gap-1 px-3 py-2.5 text-sm sm:grid-cols-[5rem_minmax(0,1fr)]"><span className="font-mono text-xs text-slate-500">{item.code ?? "Sem código"}</span><span className="min-w-0 font-medium text-slate-800">{item.name}<span className="mt-0.5 block text-xs font-normal text-slate-500">{item.workload === null ? "CH não informada" : `${item.workload}h`} · {item.originalStatus}</span></span></div>)}</div>
+        <div className="divide-y border-t border-slate-200 bg-slate-50/40">{rows.map((item) => <div key={`${item.sourcePage}-${item.sourceRow}-${item.code}-${item.name}`} className="grid gap-1 px-3 py-2.5 text-sm sm:grid-cols-[5rem_minmax(0,1fr)]"><span className="font-mono text-xs text-slate-500">{item.code ?? "Sem código"}</span><span className="min-w-0 font-medium text-slate-800">{readableName(item.name)}<span className="mt-0.5 block text-xs font-normal text-slate-500">{item.workload === null ? "CH não informada" : `${item.workload}h`} · {item.originalStatus}</span></span></div>)}</div>
       </details>;
     })}
   </div>;

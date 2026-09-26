@@ -583,10 +583,10 @@ function StudentAcademicPrintReport({ sourceSnapshot, studentName, courseName, r
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2.5">
-        <ReportStat label="Período atual" value={currentPeriod ? `${currentPeriod}º` : "—"} note={`${result.currentPeriodComponents} componentes no período`} tone="border-t-[#0693E3]" />
-        <ReportStat label="Pendências anteriores" value={mappingMissing ? "—" : pending} note="Inclui reprovações registradas" tone="border-t-[#d6ce23]" />
-        <ReportStat label="Em andamento" value={mappingMissing ? "—" : result.previousAlreadyAdded} note="Já ocupam vagas adicionais" tone="border-t-[#1ca9b4]" />
-        <ReportStat label="Vagas adicionais" value={mappingMissing ? "—" : result.remainingExtraSlots} note={`Limite de ${result.semesterMaximum} · ${result.currentPeriodAE} AE/AE*`} tone="border-t-slate-400" />
+        <ReportStat label="Período atual" value={currentPeriod ? `${currentPeriod}º` : "—"} note="Seu período no curso" tone="border-t-[#0693E3]" />
+        <ReportStat label="Concluídas" value={completed} note={`de ${included.length} disciplinas do curso`} tone="border-t-[#1ca9b4]" />
+        <ReportStat label="Pendências" value={mappingMissing ? "—" : pending} note="De períodos anteriores, a cursar" tone="border-t-[#d6ce23]" />
+        <ReportStat label="Em andamento" value={mappingMissing ? "—" : result.previousAlreadyAdded} note="Disciplinas anteriores que você já cursa" tone="border-t-slate-400" />
       </div>
     </section>
 
@@ -613,19 +613,24 @@ function StudentAcademicPrintReport({ sourceSnapshot, studentName, courseName, r
     </section>}
 
     <section className="report-card mt-2.5 rounded-2xl border border-slate-200 bg-white p-4">
-      <ReportHeading kicker="Projeção" title="Previsão de conclusão por semestre" note="Estimativa sujeita à aprovação, rematrícula no prazo, oferta e pré-requisitos." />
+      <ReportHeading kicker="Planejamento" title="Seu caminho até a conclusão" note="Estimativa sujeita à aprovação, rematrícula no prazo, oferta e pré-requisitos." />
       {steps.length ? <ol className="mt-3 grid grid-cols-2 gap-2">
         {steps.map((step, index) => {
-          const load = step.capacity > 0 ? Math.min(100, Math.round(step.totalLoad / step.capacity * 100)) : 0;
           const isCurrentStep = !step.isAdditional && step.curriculumPeriod === currentPeriod;
+          const total = step.regularSubjectNames.length + step.inProgressSubjectNames.length + step.previousSubjects.length;
+          const parts = [
+            step.regularSubjectNames.length ? `${step.regularSubjectNames.length} do período` : null,
+            step.inProgressSubjectNames.length ? `${step.inProgressSubjectNames.length} em andamento` : null,
+            step.previousSubjects.length ? plural(step.previousSubjects.length, "pendência anterior", "pendências anteriores") : null,
+            step.exemptions ? plural(step.exemptions, "dispensa", "dispensas") : null,
+          ].filter(Boolean);
           return <li key={`${step.curriculumPeriod}-${step.term}-${index}`} className={cn("relative rounded-xl border py-2.5 pl-8 pr-3", isCurrentStep ? "border-[#0693E3]/50 bg-sky-50/70" : "border-slate-200 bg-white")}>
             <span aria-hidden="true" className={cn("absolute left-3 top-3.5 size-2.5 rounded-full ring-4", step.isAdditional ? "bg-[#FEF84C] ring-amber-100" : "bg-[#0693E3] ring-sky-100")} />
             <div className="flex items-start justify-between gap-2">
-              <div><p className="text-[9.5px] font-semibold uppercase tracking-wide text-slate-500">{step.isAdditional ? `Adaptação ${step.adaptationSemesterNumber}` : `${step.curriculumPeriod}º período`}{isCurrentStep ? " · atual" : ""}</p><p className="text-sm font-semibold tabular-nums text-slate-900">{step.term ?? "Calendário indisponível"}</p></div>
-              <p className="text-right text-[9.5px] text-slate-500">Carga / capacidade<span className="block text-xs font-semibold tabular-nums text-slate-900">{step.totalLoad} / {step.capacity}</span></p>
+              <div><p className="text-[9.5px] font-semibold uppercase tracking-wide text-slate-500">{step.isAdditional ? `Semestre adicional ${step.adaptationSemesterNumber ?? ""}` : `${step.curriculumPeriod}º período`}{isCurrentStep ? " · atual" : ""}</p><p className="text-sm font-semibold tabular-nums text-slate-900">{step.term ?? "A definir"}</p></div>
+              <p className="text-right text-xs font-semibold tabular-nums text-slate-900">{plural(total, "disciplina", "disciplinas")}</p>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={cn("h-full rounded-full", load >= 100 ? "bg-amber-400" : "bg-[#0693E3]")} style={{ width: `${load}%` }} /></div>
-            <p className="mt-1 text-[9.5px] text-slate-600">{[plural(step.regularSubjects, "regular", "regulares"), `${step.inProgressFromPrevious} em andamento`, plural(step.exemptions, "dispensa", "dispensas"), step.previousSubjects.length ? plural(step.previousSubjects.length, "adaptação", "adaptações") : null].filter(Boolean).join(" · ")}</p>
+            <p className="mt-1 text-[9.5px] text-slate-600">{parts.join(" · ")}</p>
           </li>;
         })}
       </ol> : <p className="mt-2 text-xs text-slate-500">Não foi possível simular etapas com os dados disponíveis no documento.</p>}
@@ -640,7 +645,6 @@ function StudentAcademicPrintReport({ sourceSnapshot, studentName, courseName, r
           <div className="flex items-baseline justify-between"><span className="text-[10.5px] font-semibold text-slate-800">{period}º período</span><span className="text-[10px] font-semibold tabular-nums text-sky-800">{count}</span></div>
           <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0693E3]" style={{ width: `${Math.max(6, Math.round(count / maxPending * 100))}%` }} /></div>
         </div>)}</div> : <p className="mt-1 text-[11px] leading-4 text-slate-600">Não há disciplinas “A CURSAR” em períodos anteriores.</p>}
-        <p className="mt-2 text-[9.5px] leading-[1.35] text-slate-500">Cabem {result.status === "MANUAL_REVIEW_REQUIRED" ? "—" : result.canAddNow} pendência(s) no limite atual — simulação sujeita à conferência da grade e à oferta acadêmica.</p>
       </section>}
       <section className={cn("report-card rounded-2xl border p-4", ready ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
         <p className={cn("text-[10px] font-semibold uppercase tracking-[0.14em]", ready ? "text-emerald-700" : "text-amber-700")}>Próximo passo</p>
@@ -678,22 +682,22 @@ function ReportStat({ label, value, note, tone }: { label: string; value: number
 function getAcademicReportStatus(status: AcademicGridSnapshot["result"]["status"]): { title: string } {
   switch (status) {
     case "NO_PENDING": return { title: "Sem pendências anteriores" };
-    case "CAN_ADD": return { title: "Há capacidade para inclusão" };
-    case "NEAR_LIMIT": return { title: "Próximo do limite de inclusão" };
-    case "LIMIT_REACHED": return { title: "Limite de inclusão atingido" };
+    case "CAN_ADD": return { title: "Há espaço para avançar nas pendências" };
+    case "NEAR_LIMIT": return { title: "Semestre quase completo" };
+    case "LIMIT_REACHED": return { title: "Semestre com a carga completa" };
     case "MANUAL_REVIEW_REQUIRED": return { title: "Análise com ressalvas" };
   }
 }
 
 function getAcademicReportNextStep(result: AcademicGridSnapshot["result"], needsReview: number): { title: string; description: string } {
   if (result.status === "MANUAL_REVIEW_REQUIRED" || needsReview > 0) {
-    return { title: "Usar a faixa como referência", description: "A estimativa já foi calculada automaticamente com os dados legíveis. Se houver divergência no extrato, a revisão opcional pode refinar o resultado." };
+    return { title: "Use a previsão como referência", description: "A estimativa foi calculada com os dados legíveis do documento. Se algo estiver diferente do seu histórico, fale com a equipe acadêmica para ajustar." };
   }
   if (result.canAddNow > 0) {
-    return { title: "Avaliar inclusão de disciplinas pendentes", description: `${result.canAddNow} pendência(s) cabem na capacidade estimada do período. Confirme a oferta e os pré-requisitos antes de orientar a inclusão.` };
+    return { title: "Avançar nas pendências", description: `Ainda cabe(m) ${result.canAddNow} disciplina(s) pendente(s) neste semestre. Confirme a oferta e os pré-requisitos com a equipe acadêmica.` };
   }
   if (result.previousPending > 0) {
-    return { title: "Planejar as pendências restantes", description: "A capacidade adicional do período está ocupada. As pendências devem ser planejadas para etapas futuras, conforme a oferta acadêmica." };
+    return { title: "Seguir o planejamento", description: "Este semestre já está com a carga completa. As pendências restantes entram nos próximos semestres, conforme a oferta acadêmica." };
   }
   return { title: "Manter o planejamento atualizado", description: "Revise a grade a cada novo período para atualizar a estimativa de conclusão." };
 }
