@@ -66,7 +66,7 @@ export default async function StudentPortalPage({
     1,
     Math.min(10000, Math.floor(Number(params.history) || 1)),
   );
-  const [history, job, settings, historyCount] = await Promise.all([
+  const [history, job, settings, historyCount, coordinators] = await Promise.all([
     prisma.academicAnalysisVersion.findMany({
       where: { enrollmentId: enrollment.id },
       orderBy: { version: "desc" },
@@ -80,6 +80,11 @@ export default async function StudentPortalPage({
     getSystemSettings(),
     prisma.academicAnalysisVersion.count({
       where: { enrollmentId: enrollment.id },
+    }),
+    prisma.user.findMany({
+      where: { role: "ACADEMIC_COORDINATOR", isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true, phone: true },
     }),
   ]);
   if (params.version && !z.string().uuid().safeParse(params.version).success)
@@ -106,7 +111,9 @@ export default async function StudentPortalPage({
   const contactRoles: Array<[string, PoloContactEntry | undefined]> = poloContacts
     ? [
         ["Mantenedor", poloContacts.mantenedor],
-        ["Coordenação acadêmica", poloContacts.coordAcademico],
+        ...(coordinators.length
+          ? []
+          : [["Coordenação acadêmica", poloContacts.coordAcademico] as [string, PoloContactEntry]]),
         ["Coordenação comercial", poloContacts.coordComercial],
       ]
     : [];
@@ -166,6 +173,16 @@ export default async function StudentPortalPage({
                         message={contactMessage}
                       />
                     )}
+                    {coordinators.map((coordinator) => (
+                      <ContactCard
+                        key={coordinator.id}
+                        role="Coordenação acadêmica"
+                        name={coordinator.name}
+                        email={coordinator.email}
+                        phone={coordinator.phone}
+                        message={contactMessage}
+                      />
+                    ))}
                     {filledContacts.map(([label, entry]) => (
                       <ContactCard
                         key={label}
@@ -181,7 +198,7 @@ export default async function StudentPortalPage({
                         <MapPin className="size-3.5" /> Polo {polo.name}
                       </p>
                     )}
-                    {!enrollment.owner && !filledContacts.length && (
+                    {!enrollment.owner && !filledContacts.length && !coordinators.length && (
                       <p className="text-sm text-slate-500">
                         Nenhum contato disponível no momento.
                       </p>

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ROLE_DESCRIPTIONS, ROLE_LABELS, STAFF_ROLES, isStudentFacingRole } from "@/lib/rbac";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, STAFF_ROLES, isStudentFacingRole, usesPolo } from "@/lib/rbac";
 import { createUserAction } from "@/features/users/actions";
 import { TemporaryPasswordDialog } from "@/features/users/temporary-password-dialog";
 import { POLOS } from "@/domain/polos";
@@ -30,7 +30,7 @@ export function UserFormDialog() {
     const email = String(formData.get("email") ?? "").toLowerCase();
     start(async () => {
       const studentFacing = isStudentFacingRole(role);
-      const res = await createUserAction({ name, email, role, poloCode: studentFacing && polo !== NO_POLO ? polo : null, phone: studentFacing ? phone : null });
+      const res = await createUserAction({ name, email, role, poloCode: usesPolo(role) && polo !== NO_POLO ? polo : null, phone: studentFacing ? phone : null });
       if (res.ok) {
         toast.success(res.message);
         setOpen(false);
@@ -83,7 +83,7 @@ export function UserFormDialog() {
               </div>
               {isStudentFacingRole(role) && (
                 <>
-                  <div className="space-y-2">
+                  {usesPolo(role) && <div className="space-y-2">
                     <Label>Polo</Label>
                     <Select value={polo} onValueChange={setPolo}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -95,7 +95,7 @@ export function UserFormDialog() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">Define os contatos institucionais mostrados aos alunos deste tutor.</p>
-                  </div>
+                  </div>}
                   <div className="space-y-2">
                     <Label htmlFor="phone">WhatsApp</Label>
                     <Input id="phone" name="phone" type="tel" inputMode="tel" placeholder="(69) 99999-0000" value={phone} onChange={(e) => setPhone(e.target.value)} />

@@ -7,7 +7,7 @@ import { ForbiddenError, type SessionUser } from "@/lib/session";
 export function enrollmentScope(user: SessionUser) {
   if (user.role === "STUDENT") return { studentUserId: user.id };
   if (!can(user.role, "students:manage")) throw new ForbiddenError();
-  return user.role === "ADMIN" ? {} : { ownerId: user.id };
+  return can(user.role, "academic:all") ? {} : { ownerId: user.id };
 }
 
 export async function requireEnrollment(user: SessionUser, id?: string) {

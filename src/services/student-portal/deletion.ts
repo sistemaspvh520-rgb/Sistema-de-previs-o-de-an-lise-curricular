@@ -29,7 +29,7 @@ async function removeVersion(tx: Prisma.TransactionClient, versionId: string) {
 
 function assertOwner(user: SessionUser, ownerId: string) {
   if (!can(user.role, "students:manage")) throw new ForbiddenError();
-  if (user.role !== "ADMIN" && ownerId !== user.id) throw new ForbiddenError("Você só pode excluir itens dos seus alunos.");
+  if (!can(user.role, "academic:all") && ownerId !== user.id) throw new ForbiddenError("Você só pode excluir itens dos seus alunos.");
 }
 
 async function removeStoredFiles(keys: Array<string | null>) {
@@ -82,7 +82,7 @@ export async function deleteAcademicGridReview(user: SessionUser, reviewId: stri
   });
   if (!review) throw new DeletionBlockedError("Análise acadêmica não encontrada.");
   if (!can(user.role, "academic:manage")) throw new ForbiddenError();
-  if (user.role !== "ADMIN" && review.createdById !== user.id && review.enrollment?.ownerId !== user.id)
+  if (!can(user.role, "academic:all") && review.createdById !== user.id && review.enrollment?.ownerId !== user.id)
     throw new ForbiddenError("Você só pode excluir análises dos seus alunos.");
   const storageKeys: Array<string | null> = [];
   await prisma.$transaction(async (tx) => {

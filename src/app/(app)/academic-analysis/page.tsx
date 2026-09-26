@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { PortalHeroArtwork } from "@/components/shared/portal-hero-artwork";
 import Link from "next/link";
 import { requirePagePermission } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { listAcademicGridReviews } from "@/repositories/academic-analysis-repository";
 import { AcademicGridUploadForm } from "@/features/academic-analysis/upload-form";
@@ -43,7 +44,7 @@ export default async function AcademicAnalysisPage({ searchParams }: PageProps<"
   const periodValue = Number(firstParam(params.periodo));
   const period = Number.isInteger(periodValue) && periodValue >= 1 && periodValue <= 20 ? periodValue : undefined;
   const status = Object.hasOwn(statusLabel, statusValue) ? statusValue as AcademicGridReviewStatus : undefined;
-  const isAdmin = user.role === "ADMIN";
+  const isAdmin = can(user.role, "academic:all");
   const [settings, reviewResult, owners] = await Promise.all([
     getSystemSettings(),
     listAcademicGridReviews(user.id, isAdmin, { query, responsibleId: isAdmin ? responsibleId : undefined, status, period }),

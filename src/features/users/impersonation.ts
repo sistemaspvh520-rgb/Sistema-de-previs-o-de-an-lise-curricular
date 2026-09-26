@@ -16,7 +16,7 @@ export async function issueImpersonationToken(adminId: string, targetUserId: str
 }
 
 /** Consome o token; devolve o usuário-alvo e o admin, ou null se inválido/expirado/usado. */
-export async function consumeImpersonationToken(token: string): Promise<{ target: { id: string; email: string; name: string; role: "ADMIN" | "TUTOR" | "ANALYST" | "VIEWER"; sessionVersion: number; isActive: boolean }; admin: { id: string; name: string; role: string; isActive: boolean } } | null> {
+export async function consumeImpersonationToken(token: string): Promise<{ target: { id: string; email: string; name: string; role: "ADMIN" | "ACADEMIC_COORDINATOR" | "TUTOR" | "ANALYST" | "VIEWER"; sessionVersion: number; isActive: boolean }; admin: { id: string; name: string; role: string; isActive: boolean } } | null> {
   if (!token || token.length < 20) return null;
   const row = await prisma.impersonationToken.findUnique({ where: { tokenHash: hashToken(token) }, include: { target: true, admin: true } });
   if (!row || row.usedAt || row.expiresAt < new Date()) return null;

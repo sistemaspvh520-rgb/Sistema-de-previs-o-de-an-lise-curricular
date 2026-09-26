@@ -29,7 +29,7 @@ export default async function GeneralSettingsPage() {
         <Card className="mt-6 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Contatos por polo</CardTitle>
-            <CardDescription>Mantenedor e coordenações acadêmica/comercial de cada polo — exibidos ao aluno no portal, conforme o polo do tutor responsável.</CardDescription>
+            <CardDescription>Mantenedor e coordenações acadêmica/comercial de cada polo — exibidos ao aluno no portal, conforme o polo do tutor responsável. Usuários com perfil “Coordenação acadêmica” aparecem para os alunos de todos os polos, no lugar da coordenação acadêmica informada aqui.</CardDescription>
           </CardHeader>
           <CardContent>
             <PoloContactsForm polos={settings.polos} initial={settings.poloContacts} readOnly={false} />

@@ -32,6 +32,13 @@ describe("RBAC", () => {
     expect(can("TUTOR", "analysis:delete")).toBe(false);
     expect(can("ADMIN", "academic:manage")).toBe(true);
   });
+  it("Coordenação acadêmica vê a área acadêmica de todos os polos, sem administrar o sistema", () => {
+    for (const permission of ["academic:all", "academic:manage", "students:manage", "analysis:create", "analysis:review"] as const)
+      expect(can("ACADEMIC_COORDINATOR", permission)).toBe(true);
+    for (const permission of ["users:manage", "integration:manage", "privacy:manage", "audit:read", "analysis:delete"] as const)
+      expect(can("ACADEMIC_COORDINATOR", permission)).toBe(false);
+    expect(can("TUTOR", "academic:all")).toBe(false);
+  });
   it("VIEWER só lê", () => {
     expect(can("VIEWER", "analysis:read")).toBe(true);
     expect(can("VIEWER", "analysis:create")).toBe(false);

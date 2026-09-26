@@ -1,6 +1,7 @@
 import type { Role } from "@/generated/prisma/enums";
 
 export type Permission =
+  | "academic:all"
   | "academic:manage"
   | "students:manage"
   | "analysis:create"
@@ -18,6 +19,7 @@ export type Permission =
 const MATRIX: Record<Role, ReadonlySet<Permission>> = {
   STUDENT: new Set<Permission>(),
   ADMIN: new Set<Permission>([
+    "academic:all",
     "academic:manage",
     "students:manage",
     "analysis:create",
@@ -31,6 +33,17 @@ const MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "audit:read",
     "usage:read",
     "privacy:manage",
+  ]),
+  /** Coordenação acadêmica: tudo do Tutor, com visão de todos os alunos de todos os polos. */
+  ACADEMIC_COORDINATOR: new Set<Permission>([
+    "academic:all",
+    "academic:manage",
+    "students:manage",
+    "analysis:create",
+    "analysis:read",
+    "analysis:review",
+    "analysis:recalculate",
+    "analysis:summary",
   ]),
   /** Tutor: tudo o que o Analista faz + área acadêmica (análise acadêmica, solicitações e alunos). */
   TUTOR: new Set<Permission>([
@@ -59,23 +72,30 @@ export function can(role: Role | undefined | null, permission: Permission): bool
 }
 
 /** Papéis atribuíveis a usuários da equipe, na ordem exibida nos formulários. */
-export const STAFF_ROLES = ["ADMIN", "TUTOR", "ANALYST", "VIEWER"] as const satisfies readonly Role[];
+export const STAFF_ROLES = ["ADMIN", "ACADEMIC_COORDINATOR", "TUTOR", "ANALYST", "VIEWER"] as const satisfies readonly Role[];
 
 export const ROLE_DESCRIPTIONS: Record<(typeof STAFF_ROLES)[number], string> = {
   ADMIN: "Acesso total, incluindo usuários e configurações.",
+  ACADEMIC_COORDINATOR: "Toda a área acadêmica de todos os polos e a análise curricular — sem usuários e configurações. Aparece aos alunos como contato da coordenação acadêmica.",
   TUTOR: "Análise curricular, grades comerciais, relatórios e toda a área acadêmica.",
   ANALYST: "Análise curricular, grades comerciais e relatórios — sem área acadêmica.",
   VIEWER: "Somente consulta das análises.",
 };
 
-/** Papéis que atendem alunos: exibem polo e WhatsApp no cadastro. */
+/** Papéis que atendem alunos: exibem WhatsApp no cadastro. */
 export function isStudentFacingRole(role: Role): boolean {
+  return role === "ADMIN" || role === "TUTOR" || role === "ACADEMIC_COORDINATOR";
+}
+
+/** Papéis vinculados a um polo (definem os contatos do polo mostrados aos alunos). */
+export function usesPolo(role: Role): boolean {
   return role === "ADMIN" || role === "TUTOR";
 }
 
 export const ROLE_LABELS: Record<Role, string> = {
   STUDENT: "Aluno",
   ADMIN: "Administrador",
+  ACADEMIC_COORDINATOR: "Coordenação acadêmica",
   TUTOR: "Tutor",
   ANALYST: "Analista",
   VIEWER: "Visualizador",

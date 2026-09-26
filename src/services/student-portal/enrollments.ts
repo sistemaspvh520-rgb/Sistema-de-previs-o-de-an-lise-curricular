@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/session";
 import { ForbiddenError } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import type { AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import { canonicalRgm, canonicalText, canonicalCourse } from "./fingerprints";
 import { lockEnrollment, publishVersion } from "./versions";
@@ -27,7 +28,7 @@ export async function ensureEnrollment(
         where: { rgm },
       });
       if (existing) {
-        if (user.role !== "ADMIN" && existing.ownerId !== user.id)
+        if (!can(user.role, "academic:all") && existing.ownerId !== user.id)
           throw new PortalInputError(
             "Este RGM já possui cadastro com outro responsável. Solicite ajuda à administração.",
           );
@@ -48,7 +49,7 @@ export async function ensureEnrollment(
         include: { createdBy: { select: { role: true } } },
       });
       if (
-        user.role !== "ADMIN" &&
+        !can(user.role, "academic:all") &&
         legacy.some((item) => item.createdById !== user.id)
       )
         throw new PortalInputError(

@@ -6,6 +6,7 @@ import { academicGridCompletionBlockers, analyzeAcademicGrid, normalizeAcademicS
 import type { AcademicDiscipline, AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import { recordAudit } from "@/services/audit-log/audit-log";
 import { logger } from "@/lib/logger";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
@@ -115,7 +116,7 @@ export async function updateAcademicGridFieldAction(input: unknown): Promise<Act
     const parsed = changeSchema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Dados inválidos.");
     const data = parsed.data;
-    const review = await authorizedReview(data.reviewId, user.id, user.role === "ADMIN");
+    const review = await authorizedReview(data.reviewId, user.id, can(user.role, "academic:all"));
     if (review.enrollmentId && ["rgm", "courseName", "studentName"].includes(data.field)) return fail("A identidade está vinculada à matrícula e não pode ser alterada nesta análise.");
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
     let previousValue: unknown;
@@ -175,7 +176,7 @@ export async function autoMapAcademicGridAction(reviewIdInput: unknown): Promise
   try {
     const user = await requirePermission("academic:manage");
     const reviewId = idSchema.parse(reviewIdInput);
-    const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
+    const review = await authorizedReview(reviewId, user.id, can(user.role, "academic:all"));
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
     snapshot.result = { ...snapshot.result, currentPeriod: review.currentPeriod, currentPeriodConfirmed: review.currentPeriodConfirmed };
     const mapped = await autoMapHistorySnapshot(snapshot, { allowAI: true });
@@ -193,7 +194,7 @@ export async function addAcademicDisciplineAction(reviewIdInput: unknown): Promi
   try {
     const user = await requirePermission("academic:manage");
     const reviewId = idSchema.parse(reviewIdInput);
-    const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
+    const review = await authorizedReview(reviewId, user.id, can(user.role, "academic:all"));
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
     const discipline: AcademicDiscipline = { code: null, name: "", rawPeriod: "", period: null, originalStatus: "A CURSAR", normalizedStatus: "A CURSAR", workload: null, inMainCurriculum: true, sourcePage: 0, sourceRow: snapshot.disciplines.length + 1, manualEdited: true };
     const index = snapshot.disciplines.push(discipline) - 1;
@@ -210,7 +211,7 @@ export async function completeAcademicGridReviewAction(reviewIdInput: unknown): 
   try {
     const user = await requirePermission("academic:manage");
     const reviewId = idSchema.parse(reviewIdInput);
-    const review = await authorizedReview(reviewId, user.id, user.role === "ADMIN");
+    const review = await authorizedReview(reviewId, user.id, can(user.role, "academic:all"));
     if (review.completedAt) return ok(undefined, "Esta análise já foi concluída.");
 
     const snapshot = review.snapshot as unknown as AcademicGridSnapshot;

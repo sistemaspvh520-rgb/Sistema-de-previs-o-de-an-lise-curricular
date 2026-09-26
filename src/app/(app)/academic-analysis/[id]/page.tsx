@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { requirePagePermission } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import { getAcademicGridReview, findPreviousAcademicGridReview } from "@/repositories/academic-analysis-repository";
 import type { AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import { AcademicGridWorkspace } from "@/features/academic-analysis/workspace";
@@ -21,7 +22,7 @@ export default async function AcademicGridReviewPage({ params }: PageProps<"/aca
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const review = await getAcademicGridReview(id);
-  if (!review || (user.role !== "ADMIN" && review.createdById !== user.id && review.enrollment?.ownerId !== user.id)) notFound();
+  if (!review || (!can(user.role, "academic:all") && review.createdById !== user.id && review.enrollment?.ownerId !== user.id)) notFound();
   const version = await prisma.academicAnalysisVersion.findFirst({ where: { reviewId: id }, orderBy: { version: "desc" }, include: { preferredSource: true } });
   const snapshot = presentAcademicSnapshot({ snapshot: review.snapshot, preferredSource: version?.preferredSource });
   const currentRuleSet = snapshot.projectionRules ? null : await getActiveRuleSet().catch(() => null);
@@ -32,7 +33,7 @@ export default async function AcademicGridReviewPage({ params }: PageProps<"/aca
   const analysisYear = analysisDateParts.year;
   const forecastHorizon = analysisYear + Math.ceil((forecastWithoutCalendar?.semestersMax ?? 0) / 2) + 2;
   const [previousRecord, calendarTerms] = await Promise.all([
-    findPreviousAcademicGridReview(review.id, review.rgm, user.id, user.role === "ADMIN"),
+    findPreviousAcademicGridReview(review.id, review.rgm, user.id, can(user.role, "academic:all")),
     getAcademicCalendar(Math.max(zonedDateParts().year + 10, forecastHorizon)),
   ]);
   const previousSnapshot = previousRecord?.snapshot as unknown as AcademicGridSnapshot | undefined;

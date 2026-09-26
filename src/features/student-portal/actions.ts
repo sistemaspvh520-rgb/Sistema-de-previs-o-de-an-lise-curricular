@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requirePermission, getSessionUser } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import {
   fail,
   ok,
@@ -121,7 +122,7 @@ export async function createStudentAction(
     const existing = await prisma.studentEnrollment.findFirst({
       where: {
         rgm: data.rgm,
-        ...(actor.role === "ADMIN" ? {} : { ownerId: actor.id }),
+        ...(can(actor.role, "academic:all") ? {} : { ownerId: actor.id }),
       },
     });
     if (existing?.studentUserId)
@@ -134,7 +135,7 @@ export async function createStudentAction(
         where: { email: data.email },
         include: {
           studentEnrollments: {
-            where: actor.role === "ADMIN" ? {} : { ownerId: actor.id },
+            where: can(actor.role, "academic:all") ? {} : { ownerId: actor.id },
             select: { id: true },
           },
         },
@@ -326,7 +327,7 @@ export async function linkLegacyStudentAction(
     const review = await prisma.academicGridReview.findFirst({
       where: {
         id,
-        ...(actor.role === "ADMIN" ? {} : { createdById: actor.id }),
+        ...(can(actor.role, "academic:all") ? {} : { createdById: actor.id }),
       },
     });
     if (!review?.rgm || !review.studentName)

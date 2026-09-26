@@ -90,7 +90,7 @@ export async function submitAcademicDocument(
       const existing = await prisma.academicAnalysisSource.findFirst({
         where: {
           sourceFileHash: sha256(bytes),
-          enrollment: user.role === "ADMIN" ? {} : { ownerId: user.id },
+          enrollment: can(user.role, "academic:all") ? {} : { ownerId: user.id },
         },
         select: { enrollmentId: true },
       });

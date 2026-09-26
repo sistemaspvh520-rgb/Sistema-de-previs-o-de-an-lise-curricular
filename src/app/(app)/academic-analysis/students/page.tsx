@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requirePagePermission } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import {
   accessStatus,
   enrollmentScope,
@@ -47,7 +48,7 @@ export default async function StudentsPage({
   const legacyWhere: Prisma.AcademicGridReviewWhereInput = {
     enrollmentId: null,
     rgm: { not: null },
-    ...(user.role === "ADMIN" ? {} : { createdById: user.id }),
+    ...(can(user.role, "academic:all") ? {} : { createdById: user.id }),
     ...(query
       ? {
           OR: [

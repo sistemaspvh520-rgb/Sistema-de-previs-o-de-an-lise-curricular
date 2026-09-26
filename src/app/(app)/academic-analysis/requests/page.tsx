@@ -21,6 +21,7 @@ import type {
 } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requirePagePermission } from "@/lib/session";
+import { can } from "@/lib/rbac";
 import { enrollmentScope } from "@/services/student-portal/access";
 import { documentLabels } from "@/services/academic-documents/classifier";
 import { requestLabels } from "@/features/student-portal/request-labels";
@@ -47,7 +48,7 @@ export default async function AcademicRequestsPage({
     ...(q.course
       ? { courseName: { contains: q.course, mode: "insensitive" } }
       : {}),
-    ...(user.role === "ADMIN" && q.tutor
+    ...(can(user.role, "academic:all") && q.tutor
       ? { owner: { name: { contains: q.tutor, mode: "insensitive" } } }
       : {}),
   };
@@ -103,7 +104,7 @@ export default async function AcademicRequestsPage({
           Acompanhamento acadêmico
         </p>
         <h1 className="mt-2 text-2xl font-semibold">
-          {user.role === "ADMIN"
+          {can(user.role, "academic:all")
             ? "Central Acadêmica"
             : "Solicitações Acadêmicas"}
         </h1>
@@ -207,7 +208,7 @@ export default async function AcademicRequestsPage({
           placeholder="Curso"
           className="rounded-lg border p-3 text-sm"
         />
-        {user.role === "ADMIN" && (
+        {can(user.role, "academic:all") && (
           <input
             name="tutor"
             defaultValue={q.tutor}

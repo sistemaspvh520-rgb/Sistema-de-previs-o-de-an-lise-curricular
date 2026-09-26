@@ -48,7 +48,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ROLE_DESCRIPTIONS, ROLE_LABELS, STAFF_ROLES, isStudentFacingRole } from "@/lib/rbac";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, STAFF_ROLES, isStudentFacingRole, usesPolo } from "@/lib/rbac";
 import { formatWhatsapp } from "@/lib/whatsapp";
 import { POLOS } from "@/domain/polos";
 import {
@@ -106,7 +106,7 @@ export function UserRowActions({
         email,
         role,
         isActive: user.isActive,
-        poloCode: isStudentFacingRole(role) && polo !== NO_POLO ? polo : null,
+        poloCode: usesPolo(role) && polo !== NO_POLO ? polo : null,
         phone: isStudentFacingRole(role) ? phone : null,
       });
       if (res.ok) {
@@ -300,8 +300,8 @@ export function UserRowActions({
               )}
             </div>
             {isStudentFacingRole(role) && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="min-w-0 space-y-2">
+              <div className={usesPolo(role) ? "grid gap-4 sm:grid-cols-2" : "grid gap-4"}>
+                {usesPolo(role) && <div className="min-w-0 space-y-2">
                   <Label>Polo</Label>
                   <Select value={polo} onValueChange={setPolo}>
                     <SelectTrigger className="w-full">
@@ -314,7 +314,7 @@ export function UserRowActions({
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div>}
                 <div className="min-w-0 space-y-2">
                   <Label htmlFor={`phone-${user.id}`}>WhatsApp</Label>
                   <Input
