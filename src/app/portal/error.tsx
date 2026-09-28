@@ -1,6 +1,11 @@
 "use client";
+import { useEffect } from "react";
 import Link from "next/link";
-export default function PortalError({ reset }: { reset: () => void }) {
+import * as Sentry from "@sentry/nextjs";
+export default function PortalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
   return (
     <main className="grid min-h-dvh place-items-center bg-slate-50 px-5">
       <section className="max-w-md rounded-3xl border bg-white p-8 text-center">

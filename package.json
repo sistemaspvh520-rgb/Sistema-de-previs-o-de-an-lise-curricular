@@ -26,6 +26,7 @@
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@radix-ui/react-slot": "^1.2.3",
+    "@sentry/nextjs": "^11.1.0",
     "@supabase/supabase-js": "2.116.0",
     "@vercel/analytics": "^2.0.1",
     "border-beam": "^1.4.1",

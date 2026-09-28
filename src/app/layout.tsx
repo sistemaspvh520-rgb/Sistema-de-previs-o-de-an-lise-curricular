@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Caveat } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,7 +14,10 @@ export const metadata: Metadata = {
   title: { default: "Análise Curricular Inteligente", template: "%s · Análise Curricular" },
   description: "Leitura e interpretação automatizada de análises curriculares — Cruzeiro do Sul Virtual",
   robots: { index: false, follow: false },
+  appleWebApp: { capable: true, title: "Portal do Aluno", statusBarStyle: "default" },
 };
+
+export const viewport: Viewport = { themeColor: "#003B71" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

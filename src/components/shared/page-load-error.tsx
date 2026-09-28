@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, ArrowLeft } from "lucide-react";
+import * as Sentry from "@sentry/nextjs";
 import { cn } from "@/lib/utils";
 
 const RELOAD_KEY = "page-load-error:reloaded-at";
@@ -32,6 +33,8 @@ export function PageLoadError({ error, fullscreen = false }: { error: Error & { 
 
   useEffect(() => {
     console.error(error);
+    // A tela de erro "engole" a exceção; aqui ela é enviada ao Sentry (exceto versão antiga em cache).
+    if (!isStaleBuildError(error)) Sentry.captureException(error);
     if (!reloading) return;
     try {
       window.sessionStorage.setItem(RELOAD_KEY, String(Date.now()));

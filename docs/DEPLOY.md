@@ -103,3 +103,29 @@ Cron de retenção LGPD: `vercel.json` agenda `GET /api/cron/retention` diariame
 ## Desenvolvimento local continua igual
 
 `docker compose up -d db` · `npm run db:migrate` · `npm run db:seed` · `npm run dev` (ver README).
+
+## Monitoramento de erros (Sentry)
+
+O SDK `@sentry/nextjs` está integrado (`src/instrumentation.ts`, `src/instrumentation-client.ts`,
+`src/lib/observability/sentry-options.ts`) e fica **desligado** até existir o DSN.
+
+1. Em sentry.io crie a organização e um projeto **Next.js**; copie o DSN.
+   (Alternativa: Vercel → Integrations → Sentry, que cria o projeto e as variáveis sozinha.)
+2. Vercel → Settings → Environment Variables (Production e Preview):
+   - `NEXT_PUBLIC_SENTRY_DSN` — o DSN (obrigatório para ligar).
+   - `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` — opcionais, para enviar source maps
+     (stack traces legíveis). O token é um *Organization Auth Token*.
+3. Redeploy.
+
+Privacidade (LGPD): `sendDefaultPii: false`, sem replay de sessão, sem cookies/cabeçalhos
+sensíveis, URLs sem query string (tokens de convite/senha) e usuário reduzido ao id. Os eventos
+passam pelo próprio domínio em `/monitoring` (a CSP continua `connect-src 'self'`).
+
+## App Android (Play Store)
+
+O portal do aluno é um PWA instalável (`src/app/manifest.ts`, ícones em `public/app/`). Para a
+Play Store, empacote-o como TWA em https://www.pwabuilder.com com a URL
+`https://www.cruzeirodosulvirtual.app.br/portal`, publique na Play Console e configure
+`ANDROID_APP_PACKAGE` e `ANDROID_APP_SHA256` (Play Console → Integridade do app → Assinatura do
+app → SHA-256) — `/.well-known/assetlinks.json` passa a responder com eles e o app abre sem a
+barra de endereço.
