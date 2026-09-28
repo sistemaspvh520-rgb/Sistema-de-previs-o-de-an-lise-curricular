@@ -103,13 +103,14 @@ export async function reassignStudentTutorAction(input: unknown): Promise<Action
     const parsed = reassignSchema.safeParse(input);
     if (!parsed.success) return fail("Dados inválidos.");
     const [enrollment, tutor] = await Promise.all([
-      prisma.studentEnrollment.findUnique({ where: { id: parsed.data.enrollmentId }, select: { id: true, rgm: true, ownerId: true, owner: { select: { name: true } } } }),
-      prisma.user.findFirst({ where: { id: parsed.data.ownerId, isActive: true, role: { in: ["ADMIN", "ACADEMIC_COORDINATOR", "TUTOR"] } }, select: { id: true, name: true } }),
+      prisma.studentEnrollment.findUnique({ where: { id: parsed.data.enrollmentId }, select: { id: true, rgm: true, ownerId: true, poloCode: true, owner: { select: { name: true } } } }),
+      prisma.user.findFirst({ where: { id: parsed.data.ownerId, isActive: true, role: { in: ["ADMIN", "ACADEMIC_COORDINATOR", "TUTOR"] } }, select: { id: true, name: true, poloCode: true } }),
     ]);
     if (!enrollment) return fail("Aluno não encontrado.");
     if (!tutor) return fail("Escolha um tutor ativo.");
     if (enrollment.ownerId === tutor.id) return ok(undefined, `${tutor.name} já é o tutor deste aluno.`);
-    await prisma.studentEnrollment.update({ where: { id: enrollment.id }, data: { ownerId: tutor.id } });
+    // Aluno ainda sem polo herda o do novo tutor; polo já definido não muda com a troca.
+    await prisma.studentEnrollment.update({ where: { id: enrollment.id }, data: { ownerId: tutor.id, ...(!enrollment.poloCode && tutor.poloCode ? { poloCode: tutor.poloCode } : {}) } });
     await recordAudit({ userId: user.id, action: "student.tutor_changed", entityType: "StudentEnrollment", entityId: enrollment.id, metadata: { rgm: enrollment.rgm, from: enrollment.owner.name, to: tutor.name } });
     invalidate();
     revalidatePath(`/academic-analysis/students/${enrollment.id}`);

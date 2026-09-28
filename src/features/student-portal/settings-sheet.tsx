@@ -23,7 +23,7 @@ export function SettingsSheet({ children }: { children: ReactNode }) {
           <span className="hidden sm:inline">Configurações</span>
         </button>
       </SheetTrigger>
-      <SheetContent className="w-full gap-0 bg-slate-50 sm:max-w-md">
+      <SheetContent className="gap-0 bg-slate-50 data-[side=right]:w-full data-[side=right]:sm:max-w-md">
         <SheetHeader className="border-b border-slate-200 bg-gradient-to-br from-brand-cyan-50 via-white to-white px-5 py-5">
           <div className="flex items-center gap-3 pr-8">
             <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#003B71] text-white shadow-[0_10px_24px_-14px_#003B71]">

@@ -27,6 +27,8 @@ export async function ensureEnrollment(
       const existing = await tx.studentEnrollment.findUnique({
         where: { rgm },
       });
+      // Tutor com polo: o aluno que ele cadastra (ou libera) já fica com o polo definido.
+      const actorPolo = (await tx.user.findUnique({ where: { id: user.id }, select: { poloCode: true } }))?.poloCode ?? null;
       if (existing) {
         if (!can(user.role, "academic:all") && existing.ownerId !== user.id)
           throw new PortalInputError(
@@ -41,6 +43,8 @@ export async function ensureEnrollment(
           throw new PortalInputError(
             "O curso do extrato não corresponde ao cadastro. Solicite a conferência da equipe acadêmica.",
           );
+        if (!existing.poloCode && actorPolo)
+          return tx.studentEnrollment.update({ where: { id: existing.id }, data: { poloCode: actorPolo } });
         return existing;
       }
       const legacy = await tx.academicGridReview.findMany({
@@ -77,6 +81,7 @@ export async function ensureEnrollment(
           name: input.name,
           courseName: input.courseName || legacy.at(-1)?.courseName,
           ownerId: user.id,
+          poloCode: actorPolo,
         },
       });
       await lockEnrollment(tx, enrollment.id);

@@ -13,7 +13,7 @@ export function PortalAuthShell({
 }) {
   return (
     <PortalEffects>
-      <main className="portal-auth grid min-h-dvh bg-[#f7faff] lg:grid-cols-[1.05fr_1fr]">
+      <main className="portal-auth grid min-h-dvh grid-cols-1 bg-[#f7faff] lg:grid-cols-[1.05fr_1fr]">
         <aside className="portal-auth-story relative isolate flex flex-col overflow-hidden bg-[#003B71] text-white lg:justify-end lg:p-12 xl:p-16">
           {/* No celular a foto é um banner livre, sem texto por cima; no desktop ela ocupa toda a coluna. */}
           <div className="relative aspect-[16/10] w-full sm:aspect-[16/8] lg:absolute lg:inset-0 lg:aspect-auto">

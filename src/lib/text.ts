@@ -20,3 +20,10 @@ export function readableName(value: string): string {
     })
     .join(" ");
 }
+
+/** Nome curto para espaços apertados: "João Vitor Cardoso Cabral" → "João Cabral". */
+export function shortPersonName(value: string): string {
+  const words = readableName(value).split(" ").filter(Boolean);
+  if (words.length <= 2) return words.join(" ");
+  return `${words[0]} ${words[words.length - 1]}`;
+}

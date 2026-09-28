@@ -757,6 +757,8 @@ model StudentEnrollment {
   courseName       String?
   studentUserId    String?   @db.Uuid
   ownerId          String    @db.Uuid
+  /// Polo do aluno: vem do tutor que liberou o acesso ou é confirmado uma única vez pelo aluno.
+  poloCode         String?
   currentVersionId String?   @unique @db.Uuid
   welcomedAt       DateTime? @db.Timestamptz(6)
   createdAt        DateTime  @default(now()) @db.Timestamptz(6)

@@ -20,7 +20,7 @@ import { getSystemSettings } from "@/repositories/settings-repository";
 import { isProcessingFresh } from "@/services/student-portal/processing";
 import { SettingsSheet } from "@/features/student-portal/settings-sheet";
 import { SettingsSection } from "@/features/student-portal/settings-sections";
-import { ContactRow, PoloContactPicker } from "@/features/student-portal/polo-contact-picker";
+import { ContactRow, StudentPoloContacts } from "@/features/student-portal/polo-contact-picker";
 import { getPoloDirectory } from "@/services/student-portal/polo-directory";
 import { ChevronDown, FileText, Headset, KeyRound, UserRound } from "lucide-react";
 
@@ -153,11 +153,12 @@ export default async function StudentPortalPage({
                         />
                       </ul>
                     )}
-                    <PoloContactPicker
+                    <StudentPoloContacts
                       directory={directory}
                       message={contactMessage}
-                      defaultCode={enrollment.owner?.poloCode ?? null}
-                      storageKey={`portal:polo:${enrollment.id}`}
+                      poloCode={enrollment.poloCode}
+                      ownerEmail={enrollment.owner?.email ?? null}
+                      canConfirm={!support}
                     />
                   </div>
                 </SettingsSection>

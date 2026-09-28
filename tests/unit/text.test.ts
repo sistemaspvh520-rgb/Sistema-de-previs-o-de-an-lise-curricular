@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readableName } from "@/lib/text";
+import { readableName, shortPersonName } from "@/lib/text";
 
 describe("readableName", () => {
   it("converte nomes em maiúsculas para leitura", () => {
@@ -9,5 +9,13 @@ describe("readableName", () => {
   });
   it("mantém nomes que já têm maiúsculas e minúsculas", () => {
     expect(readableName("Banco de Dados")).toBe("Banco de Dados");
+  });
+});
+
+describe("shortPersonName", () => {
+  it("usa o primeiro e o último nome", () => {
+    expect(shortPersonName("João Vitor Cardoso Cabral")).toBe("João Cabral");
+    expect(shortPersonName("ESTHER SULAMITA BATISTA")).toBe("Esther Batista");
+    expect(shortPersonName("Ana Souza")).toBe("Ana Souza");
   });
 });

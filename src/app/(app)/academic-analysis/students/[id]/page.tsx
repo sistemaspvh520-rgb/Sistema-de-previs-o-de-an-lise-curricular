@@ -8,6 +8,7 @@ import { findPolo } from "@/domain/polos";
 import { can, ROLE_LABELS } from "@/lib/rbac";
 import { StudentDeletionButton } from "@/features/student-portal/student-deletion";
 import { TutorSelect } from "@/features/student-portal/tutor-select";
+import { StudentPoloSelect } from "@/features/student-portal/polo-select";
 import { prisma } from "@/lib/prisma";
 import { requirePagePermission } from "@/lib/session";
 import { requireEnrollment, accessStatus } from "@/services/student-portal/access";
@@ -49,6 +50,7 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
   ]);
 
   const manageAll = can(user.role, "academic:all");
+  const canEditPolo = manageAll || student.owner.id === user.id;
   const [tutors, pendingDeletion] = await Promise.all([
     manageAll
       ? prisma.user.findMany({ where: { isActive: true, role: { in: ["TUTOR", "ADMIN", "ACADEMIC_COORDINATOR"] } }, orderBy: { name: "asc" }, select: { id: true, name: true, role: true } })
@@ -94,25 +96,29 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
                     <span className="rounded-full bg-brand-gold/15 px-2.5 py-1 text-brand-gold ring-1 ring-brand-gold/30">{documentLabels[snapshot.documentType]}</span>
                   )}
                 </div>
-                {manageAll && (
-                  <div className="mt-3 max-w-xs">
-                    <span className="mb-1 block text-[11px] font-medium text-white/70">Tutor responsável</span>
-                    <TutorSelect enrollmentId={student.id} ownerId={student.owner.id} tutors={tutors.map((tutor) => ({ id: tutor.id, name: tutor.name, roleLabel: ROLE_LABELS[tutor.role] }))} />
+                {(manageAll || canEditPolo) && (
+                  <div className="mt-3 grid max-w-xl gap-3 sm:grid-cols-2">
+                    {manageAll && (
+                      <div className="min-w-0">
+                        <span className="mb-1 block text-[11px] font-medium text-white/70">Tutor responsável</span>
+                        <TutorSelect enrollmentId={student.id} ownerId={student.owner.id} tutors={tutors.map((tutor) => ({ id: tutor.id, name: tutor.name, roleLabel: ROLE_LABELS[tutor.role] }))} />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="mb-1 block text-[11px] font-medium text-white/70">Polo do aluno</span>
+                      <StudentPoloSelect enrollmentId={student.id} poloCode={student.poloCode} polos={settings.polos} />
+                    </div>
                   </div>
                 )}
-                {student.owner && (
-                  <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-white/75">
-                    <MapPin className="size-3.5 shrink-0" />
-                    Responsável: {student.owner.name}
-                    {student.owner.poloCode ? (
-                      <> · Polo {findPolo(student.owner.poloCode)?.name ?? student.owner.poloCode}</>
-                    ) : can(user.role, "users:manage") ? (
-                      <Link href="/settings/users" className="text-brand-gold underline-offset-2 hover:underline">· sem polo — o aluno vê os contatos de todos os polos (definir polo)</Link>
-                    ) : (
-                      <span className="text-brand-gold">· sem polo — o aluno vê os contatos de todos os polos</span>
-                    )}
-                  </p>
-                )}
+                <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-white/75">
+                  <MapPin className="size-3.5 shrink-0" />
+                  {!manageAll && <>Responsável: {student.owner.name} · </>}
+                  {student.poloCode ? (
+                    <>Polo {findPolo(student.poloCode)?.name ?? student.poloCode}</>
+                  ) : (
+                    <span className="text-brand-gold">Polo ainda não definido — o aluno confirma uma única vez no primeiro acesso ao portal</span>
+                  )}
+                </p>
               </div>
             </div>
 
