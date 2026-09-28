@@ -238,3 +238,43 @@ export function followUpEmail(p: {
     ].join("\n"),
   };
 }
+
+export function teamDigestEmail(p: {
+  name: string;
+  actions: number;
+  canAdvance: number;
+  graduating: number;
+  attention: number;
+  highlights: string[];
+  url: string;
+  institution: string;
+}): EmailContent {
+  const first = firstName(p.name);
+  const details: Array<[string, string]> = [
+    ["Precisa de você", String(p.actions)],
+    ["Podem avançar agora", String(p.canAdvance)],
+    ["Formandos à vista", String(p.graduating)],
+    ["Em atenção", String(p.attention)],
+  ];
+  const note = p.highlights.length ? `Destaques: ${p.highlights.map(escape).join(" · ")}.` : undefined;
+  return {
+    subject: `Sua semana acadêmica: ${p.canAdvance} ${p.canAdvance === 1 ? "aluno pode" : "alunos podem"} avançar`,
+    html: layout({
+      preheader: "O resumo da semana: pendências da equipe, quem pode avançar e quem está perto de se formar.",
+      title: `${first}, o resumo da sua semana`,
+      intro: "Estes são os alunos que mais se beneficiam de um contato seu nesta semana. Tudo está detalhado na Central Acadêmica.",
+      details,
+      button: { label: "Abrir a Central Acadêmica", url: p.url },
+      note,
+      institution: p.institution,
+    }),
+    text: [
+      `${first}, o resumo da sua semana`,
+      "",
+      ...details.map(([k, v]) => `${k}: ${v}`),
+      ...(p.highlights.length ? ["", `Destaques: ${p.highlights.join(" · ")}`] : []),
+      "",
+      `Central Acadêmica: ${p.url}`,
+    ].join("\n"),
+  };
+}

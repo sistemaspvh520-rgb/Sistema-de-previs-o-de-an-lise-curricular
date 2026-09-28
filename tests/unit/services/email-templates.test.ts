@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inviteEmail, resetEmail, temporaryPasswordEmail } from "@/services/email/templates";
+import { inviteEmail, resetEmail, teamDigestEmail, temporaryPasswordEmail } from "@/services/email/templates";
 
 describe("templates de e-mail", () => {
   it("convite contém link, login e validade — e nenhuma senha", () => {
@@ -26,5 +26,11 @@ describe("templates de e-mail", () => {
     expect(m.html).not.toContain("<b>x</b>");
     expect(m.html).toContain("&lt;b&gt;x&lt;/b&gt;");
     expect(m.html).toContain("CZS-abc");
+  });
+  it("resumo semanal da equipe traz os totais e o link da Central", () => {
+    const m = teamDigestEmail({ name: "MARIA SOUZA", actions: 2, canAdvance: 3, graduating: 1, attention: 0, highlights: ["Ana pode incluir 2"], url: "https://app/academic-analysis/requests", institution: "I" });
+    expect(m.subject).toContain("3 alunos podem avançar");
+    expect(m.html).toContain("Maria, o resumo da sua semana");
+    expect(m.text).toContain("https://app/academic-analysis/requests");
   });
 });

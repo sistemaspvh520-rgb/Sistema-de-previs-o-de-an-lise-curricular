@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, LogOut, Menu, UserRound } from "lucide-react";
+import { ArrowLeft, KeyRound, LogOut, Menu, UserRound } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -53,6 +54,7 @@ export function Topbar({ user, followUps, pushPublicKey }: { user: { name: strin
           <Sidebar role={user.role} variant="drawer" onNavigate={() => setOpen(false)} onClose={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
+      <BackButton />
       <div className="flex-1" />
       <FollowUpBell items={followUps.items} total={followUps.total} teamWide={followUps.teamWide} />
       <DropdownMenu>
@@ -91,5 +93,22 @@ export function Topbar({ user, followUps, pushPublicKey }: { user: { name: strin
       </DropdownMenu>
     </header>
     </>
+  );
+}
+
+/** Volta para a página anterior; se a página foi aberta direto (sem histórico), sobe um nível no endereço. */
+function BackButton() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const parent = pathname.split("/").filter(Boolean).slice(0, -1).join("/");
+  function goBack() {
+    if (window.history.length > 1) router.back();
+    else router.push(parent ? `/${parent}` : "/");
+  }
+  return (
+    <Button type="button" variant="ghost" size="sm" onClick={goBack} className="gap-1.5 text-slate-600 hover:text-[#003B71]" aria-label="Voltar para a página anterior">
+      <ArrowLeft className="size-4" />
+      <span className="hidden sm:inline">Voltar</span>
+    </Button>
   );
 }

@@ -1,19 +1,6 @@
 import { RequestLiveUpdates } from "@/features/student-portal/request-live-updates";
-import { BlurFade } from "@/components/magic/blur-fade";
 import { DeleteRequestButton } from "@/features/student-portal/delete-request-button";
-import { SpotlightCard } from "@/components/magic/spotlight-card";
-import { NumberTicker } from "@/components/magic/number-ticker";
 import Link from "next/link";
-import {
-  Inbox,
-  FilePlus2,
-  Search,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  RotateCcw,
-  type LucideIcon,
-} from "lucide-react";
 import type {
   Prisma,
   AcademicDocumentType,
@@ -25,6 +12,8 @@ import { can } from "@/lib/rbac";
 import { enrollmentScope } from "@/services/student-portal/access";
 import { documentLabels } from "@/services/academic-documents/classifier";
 import { requestLabels } from "@/features/student-portal/request-labels";
+import { getTeamInsights } from "@/services/student-portal/team-insights";
+import { TeamPanel } from "@/features/team/team-panel";
 export const dynamic = "force-dynamic";
 export default async function AcademicRequestsPage({
   searchParams,
@@ -63,7 +52,7 @@ export default async function AcademicRequestsPage({
       ? { status: q.status as AcademicRequestStatus }
       : {}),
   };
-  const [requests, count, statuses, types] = await Promise.all([
+  const [requests, count, statuses, insights] = await Promise.all([
     prisma.academicRequest.findMany({
       where,
       include: {
@@ -83,15 +72,14 @@ export default async function AcademicRequestsPage({
       where: { sourceDocument: { enrollment: scope } },
       _count: true,
     }),
-    prisma.academicAnalysisSource.groupBy({
-      by: ["documentType"],
-      where: { enrollment: scope },
-      _count: true,
-    }),
+    getTeamInsights(scope),
   ]);
-  const total = types.reduce((n, t) => n + t._count, 0);
+  const totalRequests = statuses.reduce((n, s) => n + s._count, 0);
   const statusCount = (status: string) =>
     statuses.find((s) => s.status === status)?._count ?? 0;
+  const doneRequests = statusCount("COMPLETED") + statusCount("NO_CHANGES");
+  const openRequests = ["RECEIVED", "PROCESSING", "UNDER_REVIEW", "WAITING_NEW_DOCUMENT"].reduce((n, st) => n + statusCount(st), 0);
+  const issueRequests = statusCount("FAILED") + statusCount("REJECTED");
   const href = (n: number) =>
     `/academic-analysis/requests?${new URLSearchParams({ ...Object.fromEntries(Object.entries(q).filter((entry): entry is [string, string] => typeof entry[1] === "string")), page: String(n) })}`;
   return (
@@ -109,90 +97,18 @@ export default async function AcademicRequestsPage({
             : "Solicitações Acadêmicas"}
         </h1>
         <p className="mt-2 text-sm text-sky-100">
-          Um documento por solicitação. Todas as atualizações, da chegada à
-          conferência.
+          O que precisa da equipe hoje, quem pode avançar e quem está perto de
+          se formar.
         </p>
       </header>
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {(
-          [
-            {
-              label: "Abertas",
-              value: [
-                "RECEIVED",
-                "PROCESSING",
-                "UNDER_REVIEW",
-                "WAITING_NEW_DOCUMENT",
-              ].reduce((n, s) => n + statusCount(s), 0),
-              icon: Inbox,
-              accent: "text-sky-700 bg-sky-50",
-            },
-            {
-              label: "Novas",
-              value: statusCount("RECEIVED"),
-              icon: FilePlus2,
-              accent: "text-sky-700 bg-sky-50",
-            },
-            {
-              label: "Em análise",
-              value: statusCount("PROCESSING") + statusCount("UNDER_REVIEW"),
-              icon: Search,
-              accent: "text-amber-700 bg-amber-50",
-            },
-            {
-              label: "Necessitam revisão",
-              value: statusCount("FAILED"),
-              icon: AlertTriangle,
-              accent: "text-amber-700 bg-amber-50",
-            },
-            {
-              label: "Recusadas",
-              value: statusCount("REJECTED"),
-              icon: XCircle,
-              accent: "text-rose-700 bg-rose-50",
-            },
-            {
-              label: "Reutilizadas",
-              value: statusCount("NO_CHANGES"),
-              icon: RotateCcw,
-              accent: "text-slate-600 bg-slate-100",
-            },
-            {
-              label: "Concluídas",
-              value: statusCount("COMPLETED"),
-              icon: CheckCircle2,
-              accent: "text-emerald-700 bg-emerald-50",
-            },
-          ] satisfies { label: string; value: number; icon: LucideIcon; accent: string }[]
-        ).map(({ label, value, icon: Icon, accent }, index) => (
-          <BlurFade key={label} delay={index * 0.05}>
-            <SpotlightCard className="h-full rounded-xl border border-slate-200 bg-white p-4 shadow-[0_14px_36px_-30px_rgba(15,42,66,0.55)]">
-              <div className={`inline-flex size-9 items-center justify-center rounded-xl ${accent}`}>
-                <Icon className="size-4" aria-hidden="true" />
-              </div>
-              <p className="mt-3 text-xs font-medium text-slate-500">{label}</p>
-              <p className="mt-1 text-2xl font-semibold text-[#003B71]">
-                <NumberTicker value={value} />
-              </p>
-            </SpotlightCard>
-          </BlurFade>
-        ))}
-      </section>
-      <section className="rounded-2xl border bg-white p-5">
-        <h2 className="font-semibold">Documentos recebidos</h2>
-        <div className="mt-4 flex flex-wrap gap-5 text-sm">
-          {types.map((t) => (
-            <p key={t.documentType}>
-              {documentLabels[t.documentType]} <strong>{t._count}</strong> ·{" "}
-              {total ? Math.round((t._count / total) * 100) : 0}%
-            </p>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-slate-500">
-          Toda matrícula possui um responsável. A identificação e extração
-          destes formatos são locais.
-        </p>
-      </section>
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm text-slate-600">
+        <span><strong className="text-slate-900 tabular-nums">{totalRequests}</strong> {totalRequests === 1 ? "documento recebido" : "documentos recebidos"}</span>
+        <span><strong className="text-emerald-700 tabular-nums">{totalRequests ? Math.round((doneRequests / totalRequests) * 100) : 0}%</strong> concluídos automaticamente</span>
+        {openRequests > 0 && <span><strong className="text-sky-700 tabular-nums">{openRequests}</strong> em processamento</span>}
+        {issueRequests > 0 && <span><strong className="text-rose-700 tabular-nums">{issueRequests}</strong> com falha ou recusa</span>}
+      </p>
+      <TeamPanel insights={insights} showTutor={can(user.role, "academic:all")} />
+      <h2 className="pt-2 text-lg font-semibold text-[#003B71]">Histórico de solicitações</h2>
       <form className="grid gap-3 rounded-2xl border bg-white p-5 sm:grid-cols-2 lg:grid-cols-3">
         <input
           name="q"

@@ -7,6 +7,8 @@ import {
   Users,
 } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
+import { getTeamInsights } from "@/services/student-portal/team-insights";
+import { TutorScoreboard } from "@/features/team/tutor-scoreboard";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +62,7 @@ export default async function ManagementPage({
     awaitingInitialReturn,
     reanalysesInProgress,
     commercialInsights,
+    teamInsights,
   ] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
     prisma.user.findMany({
@@ -120,6 +123,7 @@ export default async function ManagementPage({
       from: from ?? (to ? undefined : monthStart),
       to,
     }),
+    getTeamInsights({}),
   ]);
   const periodByUser = new Map(
     periodByUserRows.map((item) => [item.createdById, item._count._all]),
@@ -270,6 +274,9 @@ export default async function ManagementPage({
           </CardContent>
         </Card>
       </section>
+      <div className="mt-6">
+        <TutorScoreboard tutors={teamInsights.tutors} />
+      </div>
       <section className="mt-6 grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <Card className="border-brand-cyan/25 shadow-sm">
           <CardHeader>

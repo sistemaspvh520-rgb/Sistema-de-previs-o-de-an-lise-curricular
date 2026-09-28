@@ -3,7 +3,7 @@ import { StudentRequestsList } from "@/features/student-portal/requests-list";
 import { isProcessingFresh } from "@/services/student-portal/processing";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Eye, FilePenLine, UploadCloud, Sparkles, CalendarClock, MapPin } from "lucide-react";
+import { Eye, FilePenLine, UploadCloud, Sparkles, CalendarClock, MapPin } from "lucide-react";
 import { findPolo } from "@/domain/polos";
 import { can } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
@@ -65,9 +65,6 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <Link href="/academic-analysis/students" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-[#003B71]">
-        <ArrowLeft className="size-4" /> Voltar aos alunos
-      </Link>
 
       <BlurFade as="section" className="relative isolate overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#003B71_0%,#06508c_58%,#0a78b4_100%)] p-5 text-white shadow-[0_30px_60px_-40px_rgba(0,59,113,0.9)] sm:p-7">
         <DotPattern className="-z-10 text-white/15" />
