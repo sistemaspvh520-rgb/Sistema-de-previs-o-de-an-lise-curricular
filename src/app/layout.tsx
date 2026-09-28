@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Caveat } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { WebAnalytics } from "@/components/shared/web-analytics";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-sans", subsets: ["latin"] });
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body suppressHydrationWarning className="min-h-full flex flex-col bg-background text-foreground">
         <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
         <Toaster richColors position="top-right" />
+        <WebAnalytics />
       </body>
     </html>
   );
