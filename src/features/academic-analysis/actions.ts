@@ -207,6 +207,28 @@ export async function addAcademicDisciplineAction(reviewIdInput: unknown): Promi
   }
 }
 
+const removeDisciplineSchema = z.object({ reviewId: idSchema, disciplineIndex: z.number().int().min(0).max(1000) });
+
+/** Remove uma disciplina adicionada à mão (rascunho ou preenchida). Linhas lidas do documento não podem ser removidas. */
+export async function removeAcademicDisciplineAction(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("academic:manage");
+    const data = removeDisciplineSchema.parse(input);
+    const review = await authorizedReview(data.reviewId, user.id, can(user.role, "academic:all"));
+    const snapshot = review.snapshot as unknown as AcademicGridSnapshot;
+    const discipline = snapshot.disciplines[data.disciplineIndex];
+    if (!discipline) return fail("Disciplina não encontrada. Recarregue a página.");
+    if (discipline.sourcePage !== 0) return fail("Só é possível remover disciplinas adicionadas manualmente.");
+    snapshot.disciplines.splice(data.disciplineIndex, 1);
+    await persistCorrection({ reviewId: data.reviewId, userId: user.id, disciplineIndex: data.disciplineIndex, field: "discipline", previousValue: discipline, newValue: null, snapshot, currentPeriod: review.currentPeriod, expectedUpdatedAt: review.updatedAt, reason: "Disciplina adicionada manualmente foi removida" });
+    return ok(undefined, discipline.name.trim() ? "Disciplina removida." : "Rascunho descartado.");
+  } catch (error) {
+    logger.warn("academic_analysis.discipline_remove.failed", { errorName: error instanceof Error ? error.name : "unknown" });
+    if (error instanceof Error && error.message.startsWith("Esta análise foi atualizada por outra alteração")) return fail(error.message);
+    return toActionError(error, "Não foi possível remover a disciplina. Tente novamente.");
+  }
+}
+
 export async function completeAcademicGridReviewAction(reviewIdInput: unknown): Promise<ActionResult> {
   try {
     const user = await requirePermission("academic:manage");

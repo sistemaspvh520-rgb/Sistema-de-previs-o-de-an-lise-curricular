@@ -14,7 +14,7 @@ import { estimateGraduation, formatGraduationForecast, isBlockingForecastExtract
 import type { AcademicDiscipline, AcademicGridSnapshot } from "@/domain/academic-analysis/types";
 import type { AcademicCalendarTerm } from "@/domain/academic-calendar/calendar";
 import type { AcademicRules } from "@/domain/curricular-analysis/rules/types";
-import { updateAcademicGridFieldAction, addAcademicDisciplineAction, completeAcademicGridReviewAction, autoMapAcademicGridAction } from "@/features/academic-analysis/actions";
+import { updateAcademicGridFieldAction, addAcademicDisciplineAction, removeAcademicDisciplineAction, completeAcademicGridReviewAction, autoMapAcademicGridAction } from "@/features/academic-analysis/actions";
 import { DeleteAcademicGridReviewButton } from "@/features/academic-analysis/delete-review-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -254,6 +254,37 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules }: { review
     });
   }
 
+  async function removeDiscipline(disciplineIndex: number) {
+    if (savingFieldRef.current) {
+      toast.info("Aguarde a gravação atual antes de remover a disciplina.");
+      return false;
+    }
+    savingFieldRef.current = true;
+    setSavingField(true);
+    try {
+      const res = await removeAcademicDisciplineAction({ reviewId: review.id, disciplineIndex });
+      if (!res.ok) { toast.error(res.error); return false; }
+      setCompletedAt(null);
+      setMessageOverride(null);
+      setNewDisciplineIndex(null);
+      setSnapshot((current) => {
+        const next = structuredClone(current);
+        next.disciplines.splice(disciplineIndex, 1);
+        next.manuallyEdited = true;
+        next.result = analyzeAcademicGrid({ disciplines: next.disciplines, currentPeriod: currentPeriodValue, currentPeriodConfirmed: periodConfirmed });
+        return next;
+      });
+      toast.success(res.message);
+      return true;
+    } catch {
+      toast.error("Não foi possível remover a disciplina. Confira sua conexão e tente novamente.");
+      return false;
+    } finally {
+      savingFieldRef.current = false;
+      setSavingField(false);
+    }
+  }
+
   async function completeAnalysis() {
     start(async () => {
       try {
@@ -431,7 +462,7 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules }: { review
       <Card>
         <CardHeader><div className="flex flex-wrap items-start justify-between gap-2"><div><CardTitle className="text-base">Revisão manual dos componentes</CardTitle><p className="text-sm text-muted-foreground">Abra uma disciplina para conferir ou corrigir os dados. Pode adicionar mais de uma linha, se necessário.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={addDiscipline} disabled={working || savingField}>{addingDiscipline ? "Adicionando…" : "Adicionar disciplina"}</Button>{ambiguousRows.length > 0 && <Button type="button" variant="outline" size="sm" onClick={requestAiReview} disabled={aiReviewBusy}>{aiReviewBusy ? "Analisando…" : "Analisar linhas incertas"}</Button>}</div></div></CardHeader>
         <CardContent className="space-y-3">
-          {snapshot.disciplines.map((item, index) => isBlankManualDisciplineDraft(item) ? null : <EditableDiscipline key={`${index}-${item.sourcePage}-${item.sourceRow}`} index={index} discipline={item} uncertain={uncertainForecastIndexes.has(index)} initiallyOpen={newDisciplineIndex === index} busy={working || savingField} onSave={saveField} />)}
+          {snapshot.disciplines.map((item, index) => isBlankManualDisciplineDraft(item) ? null : <EditableDiscipline key={`${index}-${item.sourcePage}-${item.sourceRow}`} index={index} discipline={item} uncertain={uncertainForecastIndexes.has(index)} initiallyOpen={newDisciplineIndex === index} busy={working || savingField} onSave={saveField} onRemove={removeDiscipline} />)}
           {blankManualDraftIndexes.length > 0 && <details ref={draftDetailsRef} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70">
             <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-100/70 [&::-webkit-details-marker]:hidden">
               <span>{blankManualDraftIndexes.length} rascunho(s) vazio(s) <span className="font-normal text-slate-500">· opcional preencher</span></span><span className="text-xs font-medium text-slate-500">Abrir lista <span aria-hidden="true">⌄</span></span>
@@ -440,7 +471,7 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules }: { review
               <p className="text-xs leading-5 text-slate-600">Essas linhas não entram na contagem enquanto estiverem vazias. A projeção já considera automaticamente uma margem para itens do extrato não identificados{unresolvedSourceRows ? ` (${unresolvedSourceRows})` : ""}.</p>
               {blankManualDraftIndexes.map((index) => {
                 const item = snapshot.disciplines[index];
-                return <EditableDiscipline key={`${index}-${item.sourcePage}-${item.sourceRow}`} index={index} discipline={item} uncertain={false} initiallyOpen={newDisciplineIndex === index} busy={working || savingField} onSave={saveField} />;
+                return <EditableDiscipline key={`${index}-${item.sourcePage}-${item.sourceRow}`} index={index} discipline={item} uncertain={false} initiallyOpen={newDisciplineIndex === index} busy={working || savingField} onSave={saveField} onRemove={removeDiscipline} />;
               })}
             </div>
           </details>}
@@ -737,8 +768,24 @@ const ACADEMIC_STATUS_OPTIONS = [
   ["S", "Satisfatório (S)"],
 ] as const;
 
-function EditableDiscipline({ index, discipline, uncertain, initiallyOpen = false, busy, onSave }: { index: number; discipline: AcademicDiscipline; uncertain: boolean; initiallyOpen?: boolean; busy: boolean; onSave: (field: string, value: string | number | boolean | null, index: number) => Promise<boolean> }) {
+function EditableDiscipline({ index, discipline, uncertain, initiallyOpen = false, busy, onSave, onRemove }: { index: number; discipline: AcademicDiscipline; uncertain: boolean; initiallyOpen?: boolean; busy: boolean; onSave: (field: string, value: string | number | boolean | null, index: number) => Promise<boolean>; onRemove: (index: number) => Promise<boolean> }) {
   const [isOpen, setIsOpen] = useState(uncertain || initiallyOpen);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const manual = discipline.sourcePage === 0;
+  async function cancel() {
+    const hasData = Boolean(nameInputRef.current?.value.trim() || discipline.name.trim() || discipline.code || discipline.period !== null || discipline.workload !== null);
+    if (hasData && !window.confirm("Remover esta disciplina adicionada manualmente?")) return;
+    await onRemove(index);
+  }
+  function confirm() {
+    if (manual && !(nameInputRef.current?.value ?? discipline.name).trim()) {
+      toast.error("Preencha o nome da disciplina para confirmar, ou use Cancelar para descartar.");
+      nameInputRef.current?.focus();
+      return;
+    }
+    setIsOpen(false);
+    toast.success(manual ? "Disciplina salva." : "Alterações salvas.");
+  }
   const periodOptions = Array.from({ length: 20 }, (_, optionIndex) => optionIndex + 1);
   const statusIsKnown = ACADEMIC_STATUS_OPTIONS.some(([value]) => value === discipline.normalizedStatus);
   const currentStatusValue = discipline.normalizedStatus || "";
@@ -752,12 +799,16 @@ function EditableDiscipline({ index, discipline, uncertain, initiallyOpen = fals
     </button>
     {isOpen && <div className="grid min-w-0 grid-cols-1 gap-3 border-t bg-slate-50/50 p-3 md:grid-cols-2 md:items-end xl:grid-cols-[minmax(5rem,0.8fr)_minmax(12rem,2.3fr)_7rem_minmax(10rem,1.1fr)_6rem_minmax(9rem,1fr)]">
       <label className="min-w-0 space-y-1 text-[11px] font-medium text-muted-foreground">Código<input aria-label={`Código, componente ${index + 1}`} className="block h-9 min-w-0 w-full rounded-md border bg-card px-2 text-sm text-foreground" defaultValue={discipline.code ?? ""} onBlur={(event) => onSave("code", event.currentTarget.value || null, index)} disabled={busy} /></label>
-      <label className="min-w-0 space-y-1 text-[11px] font-medium text-muted-foreground">Componente<input aria-label={`Componente, linha ${index + 1}`} className="block h-9 min-w-0 w-full rounded-md border bg-card px-2 text-sm text-foreground" defaultValue={discipline.name} onBlur={(event) => onSave("name", event.currentTarget.value, index)} disabled={busy} /></label>
+      <label className="min-w-0 space-y-1 text-[11px] font-medium text-muted-foreground">Componente<input ref={nameInputRef} aria-label={`Componente, linha ${index + 1}`} className="block h-9 min-w-0 w-full rounded-md border bg-card px-2 text-sm text-foreground" defaultValue={discipline.name} onBlur={(event) => onSave("name", event.currentTarget.value, index)} disabled={busy} /></label>
       <label className="min-w-0 space-y-1 text-[11px] font-medium text-muted-foreground">Período<select aria-label={`Período, componente ${index + 1}`} className="block h-9 min-w-0 w-full rounded-md border bg-card px-2 text-sm text-foreground" defaultValue={discipline.period?.toString() ?? ""} onChange={(event) => { const select = event.currentTarget; const previous = discipline.period?.toString() ?? ""; const value = select.value; void onSave("period", value ? Number(value) : null, index).then((saved) => { if (!saved) select.value = previous; }); }} disabled={busy}><option value="">Selecionar</option>{periodOptions.map((period) => <option key={period} value={period}>{period}º</option>)}</select></label>
       <label className="min-w-0 space-y-1 text-[11px] font-medium text-muted-foreground">Status<select aria-label={`Status, componente ${index + 1}`} className="block h-9 min-w-0 w-full rounded-md border bg-card px-2 text-sm text-foreground" defaultValue={currentStatusValue} onChange={(event) => { const select = event.currentTarget; const previous = currentStatusValue; void onSave("originalStatus", select.value, index).then((saved) => { if (!saved) select.value = previous; }); }} disabled={busy}><option value="">Selecionar status</option>{!statusIsKnown && currentStatusValue && <option value={currentStatusValue}>Atual: {discipline.originalStatus} · revisar</option>}{ACADEMIC_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label className="min-w-0 space-y-1 text-[11px] font-medium text-muted-foreground">C.H.<input aria-label={`Carga horária, componente ${index + 1}`} type="number" min={0} max={2000} className="block h-9 min-w-0 w-full rounded-md border bg-card px-2 text-sm text-foreground" defaultValue={discipline.workload ?? ""} onBlur={(event) => onSave("workload", event.currentTarget.value ? Number(event.currentTarget.value) : null, index)} disabled={busy} /></label>
       <label className={cn("flex min-w-0 min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-semibold", discipline.inMainCurriculum ? "border-sky-200 bg-sky-50 text-[#003B71]" : "border-slate-200 bg-slate-50 text-slate-600")}><input type="checkbox" checked={discipline.inMainCurriculum} onChange={(event) => void onSave("inMainCurriculum", event.currentTarget.checked, index)} disabled={busy} className="size-4 shrink-0 accent-brand-navy" /><span className="min-w-0 break-words">{discipline.inMainCurriculum ? "Incluir nos cálculos" : "Fora da grade principal"}</span></label>
       <div className="min-w-0 break-words text-[10px] text-muted-foreground md:col-span-2 xl:col-span-full">Original: “{discipline.originalStatus}” · normalizado: “{discipline.normalizedStatus}” · período original: “{discipline.rawPeriod || "não identificado"}” · pág. {discipline.sourcePage || "manual"}</div>
+      <div className="flex flex-wrap justify-end gap-2 md:col-span-2 xl:col-span-full">
+        {manual && <Button type="button" size="sm" variant="outline" onClick={() => void cancel()} disabled={busy}>Cancelar</Button>}
+        <Button type="button" size="sm" onClick={confirm} disabled={busy}>Confirmar</Button>
+      </div>
     </div>}
   </div>;
 }
