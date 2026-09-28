@@ -6,7 +6,7 @@ Produção roda na **Vercel** (Next.js, região `gru1`) com **Supabase** (Postgr
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Projeto Supabase | `Sistema de previsão de análise curricular` · ref `gflvyhutqhfrfpdpcgii` · `sa-east-1`                                                                                                                                                   |
 | Projeto Vercel   | `analise-curricular` · time `Sistemas PVH` · conectado ao GitHub `main` · **URL pública: https://analise-curricular.vercel.app** · Deployment Protection (Vercel Authentication e Password Protection) desativada em 25/09/2026 — deployments por branch/preview (`https://analise-curricular-git-<branch>-sistemas-pvh.vercel.app`) também ficam acessíveis sem login na Vercel |
-| Domínio próprio  | `https://cruzeirodosulvirtual.app.br` (Registro.br) — página inicial sem login abre o Portal do Aluno; equipe entra em `/login`. `analise-curricular.vercel.app` continua respondendo (links antigos de e-mail seguem válidos) |
+| Domínio próprio  | `https://www.cruzeirodosulvirtual.app.br` (Registro.br; `cruzeirodosulvirtual.app.br` redireciona 308 para o `www`) — página inicial sem login abre o Portal do Aluno; equipe entra em `/login`. `analise-curricular.vercel.app` continua respondendo (links antigos de e-mail seguem válidos) |
 | Storage          | bucket privado `documents` (criado automaticamente no primeiro upload)                                                                                                                                                                   |
 
 ## Variáveis de ambiente (Vercel → Settings → Environment Variables → Production)
@@ -28,14 +28,14 @@ DIRECT_URL   = postgresql://postgres.gflvyhutqhfrfpdpcgii:[SENHA]@aws-0-sa-east-
 
 ## Domínio próprio (cruzeirodosulvirtual.app.br)
 
-1. **Vercel** → projeto `analise-curricular` → Settings → **Domains** → Add: `cruzeirodosulvirtual.app.br`
-   e `www.cruzeirodosulvirtual.app.br` (este com *Redirect to* `cruzeirodosulvirtual.app.br`).
+1. **Vercel** → projeto `analise-curricular` → Settings → **Domains**: `www.cruzeirodosulvirtual.app.br`
+   é o principal (Produção) e `cruzeirodosulvirtual.app.br` redireciona 308 para ele (padrão da Vercel).
 2. **Registro.br** → domínio → **DNS** → usar os servidores DNS do Registro.br → *Editar zona* →
    criar exatamente os registros que a Vercel mostrar na tela de Domains (em geral um `A` para
    `@` e um `CNAME` para `www`). Salvar e aguardar a propagação (minutos a poucas horas); a Vercel
    emite o certificado HTTPS sozinha quando o domínio fica "Valid Configuration".
 3. **Vercel** → Settings → Environment Variables (Production): `APP_URL` e `AUTH_URL` =
-   `https://cruzeirodosulvirtual.app.br` → **Redeploy**. Só depois do domínio válido — essas
+   `https://www.cruzeirodosulvirtual.app.br` → **Redeploy**. Só depois do domínio válido — essas
    variáveis definem os links dos e-mails e o endereço de retorno do login.
 4. Sessões ficam presas ao domínio: quem estava logado no endereço antigo entra de novo no novo.
 5. A página inicial do domínio do aluno está em `STUDENT_HOME_HOSTS` (`src/proxy.ts`).
