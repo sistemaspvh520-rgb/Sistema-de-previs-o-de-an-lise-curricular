@@ -298,6 +298,15 @@
   .portal-experience button:hover:not(:disabled) { transform: translateY(-1px); }
 }
 @keyframes portal-progress { from { stroke-dashoffset: 307.876; } }
+/* Contatos por polo: entrada suave em cascata e brilho no WhatsApp. */
+@keyframes polo-in { from { opacity: 0; transform: translateY(8px) scale(.985); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes polo-ping { 0% { box-shadow: 0 0 0 0 rgb(37 211 102 / .45); } 100% { box-shadow: 0 0 0 10px rgb(37 211 102 / 0); } }
+.polo-in { animation: polo-in .5s cubic-bezier(.2,.7,.2,1) backwards; }
+.polo-whats:hover, .polo-whats:focus-visible { animation: polo-ping 1.1s cubic-bezier(.2,.7,.2,1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .polo-in, .polo-whats:hover, .polo-whats:focus-visible { animation: none !important; }
+  .polo-picker *, .polo-picker { transition: none !important; }
+}
 @keyframes portal-expand { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
   .portal-experience *, .portal-experience *::before, .portal-experience *::after {

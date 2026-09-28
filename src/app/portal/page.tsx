@@ -17,12 +17,12 @@ import { ChangePasswordForm } from "@/features/account/change-password-form";
 import { portalLogoutAction } from "@/features/auth/actions";
 import { dismissWelcomeAction } from "@/features/student-portal/actions";
 import { getSystemSettings } from "@/repositories/settings-repository";
-import type { PoloContactEntry } from "@/repositories/settings-repository";
 import { isProcessingFresh } from "@/services/student-portal/processing";
 import { SettingsSheet } from "@/features/student-portal/settings-sheet";
-import { findPolo, POLOS } from "@/domain/polos";
-import { ContactCard, SettingsSection } from "@/features/student-portal/settings-sections";
-import { ChevronDown, FileText, Headset, KeyRound, MapPin, UserRound } from "lucide-react";
+import { SettingsSection } from "@/features/student-portal/settings-sections";
+import { ContactRow, PoloContactPicker } from "@/features/student-portal/polo-contact-picker";
+import { getPoloDirectory } from "@/services/student-portal/polo-directory";
+import { ChevronDown, FileText, Headset, KeyRound, UserRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -66,7 +66,7 @@ export default async function StudentPortalPage({
     1,
     Math.min(10000, Math.floor(Number(params.history) || 1)),
   );
-  const [history, job, settings, historyCount, coordinators] = await Promise.all([
+  const [history, job, settings, historyCount, directory] = await Promise.all([
     prisma.academicAnalysisVersion.findMany({
       where: { enrollmentId: enrollment.id },
       orderBy: { version: "desc" },
@@ -81,11 +81,7 @@ export default async function StudentPortalPage({
     prisma.academicAnalysisVersion.count({
       where: { enrollmentId: enrollment.id },
     }),
-    prisma.user.findMany({
-      where: { role: "ACADEMIC_COORDINATOR", isActive: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, phone: true },
-    }),
+    getPoloDirectory(),
   ]);
   if (params.version && !z.string().uuid().safeParse(params.version).success)
     notFound();
@@ -102,36 +98,6 @@ export default async function StudentPortalPage({
     `${base}${base.includes("?") ? "&" : "?"}${key}=${value}`;
   const processing = isProcessingFresh(job);
   const snapshot = selected ? presentAcademicSnapshot(selected) : undefined;
-  const polo = enrollment.owner?.poloCode
-    ? findPolo(enrollment.owner.poloCode)
-    : null;
-  const poloContacts = enrollment.owner?.poloCode
-    ? settings.poloContacts[enrollment.owner.poloCode]
-    : undefined;
-  const contactRoles: Array<[string, PoloContactEntry | undefined]> = poloContacts
-    ? [
-        ["Mantenedor", poloContacts.mantenedor],
-        ...(coordinators.length
-          ? []
-          : [["Coordenação acadêmica", poloContacts.coordAcademico] as [string, PoloContactEntry]]),
-        ["Coordenação comercial", poloContacts.coordComercial],
-      ]
-    : [];
-  const filledContacts = contactRoles.filter(([, entry]) => entry?.nome);
-  // Responsável sem polo: o aluno escolhe o próprio polo entre todos os que têm contatos cadastrados.
-  const contactsByPolo = poloContacts
-    ? []
-    : POLOS.map((item) => {
-        const entries = settings.poloContacts[item.code];
-        const roles: Array<[string, PoloContactEntry | undefined]> = entries
-          ? [
-              ["Mantenedor", entries.mantenedor],
-              ...(coordinators.length ? [] : [["Coordenação acadêmica", entries.coordAcademico] as [string, PoloContactEntry]]),
-              ["Coordenação comercial", entries.coordComercial],
-            ]
-          : [];
-        return { polo: item, contacts: roles.filter(([, entry]) => entry?.nome) };
-      }).filter((item) => item.contacts.length);
   const contactMessage = `Olá! Sou ${enrollment.name}, RGM ${enrollment.rgm}, e estou entrando em contato pelo Portal Acadêmico.`;
   return (
     <PortalEffects>
@@ -176,72 +142,23 @@ export default async function StudentPortalPage({
                   title="Contatos"
                   description="Fale com quem acompanha sua jornada acadêmica."
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {enrollment.owner && (
-                      <ContactCard
-                        highlight
-                        role="Seu tutor"
-                        name={enrollment.owner.name}
-                        email={enrollment.owner.email}
-                        phone={enrollment.owner.phone}
-                        message={contactMessage}
-                      />
+                      <ul>
+                        <ContactRow
+                          highlight
+                          role="Seu tutor"
+                          contact={{ name: enrollment.owner.name, email: enrollment.owner.email, phone: enrollment.owner.phone }}
+                          message={contactMessage}
+                        />
+                      </ul>
                     )}
-                    {coordinators.map((coordinator) => (
-                      <ContactCard
-                        key={coordinator.id}
-                        role="Coordenação acadêmica"
-                        name={coordinator.name}
-                        email={coordinator.email}
-                        phone={coordinator.phone}
-                        message={contactMessage}
-                      />
-                    ))}
-                    {filledContacts.map(([label, entry]) => (
-                      <ContactCard
-                        key={label}
-                        role={label}
-                        name={entry!.nome}
-                        email={entry!.email || null}
-                        phone={entry!.telefone || null}
-                        message={contactMessage}
-                      />
-                    ))}
-                    {contactsByPolo.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="pt-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">Contatos por polo</p>
-                        {contactsByPolo.map(({ polo: item, contacts }) => (
-                          <details key={item.code} className="group rounded-2xl border border-slate-200 bg-white open:border-brand-cyan/30 open:bg-slate-50/60">
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[#003B71] [&::-webkit-details-marker]:hidden">
-                              <span className="flex min-w-0 items-center gap-2"><MapPin className="size-4 shrink-0 text-brand-cyan-700" /><span className="truncate">{item.name}</span></span>
-                              <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
-                            </summary>
-                            <div className="space-y-2 px-3 pb-3">
-                              {contacts.map(([label, entry]) => (
-                                <ContactCard
-                                  key={label}
-                                  role={label}
-                                  name={entry!.nome}
-                                  email={entry!.email || null}
-                                  phone={entry!.telefone || null}
-                                  message={contactMessage}
-                                />
-                              ))}
-                            </div>
-                          </details>
-                        ))}
-                      </div>
-                    )}
-                    {polo && (
-                      <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                        <MapPin className="size-3.5" /> Polo {polo.name}
-                      </p>
-                    )}
-                    {!enrollment.owner && !filledContacts.length && !coordinators.length && !contactsByPolo.length && (
-                      <p className="text-sm text-slate-500">
-                        Nenhum contato disponível no momento.
-                      </p>
-                    )}
+                    <PoloContactPicker
+                      directory={directory}
+                      message={contactMessage}
+                      defaultCode={enrollment.owner?.poloCode ?? null}
+                      storageKey={`portal:polo:${enrollment.id}`}
+                    />
                   </div>
                 </SettingsSection>
                 <SettingsSection

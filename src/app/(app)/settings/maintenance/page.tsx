@@ -7,6 +7,7 @@ import { PurgeCard } from "@/features/maintenance/purge-card";
 import { purgeAiUsageAction, purgeAnalysesAction, purgeAuditLogsAction } from "@/features/maintenance/actions";
 import { DeletionRequestActions } from "@/features/analyses/components/deletion-request-actions";
 import { formatDateTime } from "@/lib/utils";
+import { SentryCard } from "@/features/maintenance/sentry-card";
 
 export const metadata: Metadata = { title: "Manutenção de dados" };
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function MaintenancePage() {
           ))}
         </CardContent>
       </Card>
+      <SentryCard enabled={Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN)} />
     </>
   );
 }

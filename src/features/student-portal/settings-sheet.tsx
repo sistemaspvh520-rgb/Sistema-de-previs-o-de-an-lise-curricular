@@ -16,6 +16,7 @@ export function SettingsSheet({ children }: { children: ReactNode }) {
       <SheetTrigger asChild>
         <button
           type="button"
+          aria-label="Configurações"
           className="flex min-h-11 items-center gap-2 rounded-full border border-slate-200 px-3 text-sm font-medium text-[#003B71] hover:bg-sky-50"
         >
           <Settings className="size-4" />
