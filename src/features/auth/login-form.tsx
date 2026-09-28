@@ -53,6 +53,7 @@ export function LoginForm({ callbackUrl, portal = false }: { callbackUrl?: strin
       <p className="text-center text-sm">
         {portal && <Link href="/portal/primeiro-acesso" className="mb-3 block text-[#003B71] underline">Primeiro acesso</Link>}
         <Link href={portal ? "/portal/recuperar" : "/esqueci-senha"} className="text-muted-foreground underline hover:text-foreground">Esqueci minha senha</Link>
+        {portal && <span className="mt-5 block text-xs text-slate-400">É da equipe? <Link href="/login" className="underline hover:text-[#003B71]">Entrar no sistema</Link></span>}
       </p>
     </form>
   );

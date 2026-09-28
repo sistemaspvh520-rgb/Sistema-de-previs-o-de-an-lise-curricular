@@ -18,6 +18,9 @@ const PUBLIC_PATHS = [
   "/api/health",
 ];
 
+/** Domínios voltados ao aluno: a página inicial sem login abre o Portal Acadêmico. */
+const STUDENT_HOME_HOSTS = new Set(["cruzeirodosulvirtual.app.br", "www.cruzeirodosulvirtual.app.br"]);
+
 export const proxy = auth((req) => {
   const { nextUrl } = req;
   const path = nextUrl.pathname;
@@ -32,7 +35,10 @@ export const proxy = auth((req) => {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
-    const loginUrl = new URL(path.startsWith("/portal") ? "/portal/login" : "/login", nextUrl);
+    // Host real da requisição (o Auth.js reescreve nextUrl com a origem de AUTH_URL).
+    const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").split(":")[0].toLowerCase();
+    const studentLogin = path.startsWith("/portal") || (path === "/" && STUDENT_HOME_HOSTS.has(host));
+    const loginUrl = new URL(studentLogin ? "/portal/login" : "/login", nextUrl);
     if (path !== "/") loginUrl.searchParams.set("callbackUrl", path);
     return NextResponse.redirect(loginUrl);
   }
