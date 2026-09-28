@@ -22,7 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { AcademicDashboardOverview, AcademicForecastRoadmap, AcademicPeriodJourney, PendingDistribution } from "@/features/academic-analysis/academic-dashboard-visuals";
+import { AcademicDashboardOverview, AcademicPeriodJourney, PendingDistribution } from "@/features/academic-analysis/academic-dashboard-visuals";
+import { ConclusionPath } from "@/features/student-portal/conclusion-path";
 
 type ReviewRecord = {
   id: string;
@@ -356,7 +357,7 @@ export function AcademicGridWorkspace({ review, calendarTerms, rules }: { review
         </CardHeader>
         <CardContent className="space-y-4">
           {graduationForecast.incomplete && <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-5 text-amber-950"><span className="font-semibold">Projeção automática com ressalvas.</span> {graduationForecast.uncertainRows > 0 ? `${graduationForecast.uncertainRows} linha(s) têm dados incompletos ou não identificados; foi incluída uma margem adicional.` : "O prazo depende das regras e da capacidade acadêmica cadastradas."} A estimativa é exibida sem exigir confirmação manual.</div>}
-          {graduationForecast.plan.length ? <AcademicForecastRoadmap steps={graduationForecast.plan} officialTerms={new Set(calendarTerms.filter((item) => item.confidence === "OFFICIAL").map((item) => item.term))} /> : <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">Não foi possível calcular etapas com os dados disponíveis. A análise não exige confirmação manual para exibir uma previsão quando houver informações suficientes.</div>}
+          {graduationForecast.plan.length ? <ConclusionPath showLoad steps={graduationForecast.plan} officialTerms={new Set(calendarTerms.filter((item) => item.confidence === "OFFICIAL").map((item) => item.term))} completion={formattedForecast?.completion ?? null} /> : <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">Não foi possível calcular etapas com os dados disponíveis. A análise não exige confirmação manual para exibir uma previsão quando houver informações suficientes.</div>}
         </CardContent>
       </Card>}
 
@@ -549,8 +550,8 @@ function StudentAcademicPrintReport({ sourceSnapshot, studentName, courseName, r
         <h1 className="text-[22px] font-semibold leading-tight tracking-tight">{studentName ?? "Estudante"}</h1>
         <p className="mt-0.5 text-[13px] text-blue-50/85">{courseName ?? "Curso não identificado"}</p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium">
-          {rgm && <span className="rounded-full bg-white/12 px-2.5 py-0.5 ring-1 ring-white/20">RGM {rgm}</span>}
-          <span className="rounded-full bg-white/12 px-2.5 py-0.5 ring-1 ring-white/20">Análise de {formatDate(analysisDate)}</span>
+          {rgm && <span className="rounded-full border border-white/20 bg-white/12 px-2.5 py-0.5">RGM {rgm}</span>}
+          <span className="rounded-full border border-white/20 bg-white/12 px-2.5 py-0.5">Análise de {formatDate(analysisDate)}</span>
           <span className="ml-1 text-[10px] font-normal text-blue-100/80">{sourceReportText(documentType)}</span>
         </div>
       </div>
@@ -625,7 +626,7 @@ function StudentAcademicPrintReport({ sourceSnapshot, studentName, courseName, r
             step.exemptions ? plural(step.exemptions, "dispensa", "dispensas") : null,
           ].filter(Boolean);
           return <li key={`${step.curriculumPeriod}-${step.term}-${index}`} className={cn("relative rounded-xl border py-2.5 pl-8 pr-3", isCurrentStep ? "border-[#0693E3]/50 bg-sky-50/70" : "border-slate-200 bg-white")}>
-            <span aria-hidden="true" className={cn("absolute left-3 top-3.5 size-2.5 rounded-full ring-4", step.isAdditional ? "bg-[#FEF84C] ring-amber-100" : "bg-[#0693E3] ring-sky-100")} />
+            <span aria-hidden="true" className={cn("absolute left-2 top-2.5 size-[18px] rounded-full border-4", step.isAdditional ? "border-amber-100 bg-[#FEF84C]" : "border-sky-100 bg-[#0693E3]")} />
             <div className="flex items-start justify-between gap-2">
               <div><p className="text-[9.5px] font-semibold uppercase tracking-wide text-slate-500">{step.isAdditional ? `Semestre adicional ${step.adaptationSemesterNumber ?? ""}` : `${step.curriculumPeriod}º período`}{isCurrentStep ? " · atual" : ""}</p><p className="text-sm font-semibold tabular-nums text-slate-900">{step.term ?? "A definir"}</p></div>
               <p className="text-right text-xs font-semibold tabular-nums text-slate-900">{plural(total, "disciplina", "disciplinas")}</p>

@@ -263,7 +263,9 @@
     -webkit-print-color-adjust: exact;
   }
   .print-report * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .print-report .report-card { break-inside: avoid; box-shadow: 0 10px 26px -24px rgb(15 42 66 / .55); }
+  .print-report .report-card { break-inside: avoid; }
+  /* Sombras viram manchas cinzas no PDF gerado pelo navegador: no relatório impresso, nenhuma. */
+  .print-report, .print-report * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
   /* Fundo da marca em toda a folha (o logo oficial é branco e some sobre papel branco). */
   html:has(.academic-report-page), body:has(.academic-report-page) { background: #eef3f9 !important; }
   body:has(.academic-report-page) .app-canvas { background: transparent !important; }

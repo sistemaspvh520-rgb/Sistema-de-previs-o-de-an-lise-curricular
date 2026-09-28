@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /** Linha do tempo "Seu caminho até a conclusão", pensada para o aluno: semestres, disciplinas e a formatura. */
-export function ConclusionPath({ steps, officialTerms, completion }: { steps: GraduationPlanStep[]; officialTerms: Set<string>; completion: string | null }) {
+export function ConclusionPath({ steps, officialTerms, completion, showLoad = false }: { steps: GraduationPlanStep[]; officialTerms: Set<string>; completion: string | null; /** Equipe: mostra a carga do semestre em relação à capacidade. */ showLoad?: boolean }) {
   return (
     <ol className="relative" aria-label="Semestres previstos até a conclusão">
       {steps.map((step, index) => {
@@ -41,7 +41,10 @@ export function ConclusionPath({ steps, officialTerms, completion }: { steps: Gr
                   {projected && <span className="ml-2 align-middle text-xs font-normal tracking-normal text-slate-400">previsto</span>}
                 </h3>
               </div>
-              <p className="text-sm font-medium text-slate-600">{plural(total, "disciplina", "disciplinas")}</p>
+              <p className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                {plural(total, "disciplina", "disciplinas")}
+                {showLoad && <span title="Carga prevista / capacidade do semestre" className={cn("rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", step.totalLoad >= step.capacity ? "bg-amber-100 text-amber-900" : "bg-sky-50 text-sky-800")}>Carga {step.totalLoad}/{step.capacity}</span>}
+              </p>
             </div>
             {chips.length > 0 && (
               <p className="mt-2 flex flex-wrap gap-1.5">

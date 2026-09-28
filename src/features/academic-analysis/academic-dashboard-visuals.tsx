@@ -1,6 +1,5 @@
 import { academicStatusOutcome } from "@/domain/academic-analysis/rules";
 import type { AcademicDiscipline } from "@/domain/academic-analysis/types";
-import type { GraduationPlanStep } from "@/domain/academic-analysis/graduation-forecast";
 import { cn } from "@/lib/utils";
 import { readableName } from "@/lib/text";
 import { SpotlightCard } from "@/components/magic/spotlight-card";
@@ -129,43 +128,6 @@ export function AcademicPeriodJourney({ disciplines, currentPeriod }: { discipli
   );
 }
 
-export function AcademicForecastRoadmap({ steps, officialTerms }: { steps: GraduationPlanStep[]; officialTerms: Set<string> }) {
-  return (
-    <ol className="relative space-y-3 before:absolute before:bottom-6 before:left-[18px] before:top-6 before:w-px before:bg-slate-200 sm:space-y-2" aria-label="Semestres previstos até a conclusão">
-      {steps.map((step, index) => {
-        const loadRatio = step.capacity > 0 ? Math.min(100, Math.round((step.totalLoad / step.capacity) * 100)) : 0;
-        const isOfficial = Boolean(step.term && officialTerms.has(step.term));
-        return <li key={`${step.curriculumPeriod}-${step.term}-${index}`} className="relative pl-10">
-          <span className={cn("absolute left-[11px] top-5 size-[15px] rounded-full border-[3px] border-white ring-1", step.isAdditional ? "bg-[#FEF84C] ring-amber-300" : "bg-[#0693E3] ring-sky-200")} aria-hidden="true" />
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,42,66,0.55)] sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{step.isAdditional ? `Adaptação ${step.adaptationSemesterNumber}` : `${step.curriculumPeriod}º período`}</p><h3 className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">{step.term ?? "Calendário indisponível"}{step.term && !isOfficial && <span className="ml-2 align-middle text-xs font-normal text-slate-500">projetado</span>}</h3></div>
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-right"><p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Carga / capacidade</p><p className="text-sm font-semibold tabular-nums text-slate-900">{step.totalLoad} / {step.capacity}</p></div>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Ocupação prevista no semestre ${step.term ?? index + 1}`} aria-valuemin={0} aria-valuemax={step.capacity} aria-valuenow={step.totalLoad}>
-              <div className={cn("h-full rounded-full transition-[width] motion-reduce:transition-none", loadRatio >= 100 ? "bg-amber-400" : "bg-[#0693E3]")} style={{ width: `${loadRatio}%` }} />
-            </div>
-            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
-              <ForecastFact label="Regulares" value={step.regularSubjects} />
-              <ForecastFact label="Em andamento" value={step.inProgressFromPrevious} />
-              <ForecastFact label="Dispensas" value={step.exemptions} />
-              <ForecastFact label="Adaptações alocadas" value={step.previousSubjects.length} />
-            </dl>
-            {step.previousSubjects.length > 0 && <details className="group mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 text-sm open:bg-white">
-              <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3.5 text-slate-800 transition-colors hover:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400 sm:px-6 [&::-webkit-details-marker]:hidden">
-                <span className="flex min-w-0 flex-1 basis-52 items-center gap-3"><span className="inline-flex min-w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-700">{step.previousSubjects.length}</span><span className="min-w-0 leading-5"><span className="block font-semibold">Disciplinas de adaptação</span><span className="mt-0.5 block text-xs font-normal text-slate-500">Alocadas neste semestre previsto</span></span></span>
-                <span className="ml-auto shrink-0 text-xs font-semibold text-brand-cyan-700 group-open:hidden">Ver disciplinas <span aria-hidden="true">⌄</span></span>
-                <span className="ml-auto hidden shrink-0 text-xs font-semibold text-brand-cyan-700 group-open:inline">Ocultar <span aria-hidden="true">⌃</span></span>
-              </summary>
-              <ul className="grid list-none gap-2 border-t border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-2 sm:p-4">{step.previousSubjects.map((name, nameIndex) => <li key={`${name}-${nameIndex}`} className="flex min-w-0 items-start gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-medium leading-5 text-slate-800 shadow-[0_2px_8px_-6px_rgba(15,23,42,0.35)]"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-[#0693E3]" /><span>{name}</span></li>)}</ul>
-            </details>}
-          </article>
-        </li>;
-      })}
-    </ol>
-  );
-}
-
 export function PendingDistribution({ byPeriod, totalPending, disciplines }: { byPeriod: Record<string, number>; totalPending: number; disciplines: AcademicDiscipline[] }) {
   const periods = Object.entries(byPeriod).sort(([a], [b]) => Number(a) - Number(b));
   if (!periods.length) return <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-5 text-center"><p className="text-sm font-semibold text-slate-800">Nenhuma pendência anterior identificada</p><p className="mt-1 text-xs text-slate-500">Não há disciplinas com situação “A CURSAR” em períodos anteriores.</p></div>;
@@ -194,8 +156,4 @@ function CompactStat({ label, value, note, tone }: { label: string; value: numbe
   const top = { blue: "border-t-[#0693E3]", gold: "border-t-[#d6ce23]", cyan: "border-t-[#1ca9b4]", slate: "border-t-slate-400" }[tone];
   const numeric = typeof value === "number" ? value : /^(\d+)º$/.exec(value);
   return <SpotlightCard className={cn("min-w-0 rounded-xl border border-slate-200 border-t-[3px] bg-white p-3.5 shadow-[0_12px_30px_-28px_rgba(15,42,66,0.6)] sm:p-4", top)}><p className="truncate text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">{typeof numeric === "number" ? <NumberTicker value={numeric} /> : numeric ? <NumberTicker value={Number(numeric[1])} suffix="º" /> : value}</p><p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{note}</p></SpotlightCard>;
-}
-
-function ForecastFact({ label, value }: { label: string; value: number }) {
-  return <div><dt className="text-slate-500">{label}</dt><dd className="mt-0.5 font-semibold tabular-nums text-slate-800">{value}</dd></div>;
 }
