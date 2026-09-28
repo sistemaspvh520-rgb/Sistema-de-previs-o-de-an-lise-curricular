@@ -27,7 +27,8 @@ export default async function MaintenancePage() {
 
   return (
     <>
-      <PageHeader eyebrow="Configurações" title="Manutenção de dados" description="Limpeza definitiva de históricos. Cada limpeza gera um único registro de auditoria com o resumo do que foi removido." />
+      <PageHeader eyebrow="Configurações" title="Manutenção de dados" description="Monitoramento de erros e limpeza definitiva de históricos. Cada limpeza gera um único registro de auditoria com o resumo do que foi removido." />
+      <SentryCard enabled={Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN)} />
       <div className="grid gap-6 lg:grid-cols-3">
         <PurgeCard title="Histórico de auditoria" description="Logins, alterações, acessos de suporte e eventos do sistema." count={audit} countLabel="registros" action={purgeAuditLogsAction} />
         <PurgeCard title="Uso de IA" description="Chamadas à OpenAI, tokens e custo estimado." count={usage} countLabel="chamadas" action={purgeAiUsageAction} />
@@ -60,7 +61,6 @@ export default async function MaintenancePage() {
           ))}
         </CardContent>
       </Card>
-      <SentryCard enabled={Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN)} />
     </>
   );
 }

@@ -16,7 +16,7 @@ export function SentryCard({ enabled }: { enabled: boolean }) {
       else toast.error(result.error);
     });
   return (
-    <Card className="mt-6 shadow-sm">
+    <Card className="mb-6 shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Activity className="size-4" /> Monitoramento de erros (Sentry)

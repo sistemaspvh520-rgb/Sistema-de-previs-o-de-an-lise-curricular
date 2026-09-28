@@ -28,6 +28,11 @@ export interface SettingsNavItem {
 export const SETTINGS_NAV: SettingsNavItem[] = [
   { href: "/settings/general", label: "Geral", permission: "privacy:manage" },
   { href: "/settings/academic-calendar", label: "Calendário letivo", permission: "privacy:manage" },
-  { href: "/settings/openai", label: "OpenAI", permission: "integration:manage" },
   { href: "/settings/users", label: "Usuários", permission: "users:manage" },
+  { href: "/settings/openai", label: "OpenAI", permission: "integration:manage" },
+  { href: "/settings/usage", label: "Uso de IA", permission: "usage:read" },
+  { href: "/settings/privacy", label: "Privacidade", permission: "privacy:manage" },
+  { href: "/settings/security", label: "Segurança", permission: "privacy:manage" },
+  { href: "/settings/audit", label: "Auditoria", permission: "audit:read" },
+  { href: "/settings/maintenance", label: "Manutenção", permission: "privacy:manage" },
 ];
