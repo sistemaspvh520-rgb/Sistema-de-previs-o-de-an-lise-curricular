@@ -5,7 +5,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Eye, FilePenLine, UploadCloud, Sparkles, CalendarClock, MapPin } from "lucide-react";
 import { findPolo } from "@/domain/polos";
-import { can } from "@/lib/rbac";
+import { can, ROLE_LABELS } from "@/lib/rbac";
+import { StudentDeletionButton } from "@/features/student-portal/student-deletion";
+import { TutorSelect } from "@/features/student-portal/tutor-select";
 import { prisma } from "@/lib/prisma";
 import { requirePagePermission } from "@/lib/session";
 import { requireEnrollment, accessStatus } from "@/services/student-portal/access";
@@ -46,6 +48,13 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
     prisma.auditLog.count({ where: { entityType: "StudentEnrollment", entityId: id, action: "ANALYSIS_REUSED" } }),
   ]);
 
+  const manageAll = can(user.role, "academic:all");
+  const [tutors, pendingDeletion] = await Promise.all([
+    manageAll
+      ? prisma.user.findMany({ where: { isActive: true, role: { in: ["TUTOR", "ADMIN", "ACADEMIC_COORDINATOR"] } }, orderBy: { name: "asc" }, select: { id: true, name: true, role: true } })
+      : Promise.resolve([]),
+    prisma.studentDeletionRequest.count({ where: { enrollmentId: id, status: "PENDING" } }),
+  ]);
   const snapshot = student.currentVersion ? presentAcademicSnapshot(student.currentVersion) : null;
   const mainGrid = snapshot?.disciplines.filter((row) => row.inMainCurriculum) ?? [];
   const completed = mainGrid.filter((row) => ["COMPLETED", "EXEMPT"].includes(academicStatusOutcome(row.normalizedStatus))).length;
@@ -85,6 +94,12 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
                     <span className="rounded-full bg-brand-gold/15 px-2.5 py-1 text-brand-gold ring-1 ring-brand-gold/30">{documentLabels[snapshot.documentType]}</span>
                   )}
                 </div>
+                {manageAll && (
+                  <div className="mt-3 max-w-xs">
+                    <span className="mb-1 block text-[11px] font-medium text-white/70">Tutor responsável</span>
+                    <TutorSelect enrollmentId={student.id} ownerId={student.owner.id} tutors={tutors.map((tutor) => ({ id: tutor.id, name: tutor.name, roleLabel: ROLE_LABELS[tutor.role] }))} />
+                  </div>
+                )}
                 {student.owner && (
                   <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-white/75">
                     <MapPin className="size-3.5 shrink-0" />
@@ -146,6 +161,9 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
                   <UploadCloud className="size-4" /> Enviar novo documento
                 </a>
               </Button>
+              <span className="inline-flex items-center rounded-lg bg-white">
+                <StudentDeletionButton enrollmentId={student.id} name={student.name} rgm={student.rgm} canDelete={manageAll} pendingRequest={pendingDeletion > 0} redirectTo="/academic-analysis/students" />
+              </span>
             </div>
             {student.currentVersion && (
               <p className="mt-4 flex items-center gap-1.5 text-xs text-white/65">

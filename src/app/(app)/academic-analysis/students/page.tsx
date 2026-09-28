@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requirePagePermission } from "@/lib/session";
-import { can } from "@/lib/rbac";
+import { can, ROLE_LABELS } from "@/lib/rbac";
+import { StudentDeletionButton, StudentDeletionDecision } from "@/features/student-portal/student-deletion";
+import { TutorSelect } from "@/features/student-portal/tutor-select";
+import { readableName } from "@/lib/text";
 import {
   accessStatus,
   enrollmentScope,
@@ -67,6 +70,8 @@ export default async function StudentsPage({
           select: { email: true, isActive: true, mustChangePassword: true },
         },
         currentVersion: true,
+        owner: { select: { id: true, name: true } },
+        deletionRequests: { where: { status: "PENDING" }, select: { id: true }, take: 1 },
       },
       orderBy: { name: "asc" },
       skip: (page - 1) * 30,
@@ -88,6 +93,23 @@ export default async function StudentsPage({
       : [],
   ]);
   const legacyCount = legacyGroups.length;
+  const manageAll = can(user.role, "academic:all");
+  const [pendingDeletions, tutors] = manageAll
+    ? await Promise.all([
+        prisma.studentDeletionRequest.findMany({
+          where: { status: "PENDING", enrollmentId: { not: null } },
+          orderBy: { createdAt: "asc" },
+          take: 50,
+          include: { requestedBy: { select: { name: true } } },
+        }),
+        prisma.user.findMany({
+          where: { isActive: true, role: { in: ["TUTOR", "ADMIN", "ACADEMIC_COORDINATOR"] } },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, role: true },
+        }),
+      ])
+    : [[], []];
+  const tutorOptions = tutors.map((tutor) => ({ id: tutor.id, name: tutor.name, roleLabel: ROLE_LABELS[tutor.role] }));
   const pagination = (number: number) =>
     `/academic-analysis/students?${new URLSearchParams({ q: query, status: params.status ?? "", page: String(number) })}`;
   const legacyPagination = (number: number) =>
@@ -137,6 +159,24 @@ export default async function StudentsPage({
         </label>
         <Button className="self-end">Pesquisar</Button>
       </form>
+      {pendingDeletions.length > 0 && (
+        <section id="pedidos-exclusao" aria-labelledby="pedidos-exclusao-title" className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 sm:p-5">
+          <h2 id="pedidos-exclusao-title" className="font-semibold text-amber-950">Pedidos de exclusão · {pendingDeletions.length}</h2>
+          <p className="mt-0.5 text-sm text-amber-900/80">Tutores pediram a exclusão destes alunos. Aprovar apaga o aluno, as análises, os documentos e a conta do portal.</p>
+          <ul className="mt-3 divide-y divide-amber-200/70">
+            {pendingDeletions.map((request) => (
+              <li key={request.id} className="flex flex-wrap items-center gap-3 py-3">
+                <span className="min-w-0 flex-1 basis-64">
+                  <Link href={`/academic-analysis/students/${request.enrollmentId}`} className="font-medium text-slate-900 hover:underline">{readableName(request.studentName)}</Link>
+                  <span className="block text-xs text-slate-600">RGM {request.rgm} · pedido por {request.requestedBy.name} em {request.createdAt.toLocaleDateString("pt-BR", { timeZone: "America/Porto_Velho" })}</span>
+                  {request.reason && <span className="mt-1 block text-sm text-slate-700">“{request.reason}”</span>}
+                </span>
+                <StudentDeletionDecision requestId={request.id} name={readableName(request.studentName)} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="animate-blur-fade overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_44px_-34px_rgba(15,42,66,0.55)] [animation-delay:120ms]">
         <div className="flex items-center justify-between border-b p-5">
           <h2 className="font-semibold">Acessos dos alunos</h2>
@@ -148,7 +188,8 @@ export default async function StudentsPage({
               <tr>
                 <th className="whitespace-nowrap px-5 py-3 font-medium">Aluno / RGM</th>
                 <th className="hidden whitespace-nowrap px-5 py-3 font-medium md:table-cell">Curso</th>
-                <th className="hidden whitespace-nowrap px-5 py-3 font-medium md:table-cell">E-mail</th>
+                <th className="hidden whitespace-nowrap px-5 py-3 font-medium md:table-cell">Tutor</th>
+                <th className="hidden whitespace-nowrap px-5 py-3 font-medium 2xl:table-cell">E-mail</th>
                 <th className="whitespace-nowrap px-5 py-3 font-medium">Acesso</th>
                 <th className="hidden whitespace-nowrap px-5 py-3 font-medium lg:table-cell">Última análise</th>
                 <th className="hidden whitespace-nowrap px-5 py-3 font-medium xl:table-cell">Período / situação</th>
@@ -177,7 +218,10 @@ export default async function StudentsPage({
                     <td className="hidden min-w-40 px-5 py-4 md:table-cell">
                       {student.courseName ?? "—"}
                     </td>
-                    <td className="hidden px-5 py-4 md:table-cell">
+                    <td className="hidden min-w-40 px-5 py-4 md:table-cell">
+                      {manageAll ? <TutorSelect compact enrollmentId={student.id} ownerId={student.owner.id} tutors={tutorOptions} /> : student.owner.name}
+                    </td>
+                    <td className="hidden px-5 py-4 2xl:table-cell">
                       {student.studentUser?.email ?? "—"}
                     </td>
                     <td className="px-5 py-4">
@@ -194,13 +238,16 @@ export default async function StudentsPage({
                         ? `${snapshot.result.currentPeriod ?? "—"}º · ${snapshot.result.previousPending} pendências`
                         : "Aguardando extrato"}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="whitespace-nowrap px-5 py-4">
                       <Link
                         className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-brand-cyan/25 px-3 py-2 font-medium text-[#003B71] transition-all hover:border-brand-cyan hover:bg-brand-cyan hover:text-white hover:shadow-[0_8px_20px_-10px_rgb(6_147_227)]"
                         href={`/academic-analysis/students/${student.id}`}
                       >
                         Abrir aluno
                       </Link>
+                      <span className="ml-2 inline-flex align-middle">
+                        <StudentDeletionButton iconOnly enrollmentId={student.id} name={readableName(student.name)} rgm={student.rgm} canDelete={manageAll} pendingRequest={student.deletionRequests.length > 0} />
+                      </span>
                     </td>
                   </tr>
                 );

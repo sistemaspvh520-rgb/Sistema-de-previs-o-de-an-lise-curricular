@@ -102,7 +102,7 @@ export type StudentRef = {
 };
 
 export type ActionItem = StudentRef & {
-  kind: "MAPPING" | "DOCUMENT" | "NO_ACCESS" | "INVITE" | "OUTDATED";
+  kind: "DELETION" | "MAPPING" | "DOCUMENT" | "NO_ACCESS" | "INVITE" | "OUTDATED";
   detail: string;
   href: string;
 };
@@ -129,9 +129,9 @@ export type TeamInsights = {
   tutors: TutorScore[];
 };
 
-const ACTION_ORDER: Record<ActionItem["kind"], number> = { DOCUMENT: 0, MAPPING: 1, NO_ACCESS: 2, INVITE: 3, OUTDATED: 4 };
+const ACTION_ORDER: Record<ActionItem["kind"], number> = { DELETION: 0, DOCUMENT: 1, MAPPING: 2, NO_ACCESS: 3, INVITE: 4, OUTDATED: 5 };
 
-export async function getTeamInsights(scope: Prisma.StudentEnrollmentWhereInput, now = new Date()): Promise<TeamInsights> {
+export async function getTeamInsights(scope: Prisma.StudentEnrollmentWhereInput, now = new Date(), options: { deletionRequests?: boolean } = {}): Promise<TeamInsights> {
   const calendar = await getAcademicCalendar(zonedDateParts(now).year + 20);
   const term = currentTerm(calendar, now);
   const termStart = new Date(`${term.startsOn}T00:00:00-04:00`);
@@ -228,6 +228,19 @@ export async function getTeamInsights(scope: Prisma.StudentEnrollmentWhereInput,
     if (reasons.length) attention.push({ ...ref, reasons });
 
     if (previous && summary.pending < previous.pending) score.advanced += 1;
+  }
+
+  if (options.deletionRequests) {
+    const requests = await prisma.studentDeletionRequest.findMany({
+      where: { status: "PENDING", enrollment: scope },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+      select: { studentName: true, rgm: true, reason: true, enrollment: { select: { id: true, courseName: true, owner: { select: { id: true, name: true } } } }, requestedBy: { select: { name: true } } },
+    });
+    for (const request of requests) {
+      if (!request.enrollment) continue;
+      actions.push({ enrollmentId: request.enrollment.id, name: request.studentName, rgm: request.rgm, courseName: request.enrollment.courseName, tutor: request.enrollment.owner, email: null, reviewId: null, kind: "DELETION", detail: `${request.requestedBy.name} pediu a exclusão${request.reason ? `: “${request.reason}”` : "."}`, href: "/academic-analysis/students#pedidos-exclusao" });
+    }
   }
 
   actions.sort((a, b) => ACTION_ORDER[a.kind] - ACTION_ORDER[b.kind] || a.name.localeCompare(b.name, "pt-BR"));

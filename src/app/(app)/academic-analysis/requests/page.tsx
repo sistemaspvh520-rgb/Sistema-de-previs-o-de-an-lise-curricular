@@ -72,7 +72,7 @@ export default async function AcademicRequestsPage({
       where: { sourceDocument: { enrollment: scope } },
       _count: true,
     }),
-    getTeamInsights(scope),
+    getTeamInsights(scope, new Date(), { deletionRequests: can(user.role, "academic:all") }),
   ]);
   const totalRequests = statuses.reduce((n, s) => n + s._count, 0);
   const statusCount = (status: string) =>

@@ -112,3 +112,53 @@ export async function deleteAcademicGridReview(user: SessionUser, reviewId: stri
   await removeStoredFiles(storageKeys);
   return { enrollmentId: review.enrollmentId };
 }
+
+/**
+ * Exclui o aluno por completo: documentos enviados (e solicitações), versões da análise, análises
+ * acadêmicas vinculadas (com o histórico de correções), a matrícula e a conta do portal do aluno.
+ * Só Administrador e Coordenação acadêmica (`academic:all`); tutores pedem pela aprovação.
+ */
+export async function deleteStudentEnrollment(user: SessionUser, enrollmentId: string) {
+  if (!can(user.role, "academic:all")) throw new ForbiddenError("Só a administração ou a coordenação acadêmica podem excluir alunos.");
+  const enrollment = await prisma.studentEnrollment.findUnique({
+    where: { id: enrollmentId },
+    select: { id: true, name: true, rgm: true, studentUserId: true, studentUser: { select: { role: true } } },
+  });
+  if (!enrollment) throw new DeletionBlockedError("Aluno não encontrado. Ele pode já ter sido excluído.");
+  const storageKeys: Array<string | null> = [];
+  await prisma.$transaction(async (tx) => {
+    await lockEnrollment(tx, enrollment.id);
+    if (await tx.academicAnalysisSource.count({ where: { enrollmentId: enrollment.id, status: "PROCESSING" } }))
+      throw new DeletionBlockedError("Há um documento deste aluno em processamento. Aguarde a conclusão para excluir.");
+    await tx.studentEnrollment.update({ where: { id: enrollment.id }, data: { currentVersionId: null } });
+    const sources = await tx.academicAnalysisSource.findMany({ where: { enrollmentId: enrollment.id }, select: { storageKey: true } });
+    storageKeys.push(...sources.map((source) => source.storageKey));
+    await tx.academicAnalysisSource.deleteMany({ where: { enrollmentId: enrollment.id } });
+    await tx.academicAnalysisVersion.updateMany({ where: { enrollmentId: enrollment.id }, data: { previousVersionId: null, preferredSourceId: null } });
+    await tx.academicAnalysisVersion.deleteMany({ where: { enrollmentId: enrollment.id } });
+    await tx.academicGridReview.deleteMany({ where: { enrollmentId: enrollment.id } });
+    await tx.studentDeletionRequest.updateMany({ where: { enrollmentId: enrollment.id, status: "PENDING" }, data: { status: "APPROVED", reviewedById: user.id, reviewedAt: new Date(), decisionNote: "Aluno excluído" } });
+    await tx.studentEnrollment.delete({ where: { id: enrollment.id } });
+    await tx.auditLog.create({
+      data: { userId: user.id, action: "student.delete", entityType: "StudentEnrollment", entityId: enrollment.id, metadata: { studentName: enrollment.name, rgm: enrollment.rgm, documents: sources.length } },
+    });
+  });
+
+  // A conta do portal só é apagada se for de aluno e não tiver outra matrícula; se algum vínculo impedir, fica desativada.
+  let account: "deleted" | "deactivated" | "none" = "none";
+  if (enrollment.studentUserId && enrollment.studentUser?.role === "STUDENT") {
+    const others = await prisma.studentEnrollment.count({ where: { studentUserId: enrollment.studentUserId } });
+    if (!others) {
+      try {
+        await prisma.user.delete({ where: { id: enrollment.studentUserId } });
+        account = "deleted";
+      } catch (error) {
+        logger.warn("student.delete.account_kept", { errorName: error instanceof Error ? error.name : "unknown" });
+        await prisma.user.update({ where: { id: enrollment.studentUserId }, data: { isActive: false, sessionVersion: { increment: 1 } } });
+        account = "deactivated";
+      }
+    }
+  }
+  await removeStoredFiles(storageKeys);
+  return { name: enrollment.name, rgm: enrollment.rgm, account };
+}

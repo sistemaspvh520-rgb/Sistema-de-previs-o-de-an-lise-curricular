@@ -217,6 +217,8 @@ model User {
   impersonationsAsTarget ImpersonationToken[] @relation("ImpersonationTarget")
   deletionRequests        AnalysisDeletionRequest[] @relation("DeletionRequestedBy")
   deletionRequestsReviewed AnalysisDeletionRequest[] @relation("DeletionReviewedBy")
+  studentDeletionRequests  StudentDeletionRequest[] @relation("StudentDeletionRequestedBy")
+  studentDeletionReviews   StudentDeletionRequest[] @relation("StudentDeletionReviewedBy")
   enrollmentUpdates       CurricularAnalysis[] @relation("EnrollmentUpdatedBy")
   pushSubscriptions       PushSubscription[]
   commercialGrades        CommercialGrade[]
@@ -766,9 +768,34 @@ model StudentEnrollment {
   versions       AcademicAnalysisVersion[] @relation("EnrollmentVersions")
   reviews        AcademicGridReview[]
   sources        AcademicAnalysisSource[]
+  deletionRequests StudentDeletionRequest[]
 
   @@index([studentUserId])
   @@index([ownerId, createdAt(sort: Desc)])
+}
+
+/// Pedido do tutor para excluir um aluno; Administrador ou Coordenação acadêmica decide.
+/// Nome e RGM ficam guardados para o histórico continuar legível depois da exclusão.
+model StudentDeletionRequest {
+  id            String                @id @default(uuid()) @db.Uuid
+  enrollmentId  String?               @db.Uuid
+  studentName   String
+  rgm           String
+  requestedById String                @db.Uuid
+  reason        String?
+  status        DeletionRequestStatus @default(PENDING)
+  reviewedById  String?               @db.Uuid
+  reviewedAt    DateTime?             @db.Timestamptz(6)
+  decisionNote  String?
+  createdAt     DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime              @updatedAt @db.Timestamptz(6)
+
+  enrollment  StudentEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  requestedBy User               @relation("StudentDeletionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?              @relation("StudentDeletionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([enrollmentId, status])
 }
 
 /// Immutable published snapshots; the existing review is the tutor's workspace.

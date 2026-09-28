@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileWarning, GraduationCap, KeyRound, Mail, Rocket, UserPlus, Waypoints, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileWarning, GraduationCap, KeyRound, Mail, Rocket, Trash2, UserPlus, Waypoints, type LucideIcon } from "lucide-react";
 import type { ActionItem, AdvanceItem, AttentionItem, GraduatingItem, TeamInsights } from "@/services/student-portal/team-insights";
 import { readableName } from "@/lib/text";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import { CopyMessageButton } from "./copy-message-button";
 const VISIBLE = 6;
 
 const ACTION_META: Record<ActionItem["kind"], { label: string; icon: LucideIcon; tone: string; cta: string }> = {
+  DELETION: { label: "Pedido de exclusão", icon: Trash2, tone: "bg-rose-50 text-rose-700", cta: "Decidir" },
   DOCUMENT: { label: "Documento com falha", icon: FileWarning, tone: "bg-rose-50 text-rose-700", cta: "Ver aluno" },
   MAPPING: { label: "Confirmar mapeamento", icon: Waypoints, tone: "bg-amber-50 text-amber-800", cta: "Abrir análise" },
   NO_ACCESS: { label: "Sem acesso ao portal", icon: UserPlus, tone: "bg-sky-50 text-sky-800", cta: "Criar acesso" },
