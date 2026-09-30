@@ -4,7 +4,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const state: { integration: Record<string, unknown>; user: { id: string; role: string } | null; audits: unknown[]; usages: unknown[] } = {
+const state: { settings: Record<string, unknown>; integration: Record<string, unknown>; user: { id: string; role: string } | null; audits: unknown[]; usages: unknown[] } = {
+  settings: {},
   integration: {},
   user: null,
   audits: [],
@@ -36,6 +37,10 @@ vi.mock("@/lib/prisma", () => {
         findUnique: async () => ({ ...state.integration }),
         findUniqueOrThrow: async () => ({ ...state.integration }),
       },
+      systemSetting: {
+        findUnique: async ({ where }: { where: { key: string } }) => (where.key in state.settings ? { key: where.key, value: state.settings[where.key] } : null),
+        upsert: async ({ where, create }: { where: { key: string }; create: { value: unknown } }) => { state.settings[where.key] = create.value; return {}; },
+      },
       auditLog: { create: async ({ data }: { data: unknown }) => state.audits.push(data) },
       aIUsage: { create: async ({ data }: { data: unknown }) => state.usages.push(data) },
     },
@@ -54,7 +59,7 @@ vi.mock("@/services/openai/test-connection", async () => {
   };
 });
 
-import { connectOpenAIAction, disconnectOpenAIAction, getOpenAIIntegrationView, replaceOpenAIKeyAction } from "@/features/integrations/openai/actions";
+import { connectOpenAIAction, disconnectOpenAIAction, getOpenAIIntegrationView, replaceOpenAIKeyAction, setAiEnabledAction } from "@/features/integrations/openai/actions";
 import { OpenAISecretService } from "@/services/openai/credentials";
 import { resetRateLimits } from "@/services/rate-limit/rate-limit";
 
@@ -64,10 +69,30 @@ const KEY_B = "sk-proj-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB5678";
 beforeEach(() => {
   state.integration = { id: "default", status: "DISCONNECTED", extractionModel: "gpt-5.5", auditModel: "gpt-5.4-mini", updatedAt: new Date() };
   state.user = { id: "11111111-1111-4111-8111-111111111111", role: "ADMIN" };
+  state.settings = {};
   state.audits = [];
   state.usages = [];
   connection.shouldFail = false;
   resetRateLimits();
+});
+
+describe("setAiEnabledAction", () => {
+  it("liga/desliga a IA, audita e reflete na visão; padrão é desligada", async () => {
+    expect((await getOpenAIIntegrationView()).aiEnabled).toBe(false);
+    const on = await setAiEnabledAction(true);
+    expect(on.ok).toBe(true);
+    expect(state.settings.aiEnabled).toBe(true);
+    expect((await getOpenAIIntegrationView()).aiEnabled).toBe(true);
+    expect(state.audits.some((a) => (a as { action: string }).action === "openai.ai_enabled")).toBe(true);
+    expect((await setAiEnabledAction(false)).ok).toBe(true);
+    expect((await getOpenAIIntegrationView()).aiEnabled).toBe(false);
+  });
+  it("valor inválido e perfil sem permissão são recusados", async () => {
+    expect((await setAiEnabledAction("nao")).ok).toBe(false);
+    state.user = { id: "22222222-2222-4222-8222-222222222222", role: "ANALYST" };
+    expect((await setAiEnabledAction(false)).ok).toBe(false);
+    expect(state.settings.aiEnabled).toBeUndefined();
+  });
 });
 
 describe("connectOpenAIAction", () => {

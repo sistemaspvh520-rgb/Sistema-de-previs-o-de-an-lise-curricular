@@ -14,11 +14,15 @@ import { OpenAIIntegrationError, mapOpenAIError } from "@/services/openai/errors
 import { recordUsage } from "@/services/openai/usage";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { getRuleSetById } from "@/repositories/rules-repository";
+import { auditCurriculumLocally, LOCAL_AUDIT_MODEL, LOCAL_AUDIT_VERSION } from "@/services/pipeline/local-audit";
 import { normalizeExtraction } from "@/services/pipeline/normalize";
 import { crossCheckWithLocalTable, readHeaderMetadata } from "@/services/pipeline/cross-check";
 import { computeAndPersist, finalizeStatus } from "@/services/pipeline/compute";
 import { parseSteps, STEP_ORDER, type ProcessingStep, type StepKey } from "@/services/pipeline/steps";
 import type { AnalysisStatus } from "@/generated/prisma/enums";
+
+/** Aviso informativo de auditoria não realizada; não conta como apontamento da IA. */
+export const AUDIT_UNAVAILABLE_CODE = "AUDIT_UNAVAILABLE";
 
 class StepFailure extends Error {
   constructor(
@@ -154,21 +158,26 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
     // ---------------- EXTRACTING (OpenAI) ----------------
     if (todo.has("EXTRACTING")) {
       await setStep(analysisId, steps, "EXTRACTING", "running", undefined, "AI_EXTRACTION");
-      let clientBundle;
-      try {
-        clientBundle = await getOpenAIClient();
-      } catch (err) {
-        const mapped = mapOpenAIError(err);
-        throw new StepFailure("EXTRACTING", mapped.code, mapped.message, true);
-      }
-      const { client, config } = clientBundle;
       const started = Date.now();
+      const localData = extractionFromLocalTable(local);
+      // A IA só é necessária quando a tabela não pôde ser reconstruída localmente.
+      let aiBundle: Awaited<ReturnType<typeof getOpenAIClient>> | null = null;
+      if (!localData) {
+        try {
+          aiBundle = await getOpenAIClient();
+        } catch (err) {
+          const mapped = mapOpenAIError(err);
+          if (mapped.code === "AI_DISABLED") {
+            throw new StepFailure("EXTRACTING", mapped.code, "A IA está desativada e a leitura local não conseguiu identificar a tabela deste PDF. Ative a IA em Configurações → OpenAI e tente novamente.", false);
+          }
+          throw new StepFailure("EXTRACTING", mapped.code, mapped.detail ? `${mapped.message} (${mapped.detail})` : mapped.message, true);
+        }
+      }
       try {
-        const localData = extractionFromLocalTable(local);
         const out = localData
           ? { data: localData, usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }, durationMs: Date.now() - started, promptVersion: "local-table-1.0", model: "local-table" }
-          : await extractCurriculum(client, {
-              model: config.extractionModel,
+          : await extractCurriculum(aiBundle!.client, {
+              model: aiBundle!.config.extractionModel,
               privacyMode: settings.aiPrivacyMode,
               documentBytes: await loadBytes(),
               filename: document.originalName,
@@ -308,11 +317,13 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
           });
         }
       } catch (err) {
+        // Sem chamada à IA (tabela local), um erro aqui é interno — não é falha da OpenAI.
+        if (!aiBundle) throw err;
         const mapped = err instanceof OpenAIIntegrationError ? err : mapOpenAIError(err);
         await prisma.aIExtraction.create({
-          data: { analysisId, model: config.extractionModel, promptVersion: "n/a", privacyMode: settings.aiPrivacyMode, durationMs: Date.now() - started, status: "ERROR", errorCode: mapped.code },
+          data: { analysisId, model: aiBundle.config.extractionModel, promptVersion: "n/a", privacyMode: settings.aiPrivacyMode, durationMs: Date.now() - started, status: "ERROR", errorCode: mapped.code },
         }).catch(() => undefined);
-        throw new StepFailure("EXTRACTING", mapped.code, mapped.message, true);
+        throw new StepFailure("EXTRACTING", mapped.code, mapped.detail ? `${mapped.message} (${mapped.detail})` : mapped.message, true);
       }
     }
 
@@ -329,14 +340,27 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
       }
     }
 
-    // ---------------- AUDITING (OpenAI) ----------------
+    // ---------------- AUDITING ----------------
+    // Auditoria local (determinística, sem IA) sempre roda. Com a IA ligada, a OpenAI faz uma segunda
+    // conferência independente; se ela falhar, a análise segue com a auditoria local e o motivo fica registrado.
     if (todo.has("AUDITING")) {
       await setStep(analysisId, steps, "AUDITING", "running", undefined, "AI_AUDIT");
+      const current = await prisma.curricularAnalysis.findUniqueOrThrow({ where: { id: analysisId }, include: { claims: true } });
+      const computed = await computeAndPersist(analysisId); // garante consistência do snapshot auditado
+      const origins = await prisma.analyzedSubject.findMany({ where: { analysisId }, select: { id: true, origin: true } });
+      const claimRows = await prisma.documentClaim.findMany({ where: { analysisId, matches: false, type: { in: ["PENDING_TOTAL", "EXEMPTED_TOTAL", "TOTAL_SUBJECTS"] } } });
+      const localAudit = auditCurriculumLocally({
+        subjects: computed.subjects,
+        manualIds: new Set(origins.filter((o) => o.origin !== "AI").map((o) => o.id)),
+        local,
+        claimMismatches: claimRows.map((c) => ({ type: c.type, value: c.value, calculatedValue: c.calculatedValue, sourcePage: c.sourcePage })),
+      });
+
+      let aiAudit: Awaited<ReturnType<typeof auditCurriculum>> | null = null;
+      let aiUnavailable: { message: string; disabled: boolean } | null = null;
       try {
         const { client, config } = await getOpenAIClient();
-        const current = await prisma.curricularAnalysis.findUniqueOrThrow({ where: { id: analysisId }, include: { claims: true } });
-        const computed = await computeAndPersist(analysisId); // garante consistência do snapshot enviado
-        const out = await auditCurriculum(client, {
+        aiAudit = await auditCurriculum(client, {
           model: config.auditModel,
           privacyMode: settings.aiPrivacyMode,
           documentBytes: await loadBytes(),
@@ -348,35 +372,53 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
           simulation: computed.simulation,
           claims: computed.claims,
         });
-        await prisma.$transaction(async (tx) => {
-          await tx.aIReview.create({
-            data: { analysisId, model: out.model, promptVersion: out.promptVersion, status: out.data.status, issues: out.data.issues as unknown as Prisma.InputJsonValue, durationMs: out.durationMs },
-          });
-          await tx.analysisWarning.deleteMany({ where: { analysisId, source: "AUDITOR" } });
-          if (out.data.issues.length) {
-            const byHash = new Map(computed.subjects.map((s) => [s.id, s.id]));
-            const subjects = await tx.analyzedSubject.findMany({ where: { analysisId }, select: { id: true, rowHash: true } });
-            const hashToId = new Map(subjects.map((s) => [s.rowHash, s.id]));
-            await tx.analysisWarning.createMany({
-              data: out.data.issues.map((i) => ({
-                analysisId,
-                code: `AUDITOR_${i.code}`,
-                severity: i.severity,
-                source: "AUDITOR" as const,
-                message: i.message,
-                subjectId: i.subjectRowHash ? (hashToId.get(i.subjectRowHash) ?? byHash.get(i.subjectRowHash) ?? null) : null,
-                sourcePage: i.sourcePage,
-              })),
-            });
-          }
-          await tx.curricularAnalysis.update({ where: { id: analysisId }, data: { auditModel: out.model, auditorPromptVersion: out.promptVersion } });
-        });
-        await recordUsage({ analysisId, operation: "AUDIT", model: out.model, ...out.usage });
-        await setStep(analysisId, steps, "AUDITING", "done", out.data.status === "OK" ? "nenhum problema apontado" : `${out.data.issues.length} apontamento(s)`);
       } catch (err) {
         const mapped = mapOpenAIError(err);
-        throw new StepFailure("AUDITING", mapped.code, mapped.message, true);
+        logger.warn("pipeline.ai_audit_unavailable", { analysisId, code: mapped.code, status: mapped.status, detail: mapped.detail });
+        aiUnavailable = { message: mapped.detail ? `${mapped.message} (${mapped.detail})` : mapped.message, disabled: mapped.code === "AI_DISABLED" };
       }
+
+      const subjectIds = new Set(computed.subjects.map((x) => x.id));
+      const warningRows = (audit: { issues: typeof localAudit.issues }, prefix: string) =>
+        audit.issues.map((i) => ({
+          analysisId,
+          code: `${prefix}${i.code}`,
+          severity: i.severity,
+          source: "AUDITOR" as const,
+          message: i.message,
+          subjectId: i.subjectRowHash && subjectIds.has(i.subjectRowHash) ? i.subjectRowHash : null,
+          sourcePage: i.sourcePage,
+        }));
+      await prisma.$transaction(async (tx) => {
+        await tx.analysisWarning.deleteMany({ where: { analysisId, source: "AUDITOR" } });
+        // A última revisão gravada define a confiabilidade: a da IA (quando houver) vem depois da local.
+        await tx.aIReview.create({ data: { analysisId, model: LOCAL_AUDIT_MODEL, promptVersion: LOCAL_AUDIT_VERSION, status: localAudit.status, issues: localAudit.issues as unknown as Prisma.InputJsonValue, durationMs: 0, createdAt: new Date(Date.now() - 1000) } });
+        const rows = warningRows(localAudit, "AUDITOR_LOCAL_");
+        if (aiAudit) {
+          const out = aiAudit;
+          await tx.aIReview.create({ data: { analysisId, model: out.model, promptVersion: out.promptVersion, status: out.data.status, issues: out.data.issues as unknown as Prisma.InputJsonValue, durationMs: out.durationMs } });
+          // O auditor da IA referencia linhas pelo rowHash do documento; traduz para o id da disciplina.
+          const persisted = await tx.analyzedSubject.findMany({ where: { analysisId }, select: { id: true, rowHash: true } });
+          const hashToId = new Map(persisted.map((p) => [p.rowHash, p.id]));
+          for (const i of out.data.issues) {
+            rows.push({ analysisId, code: `AUDITOR_${i.code}`, severity: i.severity, source: "AUDITOR" as const, message: i.message, subjectId: i.subjectRowHash ? (hashToId.get(i.subjectRowHash) ?? (subjectIds.has(i.subjectRowHash) ? i.subjectRowHash : null)) : null, sourcePage: i.sourcePage });
+          }
+          await tx.curricularAnalysis.update({ where: { id: analysisId }, data: { auditModel: out.model, auditorPromptVersion: out.promptVersion } });
+        } else if (aiUnavailable && !aiUnavailable.disabled) {
+          rows.push({ analysisId, code: AUDIT_UNAVAILABLE_CODE, severity: "INFO" as const, source: "AUDITOR" as const, message: `A conferência adicional por IA não pôde ser concluída: ${aiUnavailable.message} A auditoria local foi concluída normalmente.`, subjectId: null, sourcePage: null });
+        }
+        if (rows.length) await tx.analysisWarning.createMany({ data: rows });
+        if (!aiAudit) await tx.curricularAnalysis.update({ where: { id: analysisId }, data: { auditModel: LOCAL_AUDIT_MODEL, auditorPromptVersion: LOCAL_AUDIT_VERSION } });
+      });
+      if (aiAudit) await recordUsage({ analysisId, operation: "AUDIT", model: aiAudit.model, ...aiAudit.usage });
+      const localNote = localAudit.issues.length ? `auditoria local: ${pluralize(localAudit.issues.length, "apontamento", "apontamentos")}` : "auditoria local: nenhum problema apontado";
+      await setStep(
+        analysisId,
+        steps,
+        "AUDITING",
+        "done",
+        aiAudit ? `${localNote}; IA: ${aiAudit.data.status === "OK" ? "nenhum problema apontado" : pluralize(aiAudit.data.issues.length, "apontamento", "apontamentos")}` : aiUnavailable?.disabled ? `${localNote} (IA desativada)` : `${localNote}; IA indisponível nesta análise`,
+      );
     }
 
     // ---------------- VALIDATING (2ª passada) + FINALIZING ----------------

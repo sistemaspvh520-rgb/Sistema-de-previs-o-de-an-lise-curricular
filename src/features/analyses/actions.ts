@@ -11,6 +11,7 @@ import { runAnalysisPipeline, recalculateAnalysis } from "@/services/pipeline/ru
 import { parseSteps } from "@/services/pipeline/steps";
 import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
 import { classifySubject } from "@/domain/curricular-analysis/engine/classify";
+import { isAiEnabled } from "@/repositories/settings-repository";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
 import { isProcessingStatus } from "@/domain/curricular-analysis/status-groups";
@@ -26,7 +27,14 @@ export async function retryAnalysisAction(analysisId: unknown): Promise<ActionRe
     const id = idSchema.parse(analysisId);
     const a = await requireAnalysisAccess(id, user);
     if (isProcessingStatus(a.status)) return fail("A análise já está em processamento.");
-    await prisma.curricularAnalysis.update({ where: { id }, data: { status: "PARSING", errorCode: null, errorMessage: null } });
+    // Reprocessa desde a leitura do PDF (local e sem custo) quando o arquivo ainda existe, para aproveitar
+    // melhorias do leitor; sem o arquivo, retoma da primeira etapa não concluída.
+    const document = await prisma.uploadedDocument.findUnique({ where: { analysisId: id }, select: { deletedAt: true } });
+    const steps = parseSteps(a.processingSteps);
+    if (document && !document.deletedAt) {
+      for (const s of steps) if (s.key !== "RECEIVED" && s.key !== "VALIDATED") { s.status = "pending"; s.message = undefined; s.startedAt = undefined; s.finishedAt = undefined; }
+    }
+    await prisma.curricularAnalysis.update({ where: { id }, data: { status: "PARSING", errorCode: null, errorMessage: null, processingSteps: steps as unknown as Prisma.InputJsonValue } });
     await recordAudit({ userId: user.id, action: "analysis.retry", entityType: "CurricularAnalysis", entityId: id, metadata: { previousStatus: a.status, errorCode: a.errorCode } });
     after(() => runAnalysisPipeline(id).catch((e) => logger.error("pipeline.unhandled", { analysisId: id, err: String(e) })));
     revalidatePath(`/analyses/${id}`);
@@ -43,6 +51,7 @@ export async function reauditAnalysisAction(analysisId: unknown): Promise<Action
     const id = idSchema.parse(analysisId);
     const limit = rateLimit(`reaudit:${user.id}`, { capacity: 5, refillPerMinute: 5 });
     if (!limit.allowed) return fail(`Aguarde ${limit.retryAfterSeconds}s para reauditar novamente.`);
+    if (!(await isAiEnabled())) return fail("A IA está desativada. Ative em Configurações → OpenAI para reauditar.");
     const a = await requireAnalysisAccess(id, user);
     if (isProcessingStatus(a.status)) return fail("A análise já está em processamento.");
     const steps = parseSteps(a.processingSteps);

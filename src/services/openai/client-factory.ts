@@ -2,6 +2,8 @@ import "server-only";
 import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { OpenAISecretService } from "@/services/openai/credentials";
+import { OpenAIIntegrationError, OPENAI_ERROR_MESSAGES } from "@/services/openai/errors";
+import { isAiEnabled } from "@/repositories/settings-repository";
 
 export interface OpenAIRuntimeConfig {
   extractionModel: string;
@@ -19,10 +21,14 @@ export function createEphemeralClient(apiKey: string, opts?: { timeoutMs?: numbe
  * Descriptografa a chave apenas em memória e instancia o SDK oficial.
  * O plaintext nunca é persistido nem logado.
  */
-export async function getOpenAIClient(opts?: { timeoutMs?: number; maxRetries?: number }): Promise<{
+export async function getOpenAIClient(opts?: { timeoutMs?: number; maxRetries?: number; ignoreAiSwitch?: boolean }): Promise<{
   client: OpenAI;
   config: OpenAIRuntimeConfig;
 }> {
+  // Chave geral "Usar IA": desligada, nenhum recurso faz chamadas à OpenAI.
+  if (!opts?.ignoreAiSwitch && !(await isAiEnabled())) {
+    throw new OpenAIIntegrationError("AI_DISABLED", OPENAI_ERROR_MESSAGES.AI_DISABLED);
+  }
   const apiKey = await OpenAISecretService.getApiKeyForServer();
   const integration = await prisma.openAIIntegration.findUniqueOrThrow({
     where: { id: "default" },

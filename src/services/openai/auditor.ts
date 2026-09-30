@@ -117,7 +117,7 @@ export async function auditCurriculum(client: OpenAI, input: AuditorInput): Prom
     return out;
   } catch (err) {
     const mapped = mapOpenAIError(err);
-    logger.warn("openai.auditor.failed", { model: input.model, code: mapped.code });
+    logger.warn("openai.auditor.failed", { model: input.model, code: mapped.code, status: mapped.status, detail: mapped.detail });
     throw mapped;
   }
 }

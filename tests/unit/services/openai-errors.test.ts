@@ -25,6 +25,13 @@ describe("mapOpenAIError", () => {
     const zodLike = Object.assign(new Error("invalid"), { name: "ZodError" });
     expect(mapOpenAIError(zodLike).code).toBe("INVALID_STRUCTURED_OUTPUT");
   });
+  it("erro inesperado traz a causa técnica (sem expor chaves)", () => {
+    const mapped = mapOpenAIError(apiError(400, "Invalid value for input sk-abcdefghijklmnop"));
+    expect(mapped.code).toBe("UNKNOWN");
+    expect(mapped.detail).toContain("HTTP 400");
+    expect(mapped.detail).not.toMatch(/sk-abcdefgh/);
+    expect(mapOpenAIError(new TypeError("boom")).detail).toBe("TypeError: boom");
+  });
   it("mensagens amigáveis nunca contêm chave", () => {
     for (const m of Object.values(OPENAI_ERROR_MESSAGES)) expect(m).not.toMatch(/sk-/);
   });

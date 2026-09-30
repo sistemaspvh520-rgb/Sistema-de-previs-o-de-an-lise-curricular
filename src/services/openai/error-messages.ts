@@ -11,6 +11,7 @@ export type OpenAIErrorCode =
   | "INVALID_STRUCTURED_OUTPUT"
   | "FILE_REJECTED"
   | "NOT_CONFIGURED"
+  | "AI_DISABLED"
   | "UNKNOWN";
 
 export const OPENAI_ERROR_MESSAGES: Record<OpenAIErrorCode, string> = {
@@ -35,5 +36,7 @@ export const OPENAI_ERROR_MESSAGES: Record<OpenAIErrorCode, string> = {
     "O arquivo foi rejeitado pela OpenAI (tamanho, formato ou conteúdo).",
   NOT_CONFIGURED:
     "A integração com a OpenAI não está conectada. Configure em Configurações → OpenAI.",
+  AI_DISABLED:
+    "A IA está desativada. Ative em Configurações → OpenAI para usar este recurso.",
   UNKNOWN: "Erro inesperado ao comunicar com a OpenAI.",
 };

@@ -178,7 +178,7 @@ export async function finalizeStatus(analysisId: string): Promise<{ reliability:
   const warnings: AnalysisWarningInput[] = analysis.warnings
     .filter((w) => w.source !== "AUDITOR")
     .map((w) => ({ code: w.code, severity: w.severity, source: w.source, message: w.message }));
-  const auditorWarnings = analysis.warnings.filter((w) => w.source === "AUDITOR");
+  const auditorWarnings = analysis.warnings.filter((w) => w.source === "AUDITOR" && w.code !== "AUDIT_UNAVAILABLE");
   const review = analysis.reviews[0] ?? null;
 
   const status = calculateAnalysisStatus({

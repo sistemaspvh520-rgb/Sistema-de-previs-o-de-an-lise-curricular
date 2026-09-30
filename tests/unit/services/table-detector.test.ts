@@ -103,3 +103,37 @@ describe("table-detector (PDF real 2 — Pedagogia, pulado se ausente)", () => {
     expect(readHeaderMetadata(local).course).toContain("PEDAGOGIA");
   });
 });
+
+describe("matrícula unificada — lista de disciplinas a cursar", () => {
+  const line = (y: number, parts: Array<[number, string]>) => ({ x: parts[0][0], y, w: 400, h: 10, text: parts.map((p) => p[1]).join("\t"), parts: parts.map(([x, text]) => ({ x, w: 60, text })) });
+
+  it("lê todas as linhas mesmo com 'C.H. Tipo' colado no cabeçalho e nomes quebrados em duas linhas", async () => {
+    const { detectTables } = await import("@/services/pdf/table-detector");
+    const pages = [
+      { page: 1, width: 595, height: 842, lines: [
+        line(565, [[51, "DISCIPLINAS DISPENSADAS — 1"]]),
+        line(542, [[57, "Disciplina Dispensada"], [328, "C.H."], [356, "Usada na Dispensa"], [484, "Situação"]]),
+        line(493, [[57, "SISTEMAS OPERACIONAIS"], [329, "60h"], [356, "Sistemas Operacionais"]]),
+        line(1, [[51, "4º Semestre"]]),
+      ] },
+      { page: 2, width: 595, height: 842, lines: [
+        line(792, [[51, "DISCIPLINAS A CURSAR — 3"]]),
+        line(768, [[57, "Disciplina"], [385, "Série"], [417, "C.H. Tipo"], [504, "Situação"]]),
+        line(752, [[57, "AMBIENTAÇÃO DIGITAL"], [391, "1º"], [419, "20h"], [451, "Adaptação"], [506, "A cursar"]]),
+        line(717, [[57, "ATIVIDADES DE EXTENSÃO: INTEGRAÇÃO DE COMPETÊNCIAS PARA"]]),
+        line(712, [[391, "1º"], [419, "50h"], [451, "Adaptação"], [506, "A cursar"]]),
+        line(708, [[57, "TRANSFORMAR O EU"]]),
+        line(691, [[57, "PROJETO INTEGRADOR EM ANÁLISE"], [391, "4º"], [419, "20h"], [456, "Regular"]]),
+        line(687, [[57, "DE SISTEMAS II"]]),
+      ] },
+    ];
+    const rows = effectiveRows(detectTables(pages));
+    const pending = rows.filter((r) => r.usedSubject === null);
+    expect(rows).toHaveLength(4);
+    expect(pending.map((r) => [r.name, r.workload, r.period])).toEqual([
+      ["AMBIENTAÇÃO DIGITAL", 20, 1],
+      ["ATIVIDADES DE EXTENSÃO: INTEGRAÇÃO DE COMPETÊNCIAS PARA TRANSFORMAR O EU", 50, 1],
+      ["PROJETO INTEGRADOR EM ANÁLISE DE SISTEMAS II", 20, 4],
+    ]);
+  });
+});

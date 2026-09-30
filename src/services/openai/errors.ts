@@ -14,12 +14,22 @@ export { OPENAI_ERROR_MESSAGES, type OpenAIErrorCode };
 export class OpenAIIntegrationError extends Error {
   readonly code: OpenAIErrorCode;
   readonly status?: number;
-  constructor(code: OpenAIErrorCode, message: string, status?: number) {
+  /** Causa técnica (sem segredos) para diagnóstico quando o código é UNKNOWN. */
+  readonly detail?: string;
+  constructor(code: OpenAIErrorCode, message: string, status?: number, detail?: string) {
     super(message);
     this.name = "OpenAIIntegrationError";
     this.code = code;
     this.status = status;
+    this.detail = detail;
   }
+}
+
+/** Resume a causa real de um erro inesperado: tipo, HTTP e mensagem curta (chaves são mascaradas). */
+function describeUnknown(err: unknown, status?: number): string {
+  const name = err instanceof Error ? err.name : typeof err;
+  const message = (err instanceof Error ? err.message : String(err)).replace(/sk-[A-Za-z0-9_-]{8,}/g, "sk-***").replace(/\s+/g, " ").trim();
+  return `${name}${status ? ` HTTP ${status}` : ""}: ${message}`.slice(0, 240);
 }
 
 /** Converte qualquer erro do SDK em OpenAIIntegrationError com código e mensagem amigável. */
@@ -110,10 +120,11 @@ export function mapOpenAIError(err: unknown): OpenAIIntegrationError {
       "UNKNOWN",
       OPENAI_ERROR_MESSAGES.UNKNOWN,
       status,
+      describeUnknown(err, status),
     );
   }
   if (err instanceof OpenAIError) {
-    return new OpenAIIntegrationError("UNKNOWN", OPENAI_ERROR_MESSAGES.UNKNOWN);
+    return new OpenAIIntegrationError("UNKNOWN", OPENAI_ERROR_MESSAGES.UNKNOWN, undefined, describeUnknown(err));
   }
   if (
     err &&
@@ -129,5 +140,5 @@ export function mapOpenAIError(err: unknown): OpenAIIntegrationError {
   if (err instanceof Error && /abort|timeout/i.test(err.message)) {
     return new OpenAIIntegrationError("TIMEOUT", OPENAI_ERROR_MESSAGES.TIMEOUT);
   }
-  return new OpenAIIntegrationError("UNKNOWN", OPENAI_ERROR_MESSAGES.UNKNOWN);
+  return new OpenAIIntegrationError("UNKNOWN", OPENAI_ERROR_MESSAGES.UNKNOWN, undefined, describeUnknown(err));
 }

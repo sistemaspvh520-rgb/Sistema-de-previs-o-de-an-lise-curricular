@@ -136,6 +136,9 @@ function isEmptyMarker(t: string): boolean {
  * há uma lista de dispensadas e outra de componentes a cursar. Reconstituímos
  * ambas em uma única lista para o restante do motor continuar agnóstico ao PDF.
  */
+/** Cabeçalho "C.H." — no PDF unificado ele pode vir colado à coluna seguinte ("C.H. Tipo"). */
+const CH_HEADER = /^(c\.?h\.?|ch)(\s|$)/i;
+
 function detectUnifiedEnrollmentTables(pages: ParsedPage[]): DetectedTable | null {
   const hasLayout = pages.some((page) => page.lines.some((line) => NORMALIZE(line.text).includes("disciplinas dispensadas")));
   if (!hasLayout) return null;
@@ -169,7 +172,7 @@ function detectUnifiedEnrollmentTables(pages: ParsedPage[]): DetectedTable | nul
       }
 
       const parts = splitParts(line);
-      const hasCH = parts.some((p) => /^(c\.?h\.?|ch)$/i.test(p.text.trim()));
+      const hasCH = parts.some((p) => CH_HEADER.test(p.text.trim()));
       const hasSituation = parts.some((p) => NORMALIZE(p.text).includes("situacao"));
       if (hasCH && hasSituation && normalized.includes("usada")) {
         section = "EXEMPTED";
@@ -178,7 +181,7 @@ function detectUnifiedEnrollmentTables(pages: ParsedPage[]): DetectedTable | nul
       if (hasCH && hasSituation && parts.some((p) => NORMALIZE(p.text).startsWith("serie"))) {
         section = "PENDING";
         const name = parts.find((p) => NORMALIZE(p.text) === "disciplina");
-        const workload = parts.find((p) => /^(c\.?h\.?|ch)$/i.test(p.text.trim()));
+        const workload = parts.find((p) => CH_HEADER.test(p.text.trim()));
         const period = parts.find((p) => NORMALIZE(p.text).startsWith("serie"));
         const situation = parts.find((p) => NORMALIZE(p.text).includes("situacao"));
         if (name && workload && period) {
@@ -197,7 +200,23 @@ function detectUnifiedEnrollmentTables(pages: ParsedPage[]): DetectedTable | nul
         const periodPart = parts.find((p) => /^\d+\s*[ºª]?$/.test(p.text.trim()));
         const workloadPart = parts.find((p) => /^\d+\s*h$/i.test(p.text.trim()));
         if (!periodPart || !workloadPart) continue;
-        const name = parts.filter((p) => p.x < pendingLayout!.period - 12).map((p) => p.text.trim()).filter(Boolean).join(" ");
+        // Nomes longos quebram em até duas linhas (uma acima e/ou abaixo da linha de Série/C.H.).
+        // Linhas só com nome, coladas nesta linha de dados, completam o nome.
+        const periodX = pendingLayout.period;
+        const nameOf = (lineParts: typeof parts) => lineParts.filter((p) => p.x < periodX - 12).map((p) => p.text.trim()).filter(Boolean).join(" ");
+        const nameLines = visual
+          .filter((candidate) => candidate !== line && Math.abs(candidate.y - line.y) <= 8)
+          .filter((candidate) => {
+            const candidateParts = splitParts(candidate);
+            return !candidateParts.some((p) => /^\d+\s*[ºª]?$/.test(p.text.trim()) || /^\d+\s*h$/i.test(p.text.trim())) && !NORMALIZE(candidate.text).includes("disciplinas a cursar");
+          })
+          .map((candidate) => ({ y: candidate.y, text: nameOf(splitParts(candidate)) }))
+          .filter((candidate) => candidate.text);
+        const name = [...nameLines.filter((c) => c.y > line.y), { y: line.y, text: nameOf(parts) }, ...nameLines.filter((c) => c.y < line.y)]
+          .sort((a, b) => b.y - a.y)
+          .map((c) => c.text)
+          .filter(Boolean)
+          .join(" ");
         if (!name) continue;
         rowIndex++;
         const period = Number(periodPart.text.replace(/\D/g, ""));

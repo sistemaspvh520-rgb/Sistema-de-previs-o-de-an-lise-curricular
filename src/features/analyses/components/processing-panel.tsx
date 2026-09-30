@@ -75,7 +75,7 @@ export function ProcessingPanel({
   }
 
   const failed = data.status === "FAILED" || data.status === "AI_ERROR";
-  const friendly = data.errorCode && data.errorCode in OPENAI_ERROR_MESSAGES ? OPENAI_ERROR_MESSAGES[data.errorCode as keyof typeof OPENAI_ERROR_MESSAGES] : data.errorMessage;
+  const friendly = data.errorCode && data.errorCode !== "UNKNOWN" && data.errorCode !== "AI_DISABLED" && data.errorCode in OPENAI_ERROR_MESSAGES ? OPENAI_ERROR_MESSAGES[data.errorCode as keyof typeof OPENAI_ERROR_MESSAGES] : data.errorMessage;
 
   return (
     <Card className="shadow-sm">

@@ -149,3 +149,9 @@ devolvem apenas `apiKeyLastFour`. Rate limit em testes de conexão. RBAC: soment
 SDK mockado (`vi.mock("openai")`): chave válida; inválida (401); revogada (401); sem acesso (403); timeout; rate limit (429);
 5xx; Structured Output inválido; troca por chave válida; troca por chave inválida (anterior preservada); desconectar;
 ANALYST tentando acessar credencial (403); ADMIN acessando; API nunca retorna chave completa.
+
+## Chave geral "Usar IA" e degradação sem OpenAI
+
+- Configurações → OpenAI → **Usar inteligência artificial nas análises** (`SystemSetting.aiEnabled`, padrão **desligada**). Desligada, `getOpenAIClient()` lança `AI_DISABLED` e nenhum recurso chama a OpenAI (extração, auditoria, mapeamento de histórico, leitura de grades, calendário, revisão de linhas). Só o teste de conexão/validação de modelos ignora a chave.
+- A extração usa a tabela reconstruída localmente quando ela existe (sem IA). Sem tabela legível e com IA desligada, a análise falha com `AI_DISABLED` e mensagem explícita.
+- A **auditoria local** (`src/services/pipeline/local-audit.ts`, sem IA) sempre roda: compara a análise com a tabela reconstruída do PDF (linhas ausentes, período, carga horária, dispensada × pendente, duplicadas) e com os totais declarados no documento. Com a IA ligada, a OpenAI faz uma conferência adicional; se ela falhar, a análise conclui com a auditoria local e um aviso informativo `AUDIT_UNAVAILABLE` registra o motivo ("Reauditar com OpenAI" tenta de novo). Erros inesperados agora trazem a causa técnica (`detail`: tipo, HTTP e mensagem curta) no log e na mensagem.

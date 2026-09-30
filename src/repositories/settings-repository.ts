@@ -22,6 +22,8 @@ export interface PoloContacts {
 export interface SystemSettings {
   retentionPolicy: RetentionPolicy;
   aiPrivacyMode: AIPrivacyMode;
+  /** Chave geral da IA: desligada, o sistema usa só a leitura local do PDF e nenhuma chamada à OpenAI é feita. */
+  aiEnabled: boolean;
   institutionName: string;
   maxUploadMb: number;
   maxPdfPages: number;
@@ -41,6 +43,7 @@ export interface SystemSettings {
 const DEFAULTS: SystemSettings = {
   retentionPolicy: "DAYS_90",
   aiPrivacyMode: "REDACTED_TEXT",
+  aiEnabled: false,
   institutionName: "Universidade Cruzeiro do Sul Virtual",
   maxUploadMb: 20,
   maxPdfPages: 60,
@@ -117,6 +120,7 @@ export async function getSystemSettings(): Promise<SystemSettings> {
       (map.retentionPolicy as RetentionPolicy) ?? DEFAULTS.retentionPolicy,
     aiPrivacyMode:
       (map.aiPrivacyMode as AIPrivacyMode) ?? DEFAULTS.aiPrivacyMode,
+    aiEnabled: typeof map.aiEnabled === "boolean" ? map.aiEnabled : DEFAULTS.aiEnabled,
     institutionName:
       (map.institutionName as string) ?? DEFAULTS.institutionName,
     maxUploadMb: Number(map.maxUploadMb ?? DEFAULTS.maxUploadMb),
@@ -159,4 +163,10 @@ export async function setSystemSetting<K extends keyof SystemSettings>(
     create: { key, value: value as Prisma.InputJsonValue },
     update: { value: value as Prisma.InputJsonValue },
   });
+}
+
+/** Leitura leve da chave geral da IA (usada antes de qualquer chamada à OpenAI). */
+export async function isAiEnabled(): Promise<boolean> {
+  const row = await prisma.systemSetting.findUnique({ where: { key: "aiEnabled" } });
+  return typeof row?.value === "boolean" ? row.value : DEFAULTS.aiEnabled;
 }

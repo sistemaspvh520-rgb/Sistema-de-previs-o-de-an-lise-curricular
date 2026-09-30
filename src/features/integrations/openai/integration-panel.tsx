@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
@@ -22,6 +23,7 @@ import { formatDateTime } from "@/lib/utils";
 import { ApiKeyDialog } from "@/features/integrations/openai/api-key-dialog";
 import {
   disconnectOpenAIAction,
+  setAiEnabledAction,
   testStoredOpenAIConnectionAction,
   updateOpenAIModelsAction,
   type OpenAIIntegrationView,
@@ -39,7 +41,22 @@ export function OpenAIIntegrationPanel({ view }: { view: OpenAIIntegrationView }
   const [projectLabel, setProjectLabel] = useState(view.projectLabel ?? "");
   const [serviceAccountLabel, setServiceAccountLabel] = useState(view.serviceAccountLabel ?? "");
 
+  const [aiEnabled, setAiEnabled] = useState(view.aiEnabled);
+
   const connected = view.status !== "DISCONNECTED";
+
+  function toggleAi(next: boolean) {
+    const previous = aiEnabled;
+    setAiEnabled(next);
+    start(async () => {
+      const res = await setAiEnabledAction(next);
+      if (res.ok) toast.success(res.message);
+      else {
+        setAiEnabled(previous);
+        toast.error(res.error);
+      }
+    });
+  }
 
   function test() {
     start(async () => {
@@ -68,6 +85,20 @@ export function OpenAIIntegrationPanel({ view }: { view: OpenAIIntegrationView }
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
+      <Card className="shadow-sm lg:col-span-3">
+        <CardContent className="flex items-start justify-between gap-4 pt-6">
+          <div className="space-y-1">
+            <Label htmlFor="ai-enabled" className="text-base font-semibold">Usar inteligência artificial nas análises</Label>
+            <p className="text-sm text-muted-foreground">
+              {aiEnabled
+                ? "Ativada: além da auditoria local do sistema, a OpenAI faz uma conferência independente; a IA também é usada como reserva quando o PDF não tem tabela legível."
+                : "Desativada: nenhuma chamada é feita à OpenAI (sem custo). O sistema lê o PDF e faz a auditoria por conta própria (leitura local + conferência de totais); PDFs sem tabela legível não serão processados até a IA ser reativada."}
+            </p>
+          </div>
+          <Switch id="ai-enabled" checked={aiEnabled} onCheckedChange={toggleAi} disabled={pending} aria-label="Usar inteligência artificial nas análises" />
+        </CardContent>
+      </Card>
+
       <Card className="shadow-sm lg:col-span-2">
         <CardHeader>
           <div className="flex items-start justify-between gap-4">

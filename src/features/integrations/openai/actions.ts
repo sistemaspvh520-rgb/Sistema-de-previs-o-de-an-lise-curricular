@@ -10,12 +10,15 @@ import { getOpenAIClient } from "@/services/openai/client-factory";
 import { checkModelAvailable, testOpenAIConnection } from "@/services/openai/test-connection";
 import { mapOpenAIError, OpenAIIntegrationError } from "@/services/openai/errors";
 import { recordUsage } from "@/services/openai/usage";
+import { isAiEnabled, setSystemSetting } from "@/repositories/settings-repository";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
 import { logger } from "@/lib/logger";
 
 /** Estado público da integração — NUNCA inclui a chave. */
 export interface OpenAIIntegrationView {
+  /** Chave geral: desligada, as análises usam apenas a leitura local do PDF. */
+  aiEnabled: boolean;
   status: "DISCONNECTED" | "CONNECTED" | "ERROR";
   apiKeyLastFour: string | null;
   extractionModel: string;
@@ -33,6 +36,7 @@ export async function getOpenAIIntegrationView(): Promise<OpenAIIntegrationView>
   await requirePermission("integration:manage");
   const i = await prisma.openAIIntegration.upsert({ where: { id: "default" }, create: { id: "default" }, update: {} });
   return {
+    aiEnabled: await isAiEnabled(),
     status: i.status,
     apiKeyLastFour: i.apiKeyLastFour,
     extractionModel: i.extractionModel,
@@ -45,6 +49,23 @@ export async function getOpenAIIntegrationView(): Promise<OpenAIIntegrationView>
     lastErrorCode: i.lastErrorCode,
     updatedAt: i.updatedAt.toISOString(),
   };
+}
+
+/** ATIVAR/DESATIVAR IA — chave geral; desligada, nenhuma chamada à OpenAI é feita e o PDF é lido só localmente. */
+export async function setAiEnabledAction(enabled: unknown): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("integration:manage");
+    const parsed = z.boolean().safeParse(enabled);
+    if (!parsed.success) return fail("Valor inválido.");
+    await setSystemSetting("aiEnabled", parsed.data);
+    await recordAudit({ userId: user.id, action: parsed.data ? "openai.ai_enabled" : "openai.ai_disabled", entityType: "SystemSetting", entityId: "aiEnabled" });
+    revalidatePath("/settings/openai");
+    revalidatePath("/dashboard");
+    return ok(undefined, parsed.data ? "IA ativada. As análises voltam a ser auditadas pela OpenAI." : "IA desativada. As análises usarão apenas a leitura local do PDF.");
+  } catch (err) {
+    logger.error("setAiEnabledAction", { err: String(err) });
+    return toActionError(err);
+  }
 }
 
 const connectSchema = z.object({
@@ -187,7 +208,7 @@ export async function updateOpenAIModelsAction(input: unknown): Promise<ActionRe
 
     const integration = await prisma.openAIIntegration.findUniqueOrThrow({ where: { id: "default" } });
     if (integration.status !== "DISCONNECTED") {
-      const { client } = await getOpenAIClient({ timeoutMs: 20_000, maxRetries: 0 });
+      const { client } = await getOpenAIClient({ timeoutMs: 20_000, maxRetries: 0, ignoreAiSwitch: true });
       const toCheck = new Set([parsed.data.extractionModel, parsed.data.auditModel]);
       if (parsed.data.futureExplanationModel) toCheck.add(parsed.data.futureExplanationModel);
       for (const m of toCheck) {
