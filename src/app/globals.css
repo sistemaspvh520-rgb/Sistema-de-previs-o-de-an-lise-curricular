@@ -241,7 +241,6 @@
   body:has(.academic-report-page) { page: report; }
   body { background: #fff; }
   .no-print { display: none !important; }
-  .proposal-print { max-width: none; padding: 0; }
   body:has(.academic-report-page) aside,
   body:has(.academic-report-page) header { display: none !important; }
   body:has(.academic-report-page) main { width: 100% !important; max-width: none !important; padding: 0 !important; }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileDown, MessageCircle, Sparkles } from "lucide-react";
+import { MessageCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildCommercialProposal } from "@/domain/commercial/proposal";
 import type { AnalysisVM } from "@/features/analyses/view-model";
@@ -49,11 +49,6 @@ export function CommercialProposalActions({
           <Sparkles className="size-3.5 text-brand-gold" /> Lead prioritário: {proposal.highValueReason}
         </span>
       )}
-      <Button variant="outline" asChild>
-        <a href={`/analyses/${vm.id}/proposal`} target="_blank" rel="noreferrer">
-          <FileDown className="size-4" /> Proposta para imprimir/PDF
-        </a>
-      </Button>
       <Button asChild>
         <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer">
           <MessageCircle className="size-4" /> Enviar no WhatsApp
