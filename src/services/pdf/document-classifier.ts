@@ -1,11 +1,21 @@
 import "server-only";
 import { parsePdf } from "@/services/pdf/parser";
 
+/** Dados do cabeçalho da matrícula unificada que o analista pode completar quando o SIAA os deixa em branco. */
+export type HeaderField = "course" | "entryPeriod";
+
 export type DocumentClassification = {
   accepted: boolean;
   reason: string;
   matchedSignals: string[];
+  /** Campos do cabeçalho ausentes no PDF e não informados no envio. */
+  missing?: HeaderField[];
 };
+
+/** Valores informados no envio para suprir o cabeçalho em branco. */
+export type ManualHeader = { courseName?: string | null; entryPeriod?: number | null };
+
+const FIELD_LABELS: Record<HeaderField, string> = { course: "curso", entryPeriod: "semestre de entrada" };
 
 const normalize = (value: string) =>
   value
@@ -82,27 +92,30 @@ export function validateCurricularDocumentMetadata(
   text: string,
   fields: Record<string, string>,
   classification: DocumentClassification,
+  manual: ManualHeader = {},
 ): DocumentClassification {
+  if (!classification.accepted) return classification;
   const normalized = normalize(text);
   const unifiedRequest = normalized.includes("campus / unidade") &&
     normalized.includes("semestre de entrada");
   if (!unifiedRequest) return classification;
 
-  const campus = fields.campus?.trim();
-  const course = fields.curso?.trim();
-  const entryPeriod = fields["semestre de entrada"]?.match(/^\s*(\d{1,2})\s*[ºª°]?/i)?.[1];
-  const validEntryPeriod = entryPeriod !== undefined && Number(entryPeriod) >= 1 && Number(entryPeriod) <= 20;
-  if (campus && course && validEntryPeriod) return classification;
+  // O SIAA às vezes publica o resultado com campus, curso e semestre em branco. Curso e semestre de entrada são
+  // indispensáveis (identificação e previsão); quando faltam no PDF, o analista os informa no envio. O campus não
+  // bloqueia: o polo escolhido no envio já identifica o atendimento.
+  const course = fields.curso?.trim() || manual.courseName?.trim();
+  const validPeriod = (value: number) => Number.isInteger(value) && value >= 1 && value <= 20;
+  const fromPdf = Number(fields["semestre de entrada"]?.match(/^\s*(\d{1,2})\s*[ºª°]?/i)?.[1] ?? NaN);
+  const validEntryPeriod = validPeriod(fromPdf) || validPeriod(Number(manual.entryPeriod ?? NaN));
+  const missing: HeaderField[] = [...(!course ? ["course" as const] : []), ...(!validEntryPeriod ? ["entryPeriod" as const] : [])];
+  if (missing.length === 0) return classification;
 
+  const names = missing.map((field) => FIELD_LABELS[field]).join(" e ");
   return {
     accepted: false,
-    reason: "Este PDF está incompleto ou desatualizado: campus/unidade, curso ou semestre de entrada não foram identificados corretamente. Anexe o documento atualizado com esses dados e a grade acadêmica preenchida. A análise curricular só será iniciada após a confirmação dos dados.",
-    matchedSignals: [
-      ...classification.matchedSignals,
-      ...(!campus ? ["campus/unidade ausente"] : []),
-      ...(!course ? ["curso ausente"] : []),
-      ...(!validEntryPeriod ? ["semestre de entrada ausente ou inválido"] : []),
-    ],
+    reason: `O PDF do SIAA veio sem ${names}. Informe ${missing.length > 1 ? "esses dados" : "esse dado"} no envio para iniciar a análise.`,
+    matchedSignals: [...classification.matchedSignals, ...missing.map((field) => `${FIELD_LABELS[field]} ausente`)],
+    missing,
   };
 }
 
@@ -119,6 +132,7 @@ export class InvalidCurricularDocumentError extends Error {
 /** Lê apenas as três primeiras páginas: suficiente para cabeçalho e início da grade, sem iniciar o pipeline. */
 export async function assertCurricularAnalysisDocument(
   bytes: Buffer,
+  manual: ManualHeader = {},
 ): Promise<DocumentClassification> {
   const parsed = await parsePdf(bytes, { maxPages: 3 });
   const text = parsed.textByPage.join("\n");
@@ -126,6 +140,7 @@ export async function assertCurricularAnalysisDocument(
     text,
     parsed.headerFields ?? {},
     classifyCurricularAnalysisText(text),
+    manual,
   );
   if (!classification.accepted)
     throw new InvalidCurricularDocumentError(classification);

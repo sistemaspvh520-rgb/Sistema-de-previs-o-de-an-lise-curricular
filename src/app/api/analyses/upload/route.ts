@@ -20,9 +20,13 @@ import { isValidTerm } from "@/domain/curricular-analysis/simulation/terms";
 import { z } from "zod";
 import { validatePdfBytes } from "@/services/pdf/validate";
 
-/** O período acadêmico vem do PDF; o semestre-calendário define o início da previsão. */
+/**
+ * O período acadêmico e o curso vêm do PDF; o semestre-calendário define o início da previsão. Quando o SIAA
+ * publica o cabeçalho em branco, o analista informa curso e semestre de entrada (entryPeriod/courseName).
+ */
 const entrySchema = z.object({
   entryPeriod: z.coerce.number().int().min(1).max(20).optional(),
+  courseName: z.string().trim().min(3).max(160).optional(),
   entryTerm: z.string().refine(isValidTerm, "Use o formato AAAA.1 ou AAAA.2."),
   studentName: z.string().trim().min(3).max(120),
   poloCode: z.string().trim().min(1).max(12),
@@ -92,6 +96,7 @@ export async function POST(req: Request) {
     );
   const entry = entrySchema.safeParse({
     entryPeriod: form.get("entryPeriod") || undefined,
+    courseName: form.get("courseName") || undefined,
     entryTerm: form.get("entryTerm"),
     studentName: form.get("studentName"),
     poloCode: form.get("poloCode"),
@@ -102,12 +107,13 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Informe nome do aluno, polo, formato do curso e semestre inicial da previsão válidos.",
+          "Informe nome do aluno, polo, formato do curso, semestre inicial da previsão e, se pedidos, curso e semestre de entrada válidos.",
       },
       { status: 400 },
     );
   const {
     entryPeriod,
+    courseName,
     entryTerm,
     studentName,
     poloCode,
@@ -132,12 +138,13 @@ export async function POST(req: Request) {
     await validatePdfBytes(bytes, {
       maxBytes: settings.maxUploadMb * 1024 * 1024,
     });
-    await assertCurricularAnalysisDocument(bytes);
+    await assertCurricularAnalysisDocument(bytes, { courseName, entryPeriod });
     const { id } = await createAnalysisFromUpload({
       userId: user.id,
       bytes,
       originalName: file.name,
       entryPeriod: entryPeriod ?? null,
+      courseName: courseName ?? null,
       entryTerm,
       startTerm: entryTerm,
       studentName,
@@ -162,15 +169,19 @@ export async function POST(req: Request) {
         { error: err.message, code: err.code },
         { status: 422 },
       );
-    if (err instanceof InvalidCurricularDocumentError)
+    if (err instanceof InvalidCurricularDocumentError) {
+      const missing = err.classification.missing ?? [];
       return NextResponse.json(
         {
           error: err.message,
-          code: err.code,
+          // Cabeçalho em branco no SIAA: a tela pede curso/semestre de entrada e reenvia.
+          code: missing.length ? "PDF_HEADER_INCOMPLETE" : err.code,
+          missing,
           signals: err.classification.matchedSignals,
         },
         { status: 422 },
       );
+    }
     if (err instanceof DuplicateDocumentError) {
       const message = reanalysisOf
         ? "Este é o mesmo PDF da análise anterior. Uma reanálise exige o novo PDF do aluno."

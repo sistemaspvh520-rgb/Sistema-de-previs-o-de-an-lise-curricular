@@ -282,7 +282,8 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
           await tx.curricularAnalysis.update({
             where: { id: analysisId },
             data: {
-              courseName: header.course ?? data.document.course,
+              // Curso informado no envio (cabeçalho do PDF em branco) vale antes da leitura pela IA.
+              courseName: header.course ?? analysis.courseName ?? data.document.course,
               matrixLabel: header.matrix ?? data.document.matrix,
               campus: header.campus ?? data.document.campus,
               modality: header.modality ?? data.document.modality,
