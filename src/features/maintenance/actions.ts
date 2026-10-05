@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/services/audit-log/audit-log";
 import { getStorage } from "@/services/storage/storage";
+import { removeOrphanGradeFiles } from "@/services/commercial-grades/publish";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@/generated/prisma/client";
@@ -117,6 +118,20 @@ export async function deleteAnalysisAction(input: unknown): Promise<ActionResult
     return ok(undefined, "Análise excluída definitivamente.");
   } catch (err) {
     logger.error("deleteAnalysisAction", { err: String(err) });
+    return toActionError(err);
+  }
+}
+
+/** Apaga do armazenamento os PDFs de grades comerciais que não têm registro no catálogo (envios que falharam). */
+export async function removeOrphanGradeFilesAction(): Promise<ActionResult<{ removed: number }>> {
+  try {
+    const admin = await requirePermission("privacy:manage");
+    const removed = await removeOrphanGradeFiles();
+    await recordAudit({ userId: admin.id, action: "maintenance.orphan_grade_files_removed", entityType: "CommercialGrade", metadata: { removed } });
+    revalidatePath("/settings/maintenance");
+    return ok({ removed }, removed ? `${removed} arquivo(s) sem grade removido(s).` : "Nenhum arquivo órfão encontrado.");
+  } catch (err) {
+    logger.error("removeOrphanGradeFilesAction", { err: String(err) });
     return toActionError(err);
   }
 }

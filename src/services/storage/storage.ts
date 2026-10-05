@@ -1,5 +1,5 @@
 import "server-only";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { getEnv } from "@/lib/env";
@@ -48,6 +48,15 @@ export const localFsStorage: StorageService = {
     } catch {
       return false;
     }
+  },
+  async list(prefix) {
+    const dir = resolveKey(prefix);
+    const names = await readdir(dir).catch(() => [] as string[]);
+    const files = await Promise.all(names.map(async (name) => {
+      const info = await stat(path.join(dir, name)).catch(() => null);
+      return info?.isFile() ? { key: path.posix.join(prefix, name), createdAt: info.birthtime } : null;
+    }));
+    return files.filter((file): file is { key: string; createdAt: Date } => Boolean(file));
   },
 };
 

@@ -1,24 +1,25 @@
 /**
- * Integração: envio de matriz comercial (PDF → leitura → armazenamento → catálogo).
+ * Integração: envio de matriz comercial pela rota de API (PDF → leitura → armazenamento → catálogo).
  * Pulado automaticamente se o banco não estiver acessível.
  */
 import path from "node:path";
-import { rm } from "node:fs/promises";
+import { mkdir, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { config as loadEnv } from "dotenv";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { selectablePdf } from "../fixtures/academic-pdf";
 
 loadEnv({ path: path.resolve(process.cwd(), ".env"), override: true });
-
 vi.setConfig({ testTimeout: 30_000 });
+
 let dbOk = false;
 let userId = "";
+let role = "ADMIN";
 let prismaMod: typeof import("@/lib/prisma");
 const storageDir = path.resolve(process.cwd(), "storage-test-commercial");
 process.env.STORAGE_DIR = storageDir;
 process.env.STORAGE_DRIVER = "local";
 
-vi.mock("@/lib/session", () => ({ requirePermission: async () => ({ id: userId, role: "ADMIN" }) }));
+vi.mock("@/lib/session", () => ({ getSessionUser: async () => ({ id: userId, role }) }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 
 beforeAll(async () => {
@@ -51,41 +52,90 @@ function gradePdf(label: string, courseHours = "1.680") {
   ]);
 }
 
-function formWith(bytes: Buffer, name = "CST EM ESTÉTICA E COSMÉTICA.PDF") {
+function upload(bytes: Buffer | string, name = "CST EM ESTÉTICA E COSMÉTICA.PDF", url = "http://localhost/api/commercial-grades/upload") {
   const form = new FormData();
-  form.set("file", new File([new Uint8Array(bytes)], name, { type: "application/pdf" }));
-  return form;
+  form.set("file", new File([new Uint8Array(typeof bytes === "string" ? Buffer.from(bytes) : bytes)], name, { type: "application/pdf" }));
+  return new Request(url, { method: "POST", body: form });
 }
 
-describe("envio de grade comercial", () => {
+const storedCount = async () => (await readdir(path.join(storageDir, "commercial-grades")).catch(() => [])).length;
+
+describe("envio de grade comercial pela API", () => {
   it("lê, guarda o PDF e publica a grade mesmo sem IA configurada (leitura local)", async (ctx) => {
     if (!dbOk) return ctx.skip();
-    const { uploadCommercialGradeAction } = await import("@/features/commercial-grades/actions");
-    const result = await uploadCommercialGradeAction(formWith(gradePdf("A")));
-    expect(result).toMatchObject({ ok: true });
+    const { POST } = await import("@/app/api/commercial-grades/upload/route");
+    const response = await POST(upload(gradePdf("A")));
+    expect(response.status).toBe(200);
     const saved = await prismaMod.prisma.commercialGrade.findFirst({ where: { uploadedById: userId } });
     expect(saved?.courseName).toContain("CST");
     expect(saved?.contentHash).toHaveLength(64);
   });
 
+  it("recusa o mesmo PDF duas vezes (409) e arquivo que não é PDF (422)", async (ctx) => {
+    if (!dbOk) return ctx.skip();
+    const { POST } = await import("@/app/api/commercial-grades/upload/route");
+    expect((await POST(upload(gradePdf("A"), "REPETIDA.PDF"))).status).toBe(409);
+    const notPdf = await POST(upload("isto não é um pdf", "FALSO.PDF"));
+    expect(notPdf.status).toBe(422);
+    expect((await notPdf.json()).error).toMatch(/PDF/);
+  });
+
   it("não falha quando o PDF traz totais absurdos (estouro de INT4): o campo fica vazio para revisão", async (ctx) => {
     if (!dbOk) return ctx.skip();
-    const { uploadCommercialGradeAction } = await import("@/features/commercial-grades/actions");
-    const result = await uploadCommercialGradeAction(formWith(gradePdf("B", "99999999999"), "OUTRA GRADE.PDF"));
-    expect(result).toMatchObject({ ok: true });
+    const { POST } = await import("@/app/api/commercial-grades/upload/route");
+    expect((await POST(upload(gradePdf("B", "99999999999"), "OUTRA GRADE.PDF"))).status).toBe(200);
     const saved = await prismaMod.prisma.commercialGrade.findFirst({ where: { uploadedById: userId, originalName: "OUTRA GRADE.PDF" } });
     expect(saved?.totalCourseHours).toBeNull();
   });
 
-  it("remove o PDF do armazenamento quando a gravação no banco falha", async (ctx) => {
+  it("remove o PDF do armazenamento e informa a referência quando a gravação no banco falha", async (ctx) => {
     if (!dbOk) return ctx.skip();
-    const { readdir } = await import("node:fs/promises");
-    const { uploadCommercialGradeAction } = await import("@/features/commercial-grades/actions");
-    const before = (await readdir(path.join(storageDir, "commercial-grades"))).length;
+    const { POST } = await import("@/app/api/commercial-grades/upload/route");
+    const before = await storedCount();
     const spy = vi.spyOn(prismaMod.prisma.commercialGrade, "create").mockRejectedValueOnce(new Error("falha simulada"));
-    const result = await uploadCommercialGradeAction(formWith(gradePdf("C"), "TERCEIRA.PDF"));
+    const response = await POST(upload(gradePdf("C"), "TERCEIRA.PDF"));
     spy.mockRestore();
-    expect(result).toMatchObject({ ok: false });
-    expect((await readdir(path.join(storageDir, "commercial-grades"))).length).toBe(before);
+    expect(response.status).toBe(500);
+    expect((await response.json()).error).toMatch(/ref\.: Error/);
+    expect(await storedCount()).toBe(before);
+  });
+
+  it("atualiza uma grade existente pela rota de substituição", async (ctx) => {
+    if (!dbOk) return ctx.skip();
+    const { POST } = await import("@/app/api/commercial-grades/[id]/replace/route");
+    const target = await prismaMod.prisma.commercialGrade.findFirstOrThrow({ where: { uploadedById: userId, originalName: "OUTRA GRADE.PDF" } });
+    const before = await storedCount();
+    const response = await POST(upload(gradePdf("B", "2.000"), "OUTRA GRADE V2.PDF"), { params: Promise.resolve({ id: target.id }) });
+    expect(response.status).toBe(200);
+    const updated = await prismaMod.prisma.commercialGrade.findUniqueOrThrow({ where: { id: target.id } });
+    expect(updated.originalName).toBe("OUTRA GRADE V2.PDF");
+    expect(updated.totalCourseHours).toBe(2000);
+    expect(await storedCount()).toBe(before); // o PDF antigo foi removido
+  });
+
+  it("só administradores publicam grades", async (ctx) => {
+    if (!dbOk) return ctx.skip();
+    const { POST } = await import("@/app/api/commercial-grades/upload/route");
+    role = "ANALYST";
+    try { expect((await POST(upload(gradePdf("D"), "SEM PERMISSAO.PDF"))).status).toBe(403); } finally { role = "ADMIN"; }
+  });
+
+  it("localiza e remove apenas arquivos órfãos antigos", async (ctx) => {
+    if (!dbOk) return ctx.skip();
+    const { findOrphanGradeFiles, removeOrphanGradeFiles } = await import("@/services/commercial-grades/publish");
+    const dir = path.join(storageDir, "commercial-grades");
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, "orfao-antigo.pdf"), "x");
+    await writeFile(path.join(dir, "orfao-recente.pdf"), "x");
+    const old = new Date(Date.now() - 60 * 60 * 1000);
+    await utimes(path.join(dir, "orfao-antigo.pdf"), old, old);
+    // birthtime não é alterável; simula o relógio 1 h à frente para tornar o arquivo "antigo".
+    const found = await findOrphanGradeFiles(Date.now() + 60 * 60 * 1000);
+    expect(found).toContain("commercial-grades/orfao-antigo.pdf");
+    expect(found.some((key) => !key.includes("orfao"))).toBe(false); // arquivos com grade não são órfãos
+    expect(await findOrphanGradeFiles()).toEqual([]); // recém-criados são preservados
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 60 * 60 * 1000 });
+    try { expect(await removeOrphanGradeFiles()).toBe(2); } finally { vi.useRealTimers(); }
+    expect(await readdir(dir)).not.toContain("orfao-antigo.pdf");
   });
 });

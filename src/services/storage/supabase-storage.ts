@@ -75,4 +75,15 @@ export const supabaseStorage: StorageService = {
     if (error) return false;
     return (data ?? []).some((f) => f.name === base);
   },
+  async list(prefix) {
+    const dir = safeKey(prefix);
+    const found: Array<{ key: string; createdAt: Date }> = [];
+    for (let offset = 0; ; offset += 100) {
+      const { data, error } = await getClient().storage.from(bucketName()).list(dir, { limit: 100, offset });
+      if (error) throw new Error(`Falha ao listar o Supabase Storage: ${error.message}`);
+      for (const item of data ?? []) if (item.id) found.push({ key: path.posix.join(dir, item.name), createdAt: new Date(item.created_at ?? item.updated_at ?? Date.now()) });
+      if ((data ?? []).length < 100) break;
+    }
+    return found;
+  },
 };
