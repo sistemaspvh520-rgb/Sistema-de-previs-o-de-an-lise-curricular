@@ -25,3 +25,12 @@ describe("mapOpenAIError", () => {
     expect(mapOpenAIError(err).code).toBe("MODEL_NOT_FOUND");
   });
 });
+
+describe("erros de conexão", () => {
+  it("guarda a causa técnica da falha de rede", async () => {
+    const { APIConnectionError } = await import("openai");
+    const mapped = mapOpenAIError(new APIConnectionError({ cause: new Error("getaddrinfo ENOTFOUND api.openai.com") }));
+    expect(mapped.code).toBe("CONNECTION_ERROR");
+    expect(formatIntegrationError(mapped)).toContain("ENOTFOUND");
+  });
+});
