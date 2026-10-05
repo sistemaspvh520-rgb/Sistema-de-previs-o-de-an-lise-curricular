@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 import { requirePermission } from "@/lib/session";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
 import { getOpenAIClient } from "@/services/openai/client-factory";
-import { mapOpenAIError, OpenAIIntegrationError } from "@/services/openai/errors";
+import { formatIntegrationError, mapOpenAIError, OpenAIIntegrationError } from "@/services/openai/errors";
 import { recordUsage } from "@/services/openai/usage";
 import { reviewAmbiguousAcademicRows } from "@/services/academic-analysis/ai-review";
 
@@ -43,10 +43,10 @@ export async function POST(request: Request) {
     if (!result.reviews) return NextResponse.json({ error: result.error, usage: result.usage }, { status: 422 });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof OpenAIIntegrationError) return NextResponse.json({ error: error.message }, { status: 503 });
+    if (error instanceof OpenAIIntegrationError) return NextResponse.json({ error: formatIntegrationError(error) }, { status: 503 });
     const mapped = mapOpenAIError(error);
-    if (mapped instanceof OpenAIIntegrationError && mapped.code !== "UNKNOWN") return NextResponse.json({ error: mapped.message }, { status: mapped.status === 429 ? 429 : 502 });
-    logger.warn("academic_analysis.ai_review.failed", { userId, errorName: error instanceof Error ? error.name : "unknown" });
+    if (mapped instanceof OpenAIIntegrationError && mapped.code !== "UNKNOWN") return NextResponse.json({ error: formatIntegrationError(mapped) }, { status: mapped.status === 429 ? 429 : 502 });
+    logger.warn("academic_analysis.ai_review.failed", { userId, errorName: error instanceof Error ? error.name : "unknown", detail: mapped.detail });
     return NextResponse.json({ error: "Não foi possível priorizar a revisão. Confira as linhas diretamente no PDF." }, { status: 502 });
   }
 }

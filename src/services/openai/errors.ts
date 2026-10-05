@@ -28,8 +28,14 @@ export class OpenAIIntegrationError extends Error {
 /** Resume a causa real de um erro inesperado: tipo, HTTP e mensagem curta (chaves são mascaradas). */
 function describeUnknown(err: unknown, status?: number): string {
   const name = err instanceof Error ? err.name : typeof err;
+  const extra = err instanceof APIError ? [err.code, err.type, err.param].filter((v) => typeof v === "string" && v) : [];
   const message = (err instanceof Error ? err.message : String(err)).replace(/sk-[A-Za-z0-9_-]{8,}/g, "sk-***").replace(/\s+/g, " ").trim();
-  return `${name}${status ? ` HTTP ${status}` : ""}: ${message}`.slice(0, 240);
+  return `${name}${status ? ` HTTP ${status}` : ""}${extra.length ? ` [${extra.join("/")}]` : ""}: ${message}`.slice(0, 300);
+}
+
+/** Mensagem amigável acrescida da causa técnica (quando houver), para avisos e respostas de API. */
+export function formatIntegrationError(err: OpenAIIntegrationError): string {
+  return err.detail ? `${err.message} (${err.detail})` : err.message;
 }
 
 /** Converte qualquer erro do SDK em OpenAIIntegrationError com código e mensagem amigável. */
@@ -66,20 +72,14 @@ export function mapOpenAIError(err: unknown): OpenAIIntegrationError {
     if (
       status === 404 ||
       code === "model_not_found" ||
-      msg.includes("does not exist") ||
-      msg.includes("model")
+      (/\bmodel\b/.test(msg) && /(does not exist|not found|do not have access|not supported|unsupported model)/.test(msg))
     ) {
-      if (
-        status === 404 ||
-        code === "model_not_found" ||
-        msg.includes("model")
-      ) {
-        return new OpenAIIntegrationError(
-          "MODEL_NOT_FOUND",
-          OPENAI_ERROR_MESSAGES.MODEL_NOT_FOUND,
-          status,
-        );
-      }
+      return new OpenAIIntegrationError(
+        "MODEL_NOT_FOUND",
+        OPENAI_ERROR_MESSAGES.MODEL_NOT_FOUND,
+        status,
+        describeUnknown(err, status),
+      );
     }
     if (status === 429) {
       if (

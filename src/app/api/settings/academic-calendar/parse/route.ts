@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 import { requirePermission } from "@/lib/session";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
 import { getOpenAIClient } from "@/services/openai/client-factory";
-import { mapOpenAIError, OpenAIIntegrationError } from "@/services/openai/errors";
+import { formatIntegrationError, mapOpenAIError, OpenAIIntegrationError } from "@/services/openai/errors";
 import { recordUsage } from "@/services/openai/usage";
 import { parsePdf } from "@/services/pdf/parser";
 import { extractCalendarEvidence, readCalendarBoundaries } from "@/services/academic-calendar/calendar-reader";
@@ -52,12 +52,12 @@ export async function POST(request: Request) {
     if (!result.terms) return NextResponse.json({ error: result.error, usage: result.usage }, { status: 422 });
     return NextResponse.json({ year, terms: result.terms, usage: result.usage, evidenceLines: evidence.length }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof OpenAIIntegrationError) return NextResponse.json({ error: error.message }, { status: 503 });
+    if (error instanceof OpenAIIntegrationError) return NextResponse.json({ error: formatIntegrationError(error) }, { status: 503 });
     const mapped = mapOpenAIError(error);
     if (mapped instanceof OpenAIIntegrationError && mapped.code !== "UNKNOWN") {
-      return NextResponse.json({ error: mapped.message }, { status: mapped.status === 429 ? 429 : 502 });
+      return NextResponse.json({ error: formatIntegrationError(mapped) }, { status: mapped.status === 429 ? 429 : 502 });
     }
-    logger.warn("academic_calendar.ai_extract.failed", { userId, errorName: error instanceof Error ? error.name : "unknown" });
+    logger.warn("academic_calendar.ai_extract.failed", { userId, errorName: error instanceof Error ? error.name : "unknown", detail: mapped.detail });
     return NextResponse.json({ error: error instanceof Error && error.message.startsWith("O PDF") ? error.message : "Não foi possível extrair as datas. Confira o PDF e tente novamente." }, { status: 422 });
   }
 }

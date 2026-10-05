@@ -8,7 +8,7 @@ import { recordAudit } from "@/services/audit-log/audit-log";
 import { OpenAISecretService } from "@/services/openai/credentials";
 import { getOpenAIClient } from "@/services/openai/client-factory";
 import { checkModelAvailable, testOpenAIConnection } from "@/services/openai/test-connection";
-import { mapOpenAIError, OpenAIIntegrationError } from "@/services/openai/errors";
+import { formatIntegrationError, mapOpenAIError, OpenAIIntegrationError } from "@/services/openai/errors";
 import { recordUsage } from "@/services/openai/usage";
 import { isAiEnabled, setSystemSetting } from "@/repositories/settings-repository";
 import { rateLimit } from "@/services/rate-limit/rate-limit";
@@ -166,7 +166,7 @@ export async function testStoredOpenAIConnectionAction(): Promise<ActionResult<{
       });
       await recordAudit({ userId: user.id, action: "openai.test", entityType: "OpenAIIntegration", entityId: "default", metadata: { ok: false, code: mapped.code } });
       revalidatePath("/settings/openai");
-      return fail(mapped.message);
+      return fail(formatIntegrationError(mapped));
     }
   } catch (err) {
     if (err instanceof OpenAIIntegrationError) return fail(err.message);
@@ -216,7 +216,7 @@ export async function updateOpenAIModelsAction(input: unknown): Promise<ActionRe
           await checkModelAvailable(client, m);
         } catch (err) {
           const mapped = mapOpenAIError(err);
-          return fail(`Modelo "${m}": ${mapped.message}`);
+          return fail(`Modelo "${m}": ${formatIntegrationError(mapped)}`);
         }
       }
     }

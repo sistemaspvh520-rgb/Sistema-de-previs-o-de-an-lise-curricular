@@ -52,7 +52,7 @@ export async function testOpenAIConnection(
     return result;
   } catch (err) {
     const mapped = mapOpenAIError(err);
-    logger.warn("openai.connection_test.failed", { model, code: mapped.code, status: mapped.status });
+    logger.warn("openai.connection_test.failed", { model, code: mapped.code, status: mapped.status, detail: mapped.detail });
     throw mapped;
   }
 }
@@ -64,7 +64,7 @@ export async function checkModelAvailable(client: OpenAI, model: string): Promis
   } catch (err) {
     const mapped = mapOpenAIError(err);
     if (mapped.code === "UNKNOWN" || mapped.code === "MODEL_NOT_FOUND") {
-      throw new OpenAIIntegrationError("MODEL_NOT_FOUND", OPENAI_ERROR_MESSAGES.MODEL_NOT_FOUND, mapped.status);
+      throw new OpenAIIntegrationError("MODEL_NOT_FOUND", OPENAI_ERROR_MESSAGES.MODEL_NOT_FOUND, mapped.status, mapped.detail);
     }
     throw mapped;
   }
