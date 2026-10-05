@@ -46,9 +46,12 @@ export function mapOpenAIError(err: unknown): OpenAIIntegrationError {
     return new OpenAIIntegrationError("TIMEOUT", OPENAI_ERROR_MESSAGES.TIMEOUT);
   }
   if (err instanceof APIConnectionError) {
+    const cause = (err as { cause?: unknown }).cause;
     return new OpenAIIntegrationError(
       "CONNECTION_ERROR",
       OPENAI_ERROR_MESSAGES.CONNECTION_ERROR,
+      undefined,
+      cause ? describeUnknown(cause) : undefined,
     );
   }
   if (err instanceof APIError) {

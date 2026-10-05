@@ -58,6 +58,11 @@ const INSTRUCTIONS = `Você lê matrizes curriculares brasileiras para um time c
 - decisionSemester só pode ser preenchido se o PDF disser expressamente em qual semestre o aluno escolhe/define a formação. Não deduza o período pela posição dos estágios. Se não estiver explícito, use null e explique brevemente em decisionEvidence que a matriz não informa o período.
 - Não invente estágio, carga horária, modalidade ou vigência. Retorne em português e preserve o nome da disciplina.`;
 
+/** Tempo total reservado à IA (as rotas de envio têm maxDuration de 120 s). */
+const AI_BUDGET_MS = 100_000;
+/** A partir deste tamanho o texto extraído localmente basta e o PDF não é reenviado à IA. */
+const TEXT_ONLY_MIN_CHARS = 1_500;
+
 /**
  * Lê o PDF pela IA; se houver indisponibilidade, preserva informações seguras encontradas no texto local.
  * Nunca lança por causa do conteúdo do PDF: o que não puder ser lido vira campo vazio, para o time comercial revisar.
@@ -72,17 +77,25 @@ export async function readCommercialGrade(bytes: Buffer, filename: string): Prom
   }
   const fallback = localReading(text, filename);
   let aiNote: string | null = null;
+  // Texto local suficiente dispensa o PDF (base64 de até 4 MB, mais tokens e muito mais lento); PDF escaneado segue anexado.
+  const textOnly = text.trim().length >= TEXT_ONLY_MIN_CHARS;
+  const startedAt = Date.now();
   // A IA de raciocínio gasta parte do limite de saída pensando: se a resposta vier cortada, tenta de novo com mais folga.
   for (const maxOutputTokens of [6_000, 16_000]) {
+    // As rotas de envio têm 120 s: cada tentativa usa o que resta do orçamento, sem repetir a chamada do SDK.
+    const remainingMs = AI_BUDGET_MS - (Date.now() - startedAt);
+    if (remainingMs < 15_000) break;
     try {
-      const { client, config } = await getOpenAIClient({ timeoutMs: 90_000, maxRetries: 1 });
+      const { client, config } = await getOpenAIClient({ timeoutMs: remainingMs, maxRetries: 0 });
       const response = await client.responses.parse({
         model: config.extractionModel,
         instructions: INSTRUCTIONS,
-        input: [{ role: "user", content: [
-          { type: "input_text", text: "Leia a matriz curricular anexada. Use o texto extraído abaixo como apoio para localizar totais e semestres.\n\n" + text },
-          { type: "input_file", filename, file_data: `data:application/pdf;base64,${bytes.toString("base64")}` },
-        ] }],
+        input: [{ role: "user", content: textOnly
+          ? [{ type: "input_text", text: "Leia a matriz curricular a partir do texto extraído do PDF abaixo.\n\n" + text }]
+          : [
+            { type: "input_text", text: "Leia a matriz curricular anexada. Use o texto extraído abaixo como apoio para localizar totais e semestres.\n\n" + text },
+            { type: "input_file", filename, file_data: `data:application/pdf;base64,${bytes.toString("base64")}` },
+          ] }],
         text: { format: zodTextFormat(gradeReadingSchema, "commercial_grade_reading") },
         max_output_tokens: maxOutputTokens,
       });
@@ -93,9 +106,9 @@ export async function readCommercialGrade(bytes: Buffer, filename: string): Prom
     } catch (error) {
       const mapped = mapOpenAIError(error);
       aiNote = formatIntegrationError(mapped).replace(/\.$/, "");
-      logger.warn("commercial_grade.ai_read_failed", { filename, code: mapped.code, status: mapped.status, detail: mapped.detail, maxOutputTokens });
-      // Só vale repetir quando a falha foi na resposta (corte/formato); chave, cota, modelo ou IA desligada não mudam na segunda tentativa.
-      if (mapped.code !== "INVALID_STRUCTURED_OUTPUT" && mapped.code !== "UNKNOWN") break;
+      logger.warn("commercial_grade.ai_read_failed", { filename, code: mapped.code, status: mapped.status, detail: mapped.detail, maxOutputTokens, elapsedMs: Date.now() - startedAt });
+      // Só vale repetir quando a falha foi na resposta (corte/formato); chave, cota, modelo, rede ou IA desligada não mudam na segunda tentativa.
+      if (mapped.code !== "INVALID_STRUCTURED_OUTPUT") break;
     }
   }
   return { ...sanitizeReading(fallback), aiNote };
