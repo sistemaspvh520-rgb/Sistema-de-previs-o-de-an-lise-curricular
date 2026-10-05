@@ -113,7 +113,7 @@ function cleanDeep<T>(value: T): T {
 
 /** Garante que nenhum valor lido do PDF (local ou IA) impeça a gravação no banco. */
 export function sanitizeReading(reading: CommercialGradeReading): CommercialGradeReading {
-  return {
+  const clean = {
     ...reading,
     courseName: cleanReadingText(reading.courseName, 180),
     modality: cleanReadingText(reading.modality, 80),
@@ -124,9 +124,10 @@ export function sanitizeReading(reading: CommercialGradeReading): CommercialGrad
     totalInternshipHours: safeReadingInt(reading.totalInternshipHours),
     totalCourseHours: safeReadingInt(reading.totalCourseHours),
     internshipInfo: cleanReadingText(reading.internshipInfo),
-    whatsappSummary: cleanReadingText(reading.whatsappSummary, 8_000) ?? "",
     courseTracks: cleanDeep(reading.courseTracks),
   };
+  // O resumo é remontado só com os valores já validados: um total descartado nunca pode reaparecer no texto.
+  return { ...clean, whatsappSummary: whatsappText({ ...clean, certain: reading.source === "AI" }) };
 }
 
 function presentReading(value: GradeReading, fallback: CommercialGradeReading, source: "AI" | "LOCAL"): CommercialGradeReading {
@@ -137,17 +138,17 @@ function presentReading(value: GradeReading, fallback: CommercialGradeReading, s
   const totalCourseHours = value.totalCourseHours ?? fallback.totalCourseHours;
   const metadata = normalizeCatalogMetadata({ courseName, degree: value.degree, knowledgeArea: value.knowledgeArea, durationSemesters: value.durationSemesters });
   const courseTracks = value.tracks.map((track) => ({ ...track, internships: track.internships.sort((a, b) => a.semester - b.semester) }));
-  return { courseName, modality: value.modality?.trim() || fallback.modality, curriculumTerm: value.curriculumTerm?.trim() || fallback.curriculumTerm, hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, courseTracks, internshipInfo, whatsappSummary: whatsappText({ courseName, hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, internshipInfo }), source };
+  return { courseName, modality: value.modality?.trim() || fallback.modality, curriculumTerm: value.curriculumTerm?.trim() || fallback.curriculumTerm, hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, courseTracks, internshipInfo, whatsappSummary: whatsappText({ courseName, hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, internshipInfo, certain: true }), source };
 }
 
 function localReading(text: string, filename: string): CommercialGradeReading {
   const courseName = text.match(/Matriz Curricular\s*-\s*\d+\s*-\s*([^\n]+)/i)?.[1]?.replace(/[-–]\s*$/g, "").trim() ?? filename.replace(/\.pdf$/i, "").trim();
-  const totalInternshipHours = numberAfter(text, /Total de horas de Est[aá]gio\s*([\d.,]+)/i);
-  const totalCourseHours = numberAfter(text, /Total em Horas Rel[oó]gio\s*([\d.,]+)/i);
+  const totalInternshipHours = numberAfter(text, /Total de horas de Est[aá]gio/i, 5_000);
+  const totalCourseHours = numberAfter(text, /Total em Horas Rel[oó]gio/i, 20_000);
   const hasTcc = /\bTCC\b|TRABALHO DE CURSO|TRABALHO DE CONCLUSÃO/i.test(text);
   const internshipInfo = localInternships(text);
   const metadata = normalizeCatalogMetadata({ courseName, durationSemesters: largestSemester(text) });
-  return { courseName, modality: /GRADUAÇÃO\s+EAD/i.test(text) ? "EAD" : null, curriculumTerm: text.match(/(20\d{2}\s*\/\s*[12])/i)?.[1] ?? null, hasTcc, totalInternshipHours, totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, courseTracks: [], internshipInfo, whatsappSummary: whatsappText({ courseName, hasTcc, totalInternshipHours, totalCourseHours, internshipInfo }), source: "LOCAL" };
+  return { courseName, modality: /GRADUAÇÃO\s+EAD/i.test(text) ? "EAD" : null, curriculumTerm: text.match(/(20\d{2}\s*\/\s*[12])/i)?.[1] ?? text.match(/\b(20\d{2}\.[12])\b/)?.[1] ?? null, hasTcc, totalInternshipHours, totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, courseTracks: [], internshipInfo, whatsappSummary: whatsappText({ courseName, hasTcc, totalInternshipHours, totalCourseHours, internshipInfo, certain: false }), source: "LOCAL" };
 }
 
 function localInternships(text: string): string | null {
@@ -165,7 +166,17 @@ function localInternships(text: string): string | null {
 }
 
 function parseBullets(value: string | null): Array<{ semester: number; name: string; workload: number | null }> { return (value ?? "").split("\n").flatMap((line) => { const match = line.match(/-\s*(\d+)º\s*sem\.?:\s*(.+?)(?:\s*\((\d+)h\))?$/i); return match ? [{ semester: Number(match[1]), name: match[2], workload: match[3] ? Number(match[3]) : null }] : []; }); }
-function numberAfter(text: string, pattern: RegExp): number | null { const raw = text.match(pattern)?.[1]; if (!raw) return null; const value = Number(raw.replace(/\./g, "").replace(",", ".")); return Number.isFinite(value) ? Math.round(value) : null; }
+/**
+ * Número que vem logo depois do rótulo, em formato brasileiro (2.880 / 2880 / 2.880,00). Se o texto colado ao rótulo não for um
+ * número plausível (ex.: colunas da tabela coladas), devolve null em vez de inventar um valor.
+ */
+function numberAfter(text: string, label: RegExp, max: number): number | null {
+  const found = text.match(new RegExp(`${label.source}[\\s:.-]*((?:\\d{1,3}(?:\\.\\d{3})+|\\d+)(?:,\\d{1,2})?)(?![\\d.,])`, "i"))?.[1];
+  if (!found) return null;
+  const value = Math.round(Number(found.replace(/\./g, "").replace(",", ".")));
+  return Number.isFinite(value) && value >= 0 && value <= max ? value : null;
+}
 function largestSemester(text: string): number | null { const values = [...text.matchAll(/(?:^|\n)(\d{1,2})\s*\t\s*Descrição/gm)].map((match) => Number(match[1])).filter((value) => value > 0 && value < 30); return values.length ? Math.max(...values) : null; }
 function titleCase(value: string) { return value.toLocaleLowerCase("pt-BR").replace(/\b\p{L}/gu, (char) => char.toLocaleUpperCase("pt-BR")); }
-function whatsappText(input: { courseName: string | null; hasTcc: boolean; totalInternshipHours: number | null; totalCourseHours: number | null; internshipInfo: string | null }) { const lines = [`Matriz curricular: ${input.courseName ?? "curso selecionado"}.`]; if (input.internshipInfo) { lines.push("", "Estágios previstos:", input.internshipInfo); if (input.totalInternshipHours) lines.push("", `Ao todo, a matriz prevê ${input.totalInternshipHours.toLocaleString("pt-BR")} horas de estágio durante o curso.`); } else { lines.push("", "Uma praticidade deste curso: ele não possui estágio obrigatório, trazendo mais flexibilidade para organizar a rotina de estudos."); } if (input.hasTcc) lines.push("A matriz também prevê TCC / Trabalho de Curso."); if (input.totalCourseHours) lines.push(`Carga horária total: ${input.totalCourseHours.toLocaleString("pt-BR")} horas.`); return lines.join("\n"); }
+/** `certain`: só a leitura pela IA pode afirmar que o curso não tem estágio; a leitura local apenas não os encontrou. */
+function whatsappText(input: { courseName: string | null; hasTcc: boolean; totalInternshipHours: number | null; totalCourseHours: number | null; internshipInfo: string | null; certain: boolean }) { const lines = [`Matriz curricular: ${input.courseName ?? "curso selecionado"}.`]; if (input.internshipInfo) { lines.push("", "Estágios previstos:", input.internshipInfo); if (input.totalInternshipHours) lines.push("", `Ao todo, a matriz prevê ${input.totalInternshipHours.toLocaleString("pt-BR")} horas de estágio durante o curso.`); } else if (input.certain) { lines.push("", "Uma praticidade deste curso: ele não possui estágio obrigatório, trazendo mais flexibilidade para organizar a rotina de estudos."); } if (input.hasTcc) lines.push("A matriz também prevê TCC / Trabalho de Curso."); if (input.totalCourseHours) lines.push(`Carga horária total: ${input.totalCourseHours.toLocaleString("pt-BR")} horas.`); return lines.join("\n"); }

@@ -12,6 +12,7 @@ import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { isAiEnabled } from "@/repositories/settings-repository";
 import { COMMERCIAL_GRADE_MAX_MB } from "@/services/commercial-grades/publish";
 import { CommercialGradeUploadForm } from "@/features/commercial-grades/upload-form";
 import { CopyWhatsapp } from "@/features/commercial-grades/copy-whatsapp";
@@ -43,6 +44,7 @@ export default async function CommercialGradesPage({
 }) {
   const user = await requireUser();
   const query = await searchParams;
+  const aiEnabled = user.role === "ADMIN" ? await isAiEnabled().catch(() => true) : true;
   const filters = {
     q: one(query.q) ?? "",
     degree: one(query.degree),
@@ -120,7 +122,7 @@ export default async function CommercialGradesPage({
             </p>
           </CardHeader>
           <CardContent>
-            <CommercialGradeUploadForm maxMb={COMMERCIAL_GRADE_MAX_MB} />
+            <CommercialGradeUploadForm maxMb={COMMERCIAL_GRADE_MAX_MB} aiEnabled={aiEnabled} />
           </CardContent>
         </Card>
       )}

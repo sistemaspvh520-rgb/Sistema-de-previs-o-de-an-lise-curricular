@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { sendCommercialGradePdf } from "@/features/commercial-grades/upload-client";
 
-export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
+export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number; aiEnabled: boolean }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -49,6 +49,11 @@ export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
           </div>
         </div>
       </div>
+      {!aiEnabled && (
+        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>A IA está desligada.</strong> Sem ela, a grade é lida de forma simples e pode ficar sem estágios, vigência ou carga horária. Para a leitura completa, ative em Configurações → OpenAI e depois use “Atualizar grade” nas grades já enviadas.
+        </p>
+      )}
       <div
         role="button"
         tabIndex={0}
