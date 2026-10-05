@@ -47,7 +47,8 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    serverActions: { bodySizeLimit: "2mb" },
+    // Grades comerciais aceitam PDFs de até 20 MB; o limite anterior (2 MB) barrava o envio antes da ação rodar.
+    serverActions: { bodySizeLimit: "20mb" },
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

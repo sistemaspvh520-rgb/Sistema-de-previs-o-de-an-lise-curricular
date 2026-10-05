@@ -55,29 +55,78 @@ const INSTRUCTIONS = `Você lê matrizes curriculares brasileiras para um time c
 - decisionSemester só pode ser preenchido se o PDF disser expressamente em qual semestre o aluno escolhe/define a formação. Não deduza o período pela posição dos estágios. Se não estiver explícito, use null e explique brevemente em decisionEvidence que a matriz não informa o período.
 - Não invente estágio, carga horária, modalidade ou vigência. Retorne em português e preserve o nome da disciplina.`;
 
-/** Lê o PDF pela IA; se houver indisponibilidade, preserva informações seguras encontradas no texto local. */
+/**
+ * Lê o PDF pela IA; se houver indisponibilidade, preserva informações seguras encontradas no texto local.
+ * Nunca lança por causa do conteúdo do PDF: o que não puder ser lido vira campo vazio, para o time comercial revisar.
+ */
 export async function readCommercialGrade(bytes: Buffer, filename: string): Promise<CommercialGradeReading> {
-  const local = await parsePdf(bytes, { maxPages: 80 });
-  const fallback = localReading(local.textByPage.join("\n"), filename);
+  let text = "";
+  try {
+    const local = await parsePdf(bytes, { maxPages: 80 });
+    text = local.textByPage.join("\n");
+  } catch (error) {
+    logger.warn("commercial_grade.local_read_failed", { filename, error: String(error) });
+  }
+  const fallback = localReading(text, filename);
   try {
     const { client, config } = await getOpenAIClient({ timeoutMs: 90_000, maxRetries: 1 });
     const response = await client.responses.parse({
       model: config.extractionModel,
       instructions: INSTRUCTIONS,
       input: [{ role: "user", content: [
-        { type: "input_text", text: "Leia a matriz curricular anexada. Use o texto extraído abaixo como apoio para localizar totais e semestres.\n\n" + local.textByPage.join("\n\n") },
+        { type: "input_text", text: "Leia a matriz curricular anexada. Use o texto extraído abaixo como apoio para localizar totais e semestres.\n\n" + text },
         { type: "input_file", filename, file_data: `data:application/pdf;base64,${bytes.toString("base64")}` },
       ] }],
       text: { format: zodTextFormat(gradeReadingSchema, "commercial_grade_reading") },
       max_output_tokens: 2_500,
     });
     const parsed = response.output_parsed ? gradeReadingSchema.parse(response.output_parsed) : null;
-    if (!parsed) return fallback;
-    return presentReading(parsed, fallback, "AI");
+    if (!parsed) return sanitizeReading(fallback);
+    return sanitizeReading(presentReading(parsed, fallback, "AI"));
   } catch (error) {
     logger.warn("commercial_grade.ai_read_failed", { filename, error: String(error) });
-    return fallback;
+    return sanitizeReading(fallback);
   }
+}
+
+/** Maior valor aceito nas colunas inteiras (INT4 do PostgreSQL) com folga para carga horária/semestres reais. */
+const MAX_REASONABLE_INT = 100_000;
+
+/** Remove caracteres de controle (inclusive NUL, que o PostgreSQL rejeita) e espaços repetidos; vazio vira null. */
+export function cleanReadingText(value: string | null | undefined, maxLength = 4_000): string | null {
+  const cleaned = (value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").replace(/[ \t]+\n/g, "\n").trim();
+  return cleaned ? cleaned.slice(0, maxLength) : null;
+}
+
+/** Inteiro positivo e plausível; qualquer outra coisa (NaN, decimal, estouro) vira null. */
+export function safeReadingInt(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_REASONABLE_INT ? value : null;
+}
+
+function cleanDeep<T>(value: T): T {
+  if (typeof value === "string") return (cleanReadingText(value) ?? "") as T;
+  if (Array.isArray(value)) return value.map(cleanDeep) as T;
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cleanDeep(item)])) as T;
+  if (typeof value === "number") return (safeReadingInt(value) ?? null) as T;
+  return value;
+}
+
+/** Garante que nenhum valor lido do PDF (local ou IA) impeça a gravação no banco. */
+export function sanitizeReading(reading: CommercialGradeReading): CommercialGradeReading {
+  return {
+    ...reading,
+    courseName: cleanReadingText(reading.courseName, 180),
+    modality: cleanReadingText(reading.modality, 80),
+    curriculumTerm: cleanReadingText(reading.curriculumTerm, 40),
+    degree: cleanReadingText(reading.degree, 80),
+    knowledgeArea: cleanReadingText(reading.knowledgeArea, 80),
+    durationSemesters: safeReadingInt(reading.durationSemesters),
+    totalInternshipHours: safeReadingInt(reading.totalInternshipHours),
+    totalCourseHours: safeReadingInt(reading.totalCourseHours),
+    internshipInfo: cleanReadingText(reading.internshipInfo),
+    whatsappSummary: cleanReadingText(reading.whatsappSummary, 8_000) ?? "",
+    courseTracks: cleanDeep(reading.courseTracks),
+  };
 }
 
 function presentReading(value: GradeReading, fallback: CommercialGradeReading, source: "AI" | "LOCAL"): CommercialGradeReading {
