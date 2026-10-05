@@ -6,11 +6,12 @@ let parseImpl: () => Promise<{ textByPage: string[] }> = async () => ({ textByPa
 vi.mock("@/services/pdf/parser", () => ({ parsePdf: () => parseImpl() }));
 // Cliente de IA controlado pelo teste; por padrão, IA desligada (modo local), como em produção sem a chave geral.
 const calls: number[] = [];
+const inputs: unknown[] = [];
 let aiBehavior: (maxOutputTokens: number) => Promise<unknown> = async () => { throw new OpenAIIntegrationError("AI_DISABLED", OPENAI_ERROR_MESSAGES.AI_DISABLED); };
 vi.mock("@/services/openai/client-factory", () => ({
   getOpenAIClient: async () => ({
     config: { extractionModel: "modelo-teste" },
-    client: { responses: { parse: async (args: { max_output_tokens: number }) => { calls.push(args.max_output_tokens); return aiBehavior(args.max_output_tokens); } } },
+    client: { responses: { parse: async (args: { max_output_tokens: number; input: unknown }) => { calls.push(args.max_output_tokens); inputs.push(args.input); return aiBehavior(args.max_output_tokens); } } },
   }),
 }));
 
@@ -20,6 +21,7 @@ describe("leitura local da grade comercial (IA desligada)", () => {
   beforeEach(() => {
     parseImpl = async () => ({ textByPage: [] });
     calls.length = 0;
+    inputs.length = 0;
     aiBehavior = async () => { throw new OpenAIIntegrationError("AI_DISABLED", OPENAI_ERROR_MESSAGES.AI_DISABLED); };
   });
 
@@ -75,5 +77,30 @@ describe("leitura local da grade comercial (IA desligada)", () => {
     expect(reading).toMatchObject({ source: "AI", totalCourseHours: 1680, totalInternshipHours: 160, curriculumTerm: "2025.1" });
     expect(reading.whatsappSummary).toContain("3º sem.: Estágio em Estética I (80h)");
     expect(reading.whatsappSummary).not.toMatch(/não possui estágio/);
+  });
+
+  it("não repete a chamada quando a falha é de rede/inesperada e mostra a causa", async () => {
+    pdfText("Matriz Curricular - 20251 - CST EM ESTÉTICA E COSMÉTICA");
+    aiBehavior = async () => { throw new TypeError("Body is unusable: Body has already been read"); };
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "a.pdf");
+    expect(calls).toEqual([6_000]);
+    expect(reading.aiNote).toContain("Body is unusable");
+  });
+
+  it("envia só o texto extraído quando ele é suficiente e anexa o PDF quando é pouco (PDF escaneado)", async () => {
+    const ai = { courseName: "CST", modality: null, curriculumTerm: null, hasTcc: false, totalInternshipHours: null, totalCourseHours: null, internships: [], degree: null, knowledgeArea: null, durationSemesters: null, tracks: [] };
+    aiBehavior = async () => ({ status: "completed", output_parsed: ai });
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const types = (i: unknown) => ((i as { content: { type: string }[] }[])[0].content).map((c) => c.type);
+
+    pdfText("Matriz Curricular - 20251 - CST EM GESTÃO\n" + "Disciplina de teste 80h\n".repeat(120));
+    await readCommercialGrade(Buffer.from("x"), "a.pdf");
+    expect(types(inputs[0])).toEqual(["input_text"]);
+
+    inputs.length = 0;
+    pdfText("Matriz Curricular - 20251 - CST EM GESTÃO");
+    await readCommercialGrade(Buffer.from("x"), "a.pdf");
+    expect(types(inputs[0])).toEqual(["input_text", "input_file"]);
   });
 });
