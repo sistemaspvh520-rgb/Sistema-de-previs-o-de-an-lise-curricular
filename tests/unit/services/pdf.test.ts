@@ -50,3 +50,67 @@ describe("redação LGPD", () => {
     expect(out).not.toContain("123.456.789-09");
   });
 });
+
+/** PDF mínimo de uma página. `rotate`: como a matriz do SIAA (/Rotate 90 e texto girado com Tm 0 1 -1 0). */
+function buildPdf(items: Array<{ e: number; f: number; text: string }>, opts: { rotate?: boolean } = {}): Buffer {
+  const matrix = opts.rotate ? "0 1 -1 0" : "1 0 0 1";
+  const stream = items.map((item) => `BT /F1 8 Tf ${matrix} ${item.e} ${item.f} Tm (${item.text}) Tj ET`).join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 ${opts.rotate ? 745 : 842}] ${opts.rotate ? "/Rotate 90 " : ""}/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>`,
+    `<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = objects.map((object, index) => {
+    const offset = Buffer.byteLength(body, "latin1");
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    return offset;
+  });
+  const xref = Buffer.byteLength(body, "latin1");
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("")}`;
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(body, "latin1");
+}
+
+describe("parser pdf.js: páginas giradas", () => {
+  it("lê páginas em paisagem (/Rotate 90) por linhas, como são exibidas", async () => {
+    const parsed = await parsePdf(buildPdf([
+      { e: 20, f: 5, text: "Serie: 7" },
+      { e: 20, f: 200, text: "Grade:" },
+      { e: 65, f: 13, text: "12998" },
+      { e: 65, f: 48, text: "ESTAGIO SUPERVISIONADO" },
+      { e: 65, f: 615, text: "Estagio" },
+    ], { rotate: true }));
+    const page = parsed.pages[0];
+    expect(page.width).toBe(745);
+    expect(page.height).toBe(595);
+    expect(page.lines.map((line) => line.text)).toEqual(["Serie: 7\tGrade:", "12998\tESTAGIO SUPERVISIONADO\tEstagio"]);
+    expect(page.lines[0].y).toBeGreaterThan(page.lines[1].y);
+  });
+});
+
+describe("cabeçalho da matrícula unificada", () => {
+  const labels = [
+    { e: 58, f: 740, text: "CAMPUS / UNIDADE" },
+    { e: 224, f: 740, text: "CURSO" },
+    { e: 390, f: 740, text: "SEMESTRE DE ENTRADA" },
+    { e: 58, f: 707, text: "DATA DA ANÁLISE" },
+    { e: 224, f: 707, text: "SITUAÇÃO DE INGRESSO" },
+    { e: 58, f: 696, text: "02/10/2026" },
+    { e: 224, f: 696, text: "Aprovado" },
+  ];
+
+  it("lê campus, curso e semestre sem levar junto os rótulos da linha seguinte", async () => {
+    const parsed = await parsePdf(buildPdf([...labels, { e: 58, f: 729, text: "CRUZEIRO - GRADUAÇÃO EAD" }, { e: 224, f: 729, text: "PEDAGOGIA (LICENCIATURA)" }, { e: 390, f: 729, text: "4º Semestre" }]));
+    expect(parsed.headerFields).toMatchObject({ campus: "CRUZEIRO - GRADUAÇÃO EAD", curso: "PEDAGOGIA (LICENCIATURA)", "semestre de entrada": "4º Semestre" });
+  });
+
+  it("campos em branco no SIAA continuam em branco (não viram 'DATA DA ANÁLISE')", async () => {
+    const parsed = await parsePdf(buildPdf([...labels, { e: 390, f: 729, text: "º Semestre" }]));
+    expect(parsed.headerFields?.campus).toBeUndefined();
+    expect(parsed.headerFields?.curso).toBeUndefined();
+    expect(parsed.headerFields?.["semestre de entrada"]).toBe("º Semestre");
+  });
+});

@@ -1,8 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OPENAI_ERROR_MESSAGES, OpenAIIntegrationError } from "@/services/openai/errors";
+import type { ParsedPage, TextLine } from "@/services/pdf/parser";
+
+/** Páginas da matriz do SIAA já endireitadas pelo parser (série 8 com estágio e TCC + resumo). */
+function siaaPages(opts: { internship: string; withInternship?: boolean }): ParsedPage[] {
+  const line = (y: number, parts: Array<[number, string]>): TextLine => ({ x: parts[0][0], y, w: 700, h: 8, text: parts.map((p) => p[1]).join("\t"), parts: parts.map(([x, text]) => ({ x, w: text.length * 4.5, text })) });
+  const row = (y: number, code: string, workload: string, type: string) => line(y, [[13, code], [265, "-"], [339, workload], [615, type]]);
+  return [
+    { page: 1, width: 745, height: 595, lines: [
+      line(579, [[5, "GRADUAÇÃO EAD (UCS/UNC/UNF)"]]),
+      line(559, [[254, "Matriz Curricular - 91 - NUTRIÇÃO (BACHARELADO) (4.0)"]]),
+      line(421, [[5, "Série: 8"], [79, "Seq.: 20252"]]),
+      line(397, [[43, "Descrição"], [327, "H. Relogio"]]),
+      ...(opts.withInternship === false ? [] : [line(377, [[48, "ESTÁGIO CURRICULAR SUPERVISIONADO"]]), row(373, "12999", "214", "Estágio"), line(367, [[48, "EM NUTRIÇÃO CLÍNICA"]])]),
+      line(357, [[48, "TRABALHO DE CONCLUSÃO DE CURSO EM"]]),
+      row(353, "14265", "40", "TCC"),
+      line(347, [[48, "NUTRIÇÃO: PRODUÇÃO"]]),
+    ] },
+    { page: 2, width: 745, height: 595, lines: [
+      line(534, [[21, "Estágio Curricular Supervisionado"], [279, "-"], [517, opts.internship]]),
+      line(438, [[21, "Total em Horas Relógio"], [393, "3200"]]),
+    ] },
+  ];
+}
 
 // Função simples (não vi.fn): o Vitest marca como falha um vi.fn que lança, mesmo quando o código sob teste trata o erro.
-let parseImpl: () => Promise<{ textByPage: string[] }> = async () => ({ textByPage: [] });
+let parseImpl: () => Promise<{ textByPage: string[]; pages?: ParsedPage[] }> = async () => ({ textByPage: [] });
 vi.mock("@/services/pdf/parser", () => ({ parsePdf: () => parseImpl() }));
 // Cliente de IA controlado pelo teste; por padrão, IA desligada (modo local), como em produção sem a chave geral.
 const calls: number[] = [];
@@ -58,13 +81,33 @@ describe("leitura local da grade comercial (IA desligada)", () => {
     expect(reading.totalCourseHours).toBeNull();
   });
 
-  it("informa o motivo quando a IA falha e não repete tentativa inútil (IA desligada)", async () => {
+  it("IA desligada não é falha: segue com o PDF, sem aviso de IA indisponível e sem repetir", async () => {
     pdfText("Matriz Curricular - 20251 - CST EM ESTÉTICA E COSMÉTICA");
     const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
     const reading = await readCommercialGrade(Buffer.from("x"), "a.pdf");
     expect(reading.source).toBe("LOCAL");
-    expect(reading.aiNote).toMatch(/IA está desativada/);
+    expect(reading.aiNote).toBeNull();
+    expect(reading.complete).toBe(false);
     expect(calls).toEqual([6_000]);
+  });
+
+  it("matriz do SIAA lida por inteiro no PDF: não chama a IA", async () => {
+    parseImpl = async () => ({ textByPage: ["x"], pages: siaaPages({ internship: "640" }) });
+    aiBehavior = async () => { throw new Error("a IA não deveria ser chamada"); };
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "NUTRIÇÃO.PDF");
+    expect(calls).toEqual([]);
+    expect(reading).toMatchObject({ source: "LOCAL", aiNote: null, complete: true, courseName: "NUTRIÇÃO (BACHARELADO)", modality: "EAD", curriculumTerm: "2025.2", degree: "Bacharelado", knowledgeArea: "Saúde", durationSemesters: 8, totalInternshipHours: 640, totalCourseHours: 3200, hasTcc: true });
+    expect(reading.whatsappSummary).toContain("- 8º sem.: ESTÁGIO CURRICULAR SUPERVISIONADO EM NUTRIÇÃO CLÍNICA (214h)");
+    expect(reading.whatsappSummary).toContain("Ao todo, a matriz prevê 640 horas de estágio durante o curso.");
+  });
+
+  it("informa que não há estágio quando o resumo do PDF declara estágio zerado", async () => {
+    parseImpl = async () => ({ textByPage: ["x"], pages: siaaPages({ internship: "-", withInternship: false }) });
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "a.pdf");
+    expect(reading.totalInternshipHours).toBe(0);
+    expect(reading.whatsappSummary).toMatch(/não possui estágio obrigatório/);
   });
 
   it("repete com mais espaço de saída quando a resposta da IA vem cortada e usa o resultado da IA", async () => {

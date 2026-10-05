@@ -2,11 +2,12 @@ import "server-only";
 
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
-import { parsePdf } from "@/services/pdf/parser";
+import { parsePdf, type ParsedPage } from "@/services/pdf/parser";
 import { getOpenAIClient } from "@/services/openai/client-factory";
 import { formatIntegrationError, mapOpenAIError } from "@/services/openai/errors";
 import { logger } from "@/lib/logger";
 import { normalizeCatalogMetadata, type CommercialTrack } from "@/services/commercial-grades/course-metadata";
+import { readMatrixLayout, type MatrixLayoutReading } from "@/services/commercial-grades/matrix-layout";
 
 const gradeReadingSchema = z.object({
   courseName: z.string().nullable(),
@@ -43,8 +44,10 @@ export interface CommercialGradeReading {
   internshipInfo: string | null;
   whatsappSummary: string;
   source: "AI" | "LOCAL";
-  /** Quando a leitura caiu no modo local, o motivo (legível) pelo qual a IA não foi usada. */
+  /** Quando a IA foi necessária e falhou, o motivo (legível). IA desligada ou dispensada não gera aviso. */
   aiNote?: string | null;
+  /** false quando o PDF não trouxe curso, carga horária total ou duração (o time precisa conferir). */
+  complete?: boolean;
 }
 
 const INSTRUCTIONS = `Você lê matrizes curriculares brasileiras para um time comercial. Extraia somente dados comprovados pelo PDF.
@@ -64,18 +67,27 @@ const AI_BUDGET_MS = 100_000;
 const TEXT_ONLY_MIN_CHARS = 1_500;
 
 /**
- * Lê o PDF pela IA; se houver indisponibilidade, preserva informações seguras encontradas no texto local.
+ * Lê a grade direto do PDF (layout da "Matriz Curricular" do SIAA). A IA só entra quando o PDF não traz curso, carga
+ * horária total ou duração (ex.: PDF escaneado ou outro layout) e o interruptor de IA está ligado; nesse caso o que foi
+ * lido do PDF prevalece e a IA completa o resto.
  * Nunca lança por causa do conteúdo do PDF: o que não puder ser lido vira campo vazio, para o time comercial revisar.
  */
 export async function readCommercialGrade(bytes: Buffer, filename: string): Promise<CommercialGradeReading> {
   let text = "";
+  let pages: ParsedPage[] | undefined;
   try {
     const local = await parsePdf(bytes, { maxPages: 80 });
     text = local.textByPage.join("\n");
+    pages = local.pages;
   } catch (error) {
     logger.warn("commercial_grade.local_read_failed", { filename, error: String(error) });
   }
-  const fallback = localReading(text, filename);
+  const layout = readMatrixLayout(pages);
+  if (layout && layoutComplete(layout)) return { ...sanitizeReading(layoutReading(layout, filename)), aiNote: null, complete: true };
+  const fromPdf = layout ? layoutReading(layout, filename) : null;
+  const legacy = localReading(text, filename);
+  const fallback = fromPdf ? mergeReadings(fromPdf, legacy) : legacy;
+  const complete = Boolean(fallback.courseName && fallback.totalCourseHours !== null && fallback.durationSemesters !== null);
   let aiNote: string | null = null;
   // Texto local suficiente dispensa o PDF (base64 de até 4 MB, mais tokens e muito mais lento); PDF escaneado segue anexado.
   const textOnly = text.trim().length >= TEXT_ONLY_MIN_CHARS;
@@ -100,18 +112,44 @@ export async function readCommercialGrade(bytes: Buffer, filename: string): Prom
         max_output_tokens: maxOutputTokens,
       });
       const parsed = response.output_parsed ? gradeReadingSchema.parse(response.output_parsed) : null;
-      if (parsed) return sanitizeReading(presentReading(parsed, fallback, "AI"));
+      if (parsed) return { ...sanitizeReading(presentReading(parsed, fallback, "AI", Boolean(fromPdf))), complete: true };
       aiNote = response.status === "incomplete" ? "a resposta da IA veio incompleta" : "a IA não devolveu os dados no formato esperado";
       logger.warn("commercial_grade.ai_read_empty", { filename, status: response.status, reason: response.incomplete_details?.reason, maxOutputTokens });
     } catch (error) {
       const mapped = mapOpenAIError(error);
+      // IA desligada é uma escolha, não uma falha: a grade segue com o que o PDF trouxe.
+      if (mapped.code === "AI_DISABLED") break;
       aiNote = formatIntegrationError(mapped).replace(/\.$/, "");
       logger.warn("commercial_grade.ai_read_failed", { filename, code: mapped.code, status: mapped.status, detail: mapped.detail, maxOutputTokens, elapsedMs: Date.now() - startedAt });
       // Só vale repetir quando a falha foi na resposta (corte/formato); chave, cota, modelo, rede ou IA desligada não mudam na segunda tentativa.
       if (mapped.code !== "INVALID_STRUCTURED_OUTPUT") break;
     }
   }
-  return { ...sanitizeReading(fallback), aiNote };
+  return { ...sanitizeReading(fallback), aiNote, complete };
+}
+
+/** Curso, carga total e duração: com eles a grade do SIAA está lida por inteiro e a IA não é chamada. */
+function layoutComplete(layout: MatrixLayoutReading): boolean {
+  return Boolean(layout.courseName && layout.totalCourseHours !== null && layout.durationSemesters !== null && layout.componentCount > 0);
+}
+
+/** Layout parcial: o que veio das colunas do SIAA prevalece; os rótulos do texto corrido completam o resto. */
+function mergeReadings(layout: CommercialGradeReading, text: CommercialGradeReading): CommercialGradeReading {
+  const courseName = layout.courseName ?? text.courseName;
+  const internshipInfo = layout.internshipInfo ?? text.internshipInfo;
+  const totalInternshipHours = layout.totalInternshipHours ?? text.totalInternshipHours;
+  const totalCourseHours = layout.totalCourseHours ?? text.totalCourseHours;
+  const hasTcc = layout.hasTcc || text.hasTcc;
+  const metadata = normalizeCatalogMetadata({ courseName, durationSemesters: layout.durationSemesters ?? text.durationSemesters });
+  return { ...layout, courseName, modality: layout.modality ?? text.modality, curriculumTerm: layout.curriculumTerm ?? text.curriculumTerm, hasTcc, totalInternshipHours, totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, internshipInfo, whatsappSummary: whatsappText({ courseName, hasTcc, totalInternshipHours, totalCourseHours, internshipInfo, certain: false }) };
+}
+
+function layoutReading(layout: MatrixLayoutReading, filename: string): CommercialGradeReading {
+  const courseName = layout.courseName ?? filename.replace(/\.pdf$/i, "").trim();
+  const internshipInfo = layout.internships.length ? layout.internships.map((item) => `- ${item.semester}º sem.: ${item.name}${item.workload ? ` (${item.workload}h)` : ""}`).join("\n") : null;
+  const metadata = normalizeCatalogMetadata({ courseName, durationSemesters: layout.durationSemesters });
+  const reading = { courseName, modality: layout.modality, curriculumTerm: layout.curriculumTerm, hasTcc: layout.hasTcc, totalInternshipHours: layout.totalInternshipHours, totalCourseHours: layout.totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, courseTracks: layout.tracks, internshipInfo };
+  return { ...reading, whatsappSummary: whatsappText({ ...reading, certain: false }), source: "LOCAL" };
 }
 
 /** Maior valor aceito nas colunas inteiras (INT4 do PostgreSQL) com folga para carga horária/semestres reais. */
@@ -155,15 +193,18 @@ export function sanitizeReading(reading: CommercialGradeReading): CommercialGrad
   return { ...clean, whatsappSummary: whatsappText({ ...clean, certain: reading.source === "AI" }) };
 }
 
-function presentReading(value: GradeReading, fallback: CommercialGradeReading, source: "AI" | "LOCAL"): CommercialGradeReading {
-  const internships = value.internships.length ? value.internships.sort((a, b) => a.semester - b.semester) : parseBullets(fallback.internshipInfo);
+/** `pdfFirst`: os campos lidos do layout do SIAA são exatos; a IA só preenche o que o PDF não trouxe. */
+function presentReading(value: GradeReading, fallback: CommercialGradeReading, source: "AI" | "LOCAL", pdfFirst = false): CommercialGradeReading {
+  const pick = <T>(pdf: T | null | undefined, ai: T | null | undefined): T | null => (pdfFirst ? (pdf ?? ai) : (ai ?? pdf)) ?? null;
+  const aiInternships = value.internships.length ? value.internships.sort((a, b) => a.semester - b.semester) : parseBullets(fallback.internshipInfo);
+  const internships = pdfFirst && fallback.internshipInfo ? parseBullets(fallback.internshipInfo) : aiInternships;
   const internshipInfo = internships.length ? internships.map((item) => `- ${item.semester}º sem.: ${item.name}${item.workload ? ` (${item.workload}h)` : ""}`).join("\n") : fallback.internshipInfo;
-  const courseName = value.courseName?.trim() || fallback.courseName;
-  const totalInternshipHours = value.totalInternshipHours ?? fallback.totalInternshipHours;
-  const totalCourseHours = value.totalCourseHours ?? fallback.totalCourseHours;
-  const metadata = normalizeCatalogMetadata({ courseName, degree: value.degree, knowledgeArea: value.knowledgeArea, durationSemesters: value.durationSemesters });
-  const courseTracks = value.tracks.map((track) => ({ ...track, internships: track.internships.sort((a, b) => a.semester - b.semester) }));
-  return { courseName, modality: value.modality?.trim() || fallback.modality, curriculumTerm: value.curriculumTerm?.trim() || fallback.curriculumTerm, hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, courseTracks, internshipInfo, whatsappSummary: whatsappText({ courseName, hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, internshipInfo, certain: true }), source };
+  const courseName = pick(fallback.courseName, value.courseName?.trim() || null) ?? fallback.courseName;
+  const totalInternshipHours = pick(fallback.totalInternshipHours, value.totalInternshipHours);
+  const totalCourseHours = pick(fallback.totalCourseHours, value.totalCourseHours);
+  const metadata = normalizeCatalogMetadata({ courseName, degree: value.degree, knowledgeArea: value.knowledgeArea, durationSemesters: pick(fallback.durationSemesters, value.durationSemesters) });
+  const courseTracks = pdfFirst && fallback.courseTracks.length ? fallback.courseTracks : value.tracks.map((track) => ({ ...track, internships: track.internships.sort((a, b) => a.semester - b.semester) }));
+  return { courseName, modality: pick(fallback.modality, value.modality?.trim() || null), curriculumTerm: pick(fallback.curriculumTerm, value.curriculumTerm?.trim() || null), hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, degree: metadata.degree, knowledgeArea: metadata.knowledgeArea, durationSemesters: metadata.durationSemesters, courseTracks, internshipInfo, whatsappSummary: whatsappText({ courseName, hasTcc: value.hasTcc || fallback.hasTcc, totalInternshipHours, totalCourseHours, internshipInfo, certain: true }), source };
 }
 
 function localReading(text: string, filename: string): CommercialGradeReading {
@@ -203,5 +244,5 @@ function numberAfter(text: string, label: RegExp, max: number): number | null {
 }
 function largestSemester(text: string): number | null { const values = [...text.matchAll(/(?:^|\n)(\d{1,2})\s*\t\s*Descrição/gm)].map((match) => Number(match[1])).filter((value) => value > 0 && value < 30); return values.length ? Math.max(...values) : null; }
 function titleCase(value: string) { return value.toLocaleLowerCase("pt-BR").replace(/\b\p{L}/gu, (char) => char.toLocaleUpperCase("pt-BR")); }
-/** `certain`: só a leitura pela IA pode afirmar que o curso não tem estágio; a leitura local apenas não os encontrou. */
-function whatsappText(input: { courseName: string | null; hasTcc: boolean; totalInternshipHours: number | null; totalCourseHours: number | null; internshipInfo: string | null; certain: boolean }) { const lines = [`Matriz curricular: ${input.courseName ?? "curso selecionado"}.`]; if (input.internshipInfo) { lines.push("", "Estágios previstos:", input.internshipInfo); if (input.totalInternshipHours) lines.push("", `Ao todo, a matriz prevê ${input.totalInternshipHours.toLocaleString("pt-BR")} horas de estágio durante o curso.`); } else if (input.certain) { lines.push("", "Uma praticidade deste curso: ele não possui estágio obrigatório, trazendo mais flexibilidade para organizar a rotina de estudos."); } if (input.hasTcc) lines.push("A matriz também prevê TCC / Trabalho de Curso."); if (input.totalCourseHours) lines.push(`Carga horária total: ${input.totalCourseHours.toLocaleString("pt-BR")} horas.`); return lines.join("\n"); }
+/** `certain`: a IA leu o curso inteiro. Sem ela, só um total de estágio declarado como 0 no PDF permite afirmar que não há estágio. */
+function whatsappText(input: { courseName: string | null; hasTcc: boolean; totalInternshipHours: number | null; totalCourseHours: number | null; internshipInfo: string | null; certain: boolean }) { const lines = [`Matriz curricular: ${input.courseName ?? "curso selecionado"}.`]; if (input.internshipInfo) { lines.push("", "Estágios previstos:", input.internshipInfo); if (input.totalInternshipHours) lines.push("", `Ao todo, a matriz prevê ${input.totalInternshipHours.toLocaleString("pt-BR")} horas de estágio durante o curso.`); } else if (input.certain || input.totalInternshipHours === 0) { lines.push("", "Uma praticidade deste curso: ele não possui estágio obrigatório, trazendo mais flexibilidade para organizar a rotina de estudos."); } if (input.hasTcc) lines.push("A matriz também prevê TCC / Trabalho de Curso."); if (input.totalCourseHours) lines.push(`Carga horária total: ${input.totalCourseHours.toLocaleString("pt-BR")} horas.`); return lines.join("\n"); }

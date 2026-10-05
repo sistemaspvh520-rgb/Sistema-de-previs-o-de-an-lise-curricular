@@ -55,9 +55,15 @@ export async function publishCommercialGrade(input: { bytes: Buffer; filename: s
     // A grade já está publicada: uma falha só na auditoria não deve acusar erro ao usuário.
     logger.error("commercial_grade.audit_failed", { id, error: String(error) });
   }
-  const ai = reading.source === "AI";
+  return { ok: true, id, message: publishMessage(reading, Boolean(previous)) };
+}
+
+/** A leitura do PDF é o caminho normal; aviso só quando faltou dado e, se a IA foi tentada, o motivo da falha. */
+export function publishMessage(reading: Pick<CommercialGradeReading, "source" | "aiNote" | "complete">, updated: boolean): string {
+  if (reading.source === "AI") return updated ? "Grade atualizada e completada pela IA; confira os dados antes do envio." : "Grade lida e completada pela IA e disponibilizada para o time comercial; confira os dados antes do envio.";
+  if (reading.complete !== false) return updated ? "Grade atualizada a partir do PDF; confira os dados antes do envio." : "Grade lida do PDF e disponibilizada para o time comercial; confira os dados antes do envio.";
   const why = reading.aiNote ? ` (IA indisponível: ${reading.aiNote})` : "";
-  return { ok: true, id, message: previous ? (ai ? "Grade atualizada e lida novamente pela IA." : `Grade atualizada com leitura simples${why}; revise os dados antes do envio.`) : (ai ? "Grade lida pela IA e disponibilizada para o time comercial." : `Grade disponibilizada com leitura simples${why}; revise os dados antes do envio.`) };
+  return `${updated ? "Grade atualizada" : "Grade disponibilizada"}, mas o PDF não trouxe todos os dados (curso, carga horária ou duração)${why}; revise antes do envio.`;
 }
 
 function gradeData(reading: CommercialGradeReading, own: { courseName: string; contentHash: string; catalogKey: string; originalName: string; storageKey: string; sizeBytes: number; uploadedById: string }) {
