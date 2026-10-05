@@ -56,7 +56,9 @@ export async function publishCommercialGrade(input: { bytes: Buffer; filename: s
     logger.error("commercial_grade.audit_failed", { id, error: String(error) });
   }
   const ai = reading.source === "AI";
+  // Sem aiNote a IA não foi usada de propósito: a leitura do PDF é o caminho normal, não um aviso.
   const why = reading.aiNote ? ` (IA indisponível: ${reading.aiNote})` : "";
+  if (!ai && !reading.aiNote) return { ok: true, id, message: previous ? "Grade atualizada a partir do PDF; confira os dados antes do envio." : "Grade lida do PDF e disponibilizada para o time comercial; confira os dados antes do envio." };
   return { ok: true, id, message: previous ? (ai ? "Grade atualizada e lida novamente pela IA." : `Grade atualizada com leitura simples${why}; revise os dados antes do envio.`) : (ai ? "Grade lida pela IA e disponibilizada para o time comercial." : `Grade disponibilizada com leitura simples${why}; revise os dados antes do envio.`) };
 }
 

@@ -19,6 +19,7 @@ const pdfText = (text: string) => { parseImpl = async () => ({ textByPage: [text
 
 describe("leitura local da grade comercial (IA desligada)", () => {
   beforeEach(() => {
+    process.env.COMMERCIAL_GRADES_USE_AI = "true";
     parseImpl = async () => ({ textByPage: [] });
     calls.length = 0;
     inputs.length = 0;
@@ -102,5 +103,23 @@ describe("leitura local da grade comercial (IA desligada)", () => {
     pdfText("Matriz Curricular - 20251 - CST EM GESTÃO");
     await readCommercialGrade(Buffer.from("x"), "a.pdf");
     expect(types(inputs[0])).toEqual(["input_text", "input_file"]);
+  });
+
+  it("por padrão lê só o PDF: não chama a IA e não gera aviso de IA indisponível", async () => {
+    delete process.env.COMMERCIAL_GRADES_USE_AI;
+    pdfText("Matriz Curricular - 20252 - CST EM RADIOLOGIA\nGRADUAÇÃO EAD\nTotal de horas de Estágio 480\nTotal em Horas Relógio 2.880\nTCC");
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "a.pdf");
+    expect(calls).toEqual([]);
+    expect(reading).toMatchObject({ source: "LOCAL", aiNote: null, courseName: "CST EM RADIOLOGIA", modality: "EAD", degree: "Tecnólogo", knowledgeArea: "Saúde", totalInternshipHours: 480, totalCourseHours: 2880, hasTcc: true });
+  });
+
+  it("informa que não há estágio quando o PDF declara 0 hora de estágio", async () => {
+    delete process.env.COMMERCIAL_GRADES_USE_AI;
+    pdfText("Matriz Curricular - 20252 - CST EM GESTÃO\nTotal de horas de Estágio 0\nTotal em Horas Relógio 1.680");
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "a.pdf");
+    expect(reading.totalInternshipHours).toBe(0);
+    expect(reading.whatsappSummary).toMatch(/não possui estágio obrigatório/);
   });
 });

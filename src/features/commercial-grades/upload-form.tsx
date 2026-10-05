@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { sendCommercialGradePdf } from "@/features/commercial-grades/upload-client";
 
-export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number; aiEnabled: boolean }) {
+export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -44,16 +44,11 @@ export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number;
         <div className="flex gap-3">
           <span className="rounded-lg bg-brand-navy p-2 text-white"><Bot className="size-5" /></span>
           <div>
-            <p className="font-medium text-brand-navy">Leitura automática da grade</p>
-            <p className="mt-1 text-sm text-muted-foreground">A IA identifica curso, estágios obrigatórios, TCC, carga horária e prepara a mensagem comercial.</p>
+            <p className="font-medium text-brand-navy">Leitura automática do PDF</p>
+            <p className="mt-1 text-sm text-muted-foreground">O sistema lê o PDF e identifica curso, grau, área, duração, estágios obrigatórios, TCC e carga horária, e prepara a mensagem comercial. Confira os dados antes de enviar.</p>
           </div>
         </div>
       </div>
-      {!aiEnabled && (
-        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <strong>A IA está desligada.</strong> Sem ela, a grade é lida de forma simples e pode ficar sem estágios, vigência ou carga horária. Para a leitura completa, ative em Configurações → OpenAI e depois use “Atualizar grade” nas grades já enviadas.
-        </p>
-      )}
       <div
         role="button"
         tabIndex={0}
