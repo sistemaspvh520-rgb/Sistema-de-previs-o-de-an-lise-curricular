@@ -58,6 +58,11 @@ const INSTRUCTIONS = `Você lê matrizes curriculares brasileiras para um time c
 - decisionSemester só pode ser preenchido se o PDF disser expressamente em qual semestre o aluno escolhe/define a formação. Não deduza o período pela posição dos estágios. Se não estiver explícito, use null e explique brevemente em decisionEvidence que a matriz não informa o período.
 - Não invente estágio, carga horária, modalidade ou vigência. Retorne em português e preserve o nome da disciplina.`;
 
+/** A leitura da grade é feita só pelo PDF (determinística); a IA é opcional e fica desligada, a menos que COMMERCIAL_GRADES_USE_AI=true. */
+export function commercialGradeAiEnabled(): boolean {
+  return process.env.COMMERCIAL_GRADES_USE_AI === "true";
+}
+
 /** Tempo total reservado à IA (as rotas de envio têm maxDuration de 120 s). */
 const AI_BUDGET_MS = 100_000;
 /** A partir deste tamanho o texto extraído localmente basta e o PDF não é reenviado à IA. */
@@ -76,6 +81,7 @@ export async function readCommercialGrade(bytes: Buffer, filename: string): Prom
     logger.warn("commercial_grade.local_read_failed", { filename, error: String(error) });
   }
   const fallback = localReading(text, filename);
+  if (!commercialGradeAiEnabled()) return { ...sanitizeReading(fallback), aiNote: null };
   let aiNote: string | null = null;
   // Texto local suficiente dispensa o PDF (base64 de até 4 MB, mais tokens e muito mais lento); PDF escaneado segue anexado.
   const textOnly = text.trim().length >= TEXT_ONLY_MIN_CHARS;
@@ -204,4 +210,4 @@ function numberAfter(text: string, label: RegExp, max: number): number | null {
 function largestSemester(text: string): number | null { const values = [...text.matchAll(/(?:^|\n)(\d{1,2})\s*\t\s*Descrição/gm)].map((match) => Number(match[1])).filter((value) => value > 0 && value < 30); return values.length ? Math.max(...values) : null; }
 function titleCase(value: string) { return value.toLocaleLowerCase("pt-BR").replace(/\b\p{L}/gu, (char) => char.toLocaleUpperCase("pt-BR")); }
 /** `certain`: só a leitura pela IA pode afirmar que o curso não tem estágio; a leitura local apenas não os encontrou. */
-function whatsappText(input: { courseName: string | null; hasTcc: boolean; totalInternshipHours: number | null; totalCourseHours: number | null; internshipInfo: string | null; certain: boolean }) { const lines = [`Matriz curricular: ${input.courseName ?? "curso selecionado"}.`]; if (input.internshipInfo) { lines.push("", "Estágios previstos:", input.internshipInfo); if (input.totalInternshipHours) lines.push("", `Ao todo, a matriz prevê ${input.totalInternshipHours.toLocaleString("pt-BR")} horas de estágio durante o curso.`); } else if (input.certain) { lines.push("", "Uma praticidade deste curso: ele não possui estágio obrigatório, trazendo mais flexibilidade para organizar a rotina de estudos."); } if (input.hasTcc) lines.push("A matriz também prevê TCC / Trabalho de Curso."); if (input.totalCourseHours) lines.push(`Carga horária total: ${input.totalCourseHours.toLocaleString("pt-BR")} horas.`); return lines.join("\n"); }
+function whatsappText(input: { courseName: string | null; hasTcc: boolean; totalInternshipHours: number | null; totalCourseHours: number | null; internshipInfo: string | null; certain: boolean }) { const lines = [`Matriz curricular: ${input.courseName ?? "curso selecionado"}.`]; if (input.internshipInfo) { lines.push("", "Estágios previstos:", input.internshipInfo); if (input.totalInternshipHours) lines.push("", `Ao todo, a matriz prevê ${input.totalInternshipHours.toLocaleString("pt-BR")} horas de estágio durante o curso.`); } else if (input.certain || input.totalInternshipHours === 0) { lines.push("", "Uma praticidade deste curso: ele não possui estágio obrigatório, trazendo mais flexibilidade para organizar a rotina de estudos."); } if (input.hasTcc) lines.push("A matriz também prevê TCC / Trabalho de Curso."); if (input.totalCourseHours) lines.push(`Carga horária total: ${input.totalCourseHours.toLocaleString("pt-BR")} horas.`); return lines.join("\n"); }
