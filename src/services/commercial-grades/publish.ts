@@ -50,13 +50,14 @@ export async function publishCommercialGrade(input: { bytes: Buffer; filename: s
   }
   if (previous) await getStorage().delete(previous.storageKey).catch(() => undefined);
   try {
-    await recordAudit({ userId, action: previous ? "commercial_grade.update" : "commercial_grade.upload", entityType: "CommercialGrade", entityId: id, metadata: { courseName, originalName: filename, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, source: reading.source } });
+    await recordAudit({ userId, action: previous ? "commercial_grade.update" : "commercial_grade.upload", entityType: "CommercialGrade", entityId: id, metadata: { courseName, originalName: filename, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, source: reading.source, aiNote: reading.aiNote ?? null } });
   } catch (error) {
     // A grade já está publicada: uma falha só na auditoria não deve acusar erro ao usuário.
     logger.error("commercial_grade.audit_failed", { id, error: String(error) });
   }
   const ai = reading.source === "AI";
-  return { ok: true, id, message: previous ? (ai ? "Grade atualizada e lida novamente pela IA." : "Grade atualizada; a leitura local precisa de revisão.") : (ai ? "Grade lida pela IA e disponibilizada para o time comercial." : "Grade disponibilizada com leitura local; revise os dados antes do envio.") };
+  const why = reading.aiNote ? ` (IA indisponível: ${reading.aiNote})` : "";
+  return { ok: true, id, message: previous ? (ai ? "Grade atualizada e lida novamente pela IA." : `Grade atualizada com leitura simples${why}; revise os dados antes do envio.`) : (ai ? "Grade lida pela IA e disponibilizada para o time comercial." : `Grade disponibilizada com leitura simples${why}; revise os dados antes do envio.`) };
 }
 
 function gradeData(reading: CommercialGradeReading, own: { courseName: string; contentHash: string; catalogKey: string; originalName: string; storageKey: string; sizeBytes: number; uploadedById: string }) {

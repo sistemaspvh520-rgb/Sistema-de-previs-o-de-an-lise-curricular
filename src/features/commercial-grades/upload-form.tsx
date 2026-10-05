@@ -33,7 +33,7 @@ export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number;
     const result = await sendCommercialGradePdf("/api/commercial-grades/upload", file);
     setSending(false);
     if (!result.ok) return void toast.error(result.error);
-    toast.success(result.message);
+    (/leitura simples/.test(result.message) ? toast.warning : toast.success)(result.message, { duration: 12_000 });
     clear();
     router.refresh();
   }

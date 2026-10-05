@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import { parsePdf } from "@/services/pdf/parser";
 import { getOpenAIClient } from "@/services/openai/client-factory";
+import { mapOpenAIError } from "@/services/openai/errors";
 import { logger } from "@/lib/logger";
 import { normalizeCatalogMetadata, type CommercialTrack } from "@/services/commercial-grades/course-metadata";
 
@@ -42,6 +43,8 @@ export interface CommercialGradeReading {
   internshipInfo: string | null;
   whatsappSummary: string;
   source: "AI" | "LOCAL";
+  /** Quando a leitura caiu no modo local, o motivo (legível) pelo qual a IA não foi usada. */
+  aiNote?: string | null;
 }
 
 const INSTRUCTIONS = `Você lê matrizes curriculares brasileiras para um time comercial. Extraia somente dados comprovados pelo PDF.
@@ -68,25 +71,34 @@ export async function readCommercialGrade(bytes: Buffer, filename: string): Prom
     logger.warn("commercial_grade.local_read_failed", { filename, error: String(error) });
   }
   const fallback = localReading(text, filename);
-  try {
-    const { client, config } = await getOpenAIClient({ timeoutMs: 90_000, maxRetries: 1 });
-    const response = await client.responses.parse({
-      model: config.extractionModel,
-      instructions: INSTRUCTIONS,
-      input: [{ role: "user", content: [
-        { type: "input_text", text: "Leia a matriz curricular anexada. Use o texto extraído abaixo como apoio para localizar totais e semestres.\n\n" + text },
-        { type: "input_file", filename, file_data: `data:application/pdf;base64,${bytes.toString("base64")}` },
-      ] }],
-      text: { format: zodTextFormat(gradeReadingSchema, "commercial_grade_reading") },
-      max_output_tokens: 2_500,
-    });
-    const parsed = response.output_parsed ? gradeReadingSchema.parse(response.output_parsed) : null;
-    if (!parsed) return sanitizeReading(fallback);
-    return sanitizeReading(presentReading(parsed, fallback, "AI"));
-  } catch (error) {
-    logger.warn("commercial_grade.ai_read_failed", { filename, error: String(error) });
-    return sanitizeReading(fallback);
+  let aiNote: string | null = null;
+  // A IA de raciocínio gasta parte do limite de saída pensando: se a resposta vier cortada, tenta de novo com mais folga.
+  for (const maxOutputTokens of [6_000, 16_000]) {
+    try {
+      const { client, config } = await getOpenAIClient({ timeoutMs: 90_000, maxRetries: 1 });
+      const response = await client.responses.parse({
+        model: config.extractionModel,
+        instructions: INSTRUCTIONS,
+        input: [{ role: "user", content: [
+          { type: "input_text", text: "Leia a matriz curricular anexada. Use o texto extraído abaixo como apoio para localizar totais e semestres.\n\n" + text },
+          { type: "input_file", filename, file_data: `data:application/pdf;base64,${bytes.toString("base64")}` },
+        ] }],
+        text: { format: zodTextFormat(gradeReadingSchema, "commercial_grade_reading") },
+        max_output_tokens: maxOutputTokens,
+      });
+      const parsed = response.output_parsed ? gradeReadingSchema.parse(response.output_parsed) : null;
+      if (parsed) return sanitizeReading(presentReading(parsed, fallback, "AI"));
+      aiNote = response.status === "incomplete" ? "a resposta da IA veio incompleta" : "a IA não devolveu os dados no formato esperado";
+      logger.warn("commercial_grade.ai_read_empty", { filename, status: response.status, reason: response.incomplete_details?.reason, maxOutputTokens });
+    } catch (error) {
+      const mapped = mapOpenAIError(error);
+      aiNote = mapped.message.replace(/\.$/, "");
+      logger.warn("commercial_grade.ai_read_failed", { filename, code: mapped.code, status: mapped.status, detail: mapped.detail, maxOutputTokens });
+      // Só vale repetir quando a falha foi na resposta (corte/formato); chave, cota, modelo ou IA desligada não mudam na segunda tentativa.
+      if (mapped.code !== "INVALID_STRUCTURED_OUTPUT" && mapped.code !== "UNKNOWN") break;
+    }
   }
+  return { ...sanitizeReading(fallback), aiNote };
 }
 
 /** Maior valor aceito nas colunas inteiras (INT4 do PostgreSQL) com folga para carga horária/semestres reais. */
