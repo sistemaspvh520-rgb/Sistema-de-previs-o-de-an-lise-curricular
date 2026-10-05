@@ -7,7 +7,8 @@ import { requirePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { getStorage } from "@/services/storage/storage";
 import { recordAudit } from "@/services/audit-log/audit-log";
-import { readCommercialGrade } from "@/services/commercial-grades/reader";
+import { cleanReadingText, readCommercialGrade } from "@/services/commercial-grades/reader";
+import { logger } from "@/lib/logger";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/action-result";
 
 const metadataSchema = z.object({ courseName: z.string().trim().max(180), modality: z.string().trim().max(80), curriculumTerm: z.string().trim().max(40) });
@@ -25,15 +26,15 @@ export async function uploadCommercialGradeAction(input: FormData): Promise<Acti
     const sameFile = await prisma.commercialGrade.findUnique({ where: { contentHash }, select: { courseName: true } });
     if (sameFile) return fail(`Este mesmo PDF já está disponível como “${sameFile.courseName}”.`);
     const reading = await readCommercialGrade(bytes, file.name);
-    const courseName = parsed.data.courseName || reading.courseName || file.name.replace(/\.pdf$/i, "");
+    const courseName = cleanReadingText(parsed.data.courseName, 180) || reading.courseName || cleanReadingText(file.name.replace(/\.pdf$/i, ""), 180) || "Grade sem nome";
     const modality = parsed.data.modality || reading.modality;
     const curriculumTerm = parsed.data.curriculumTerm || reading.curriculumTerm;
     const catalogKey = fingerprint(`${normalizeCatalogValue(courseName)}|${normalizeCatalogValue(modality)}|${normalizeCatalogValue(curriculumTerm)}`);
     const sameMatrix = await prisma.commercialGrade.findFirst({ where: { OR: [{ catalogKey }, { courseName, modality, curriculumTerm }] }, select: { courseName: true, curriculumTerm: true } });
     if (sameMatrix) return fail(`Já existe uma matriz de “${sameMatrix.courseName}”${sameMatrix.curriculumTerm ? ` (${sameMatrix.curriculumTerm})` : ""}. Exclua a versão anterior antes de publicar outra.`);
     const stored = await getStorage().save(bytes, { extension: "pdf", prefix: "commercial-grades" });
-    const grade = await prisma.commercialGrade.create({ data: { courseName, modality, curriculumTerm, contentHash, catalogKey, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, courseTracks: reading.courseTracks, internshipInfo: reading.internshipInfo, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, totalCourseHours: reading.totalCourseHours, whatsappSummary: reading.whatsappSummary, originalName: file.name, storageKey: stored.key, sizeBytes: stored.sizeBytes, uploadedById: user.id } });
-    await recordAudit({ userId: user.id, action: "commercial_grade.upload", entityType: "CommercialGrade", entityId: grade.id, metadata: { courseName: grade.courseName, degree: grade.degree, knowledgeArea: grade.knowledgeArea, durationSemesters: grade.durationSemesters, hasTcc: grade.hasTcc, totalInternshipHours: grade.totalInternshipHours, source: reading.source } });
+    const grade = await persistOrDiscard(stored.key, () => prisma.commercialGrade.create({ data: { courseName, modality, curriculumTerm, contentHash, catalogKey, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, courseTracks: reading.courseTracks, internshipInfo: reading.internshipInfo, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, totalCourseHours: reading.totalCourseHours, whatsappSummary: reading.whatsappSummary, originalName: file.name, storageKey: stored.key, sizeBytes: stored.sizeBytes, uploadedById: user.id } }));
+    await recordAuditSafely({ userId: user.id, action: "commercial_grade.upload", entityType: "CommercialGrade", entityId: grade.id, metadata: { courseName: grade.courseName, degree: grade.degree, knowledgeArea: grade.knowledgeArea, durationSemesters: grade.durationSemesters, hasTcc: grade.hasTcc, totalInternshipHours: grade.totalInternshipHours, source: reading.source } });
     revalidatePath("/commercial-grades"); return ok(undefined, reading.source === "AI" ? "Grade lida pela IA e disponibilizada para o time comercial." : "Grade disponibilizada com leitura local; revise os dados antes do envio.");
   } catch (error) { return toActionError(error); }
 }
@@ -47,7 +48,7 @@ export async function deleteCommercialGradeAction(input: unknown): Promise<Actio
     if (!grade) return fail("Grade não encontrada.");
     await prisma.commercialGrade.delete({ where: { id: grade.id } });
     await getStorage().delete(grade.storageKey).catch(() => undefined);
-    await recordAudit({ userId: user.id, action: "commercial_grade.delete", entityType: "CommercialGrade", entityId: grade.id, metadata: { courseName: grade.courseName, originalName: grade.originalName } });
+    await recordAuditSafely({ userId: user.id, action: "commercial_grade.delete", entityType: "CommercialGrade", entityId: grade.id, metadata: { courseName: grade.courseName, originalName: grade.originalName } });
     revalidatePath("/commercial-grades");
     return ok(undefined, "Grade excluída definitivamente.");
   } catch (error) { return toActionError(error); }
@@ -69,17 +70,29 @@ export async function updateCommercialGradeAction(input: FormData): Promise<Acti
     const sameFile = await prisma.commercialGrade.findFirst({ where: { contentHash, NOT: { id } }, select: { courseName: true } });
     if (sameFile) return fail(`Este PDF já pertence à grade “${sameFile.courseName}”.`);
     const reading = await readCommercialGrade(bytes, file.name);
-    const courseName = reading.courseName || file.name.replace(/\.pdf$/i, "");
+    const courseName = reading.courseName || cleanReadingText(file.name.replace(/\.pdf$/i, ""), 180) || "Grade sem nome";
     const catalogKey = fingerprint(`${normalizeCatalogValue(courseName)}|${normalizeCatalogValue(reading.modality)}|${normalizeCatalogValue(reading.curriculumTerm)}`);
     const sameMatrix = await prisma.commercialGrade.findFirst({ where: { NOT: { id }, OR: [{ catalogKey }, { courseName, modality: reading.modality, curriculumTerm: reading.curriculumTerm }] }, select: { courseName: true, curriculumTerm: true } });
     if (sameMatrix) return fail(`Já existe uma matriz de “${sameMatrix.courseName}”${sameMatrix.curriculumTerm ? ` (${sameMatrix.curriculumTerm})` : ""}. Exclua a versão anterior antes de atualizar.`);
     const stored = await getStorage().save(bytes, { extension: "pdf", prefix: "commercial-grades" });
-    await prisma.commercialGrade.update({ where: { id }, data: { courseName, modality: reading.modality, curriculumTerm: reading.curriculumTerm, contentHash, catalogKey, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, courseTracks: reading.courseTracks, internshipInfo: reading.internshipInfo, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, totalCourseHours: reading.totalCourseHours, whatsappSummary: reading.whatsappSummary, originalName: file.name, storageKey: stored.key, sizeBytes: stored.sizeBytes, uploadedById: user.id } });
+    await persistOrDiscard(stored.key, () => prisma.commercialGrade.update({ where: { id }, data: { courseName, modality: reading.modality, curriculumTerm: reading.curriculumTerm, contentHash, catalogKey, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, courseTracks: reading.courseTracks, internshipInfo: reading.internshipInfo, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, totalCourseHours: reading.totalCourseHours, whatsappSummary: reading.whatsappSummary, originalName: file.name, storageKey: stored.key, sizeBytes: stored.sizeBytes, uploadedById: user.id } }));
     await getStorage().delete(previous.storageKey).catch(() => undefined);
-    await recordAudit({ userId: user.id, action: "commercial_grade.update", entityType: "CommercialGrade", entityId: id, metadata: { courseName, originalName: file.name, source: reading.source } });
+    await recordAuditSafely({ userId: user.id, action: "commercial_grade.update", entityType: "CommercialGrade", entityId: id, metadata: { courseName, originalName: file.name, source: reading.source } });
     revalidatePath("/commercial-grades");
     return ok(undefined, reading.source === "AI" ? "Grade atualizada e lida novamente pela IA." : "Grade atualizada; a leitura local precisa de revisão.");
   } catch (error) { return toActionError(error); }
+}
+
+/** Grava no banco; se falhar, remove o PDF recém-enviado ao armazenamento para não deixar arquivos órfãos. */
+async function persistOrDiscard<T>(storageKey: string, write: () => Promise<T>): Promise<T> {
+  try { return await write(); }
+  catch (error) { await getStorage().delete(storageKey).catch(() => undefined); throw error; }
+}
+
+/** A grade já foi publicada; uma falha só na trilha de auditoria não deve desfazer nem acusar erro ao usuário. */
+async function recordAuditSafely(entry: Parameters<typeof recordAudit>[0]) {
+  try { await recordAudit(entry); }
+  catch (error) { logger.error("commercial_grade.audit_failed", { action: entry.action, error: String(error) }); }
 }
 
 function fingerprint(value: Buffer | string) { return createHash("sha256").update(value).digest("hex"); }
