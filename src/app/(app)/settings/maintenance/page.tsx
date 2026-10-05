@@ -4,20 +4,23 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PurgeCard } from "@/features/maintenance/purge-card";
-import { purgeAiUsageAction, purgeAnalysesAction, purgeAuditLogsAction } from "@/features/maintenance/actions";
+import { purgeAiUsageAction, purgeAnalysesAction, purgeAuditLogsAction, removeOrphanGradeFilesAction } from "@/features/maintenance/actions";
 import { DeletionRequestActions } from "@/features/analyses/components/deletion-request-actions";
 import { formatDateTime } from "@/lib/utils";
 import { SentryCard } from "@/features/maintenance/sentry-card";
+import { OrphanFilesCard } from "@/features/maintenance/orphan-files-card";
+import { findOrphanGradeFiles } from "@/services/commercial-grades/publish";
 
 export const metadata: Metadata = { title: "Manutenção de dados" };
 export const dynamic = "force-dynamic";
 
 export default async function MaintenancePage() {
   await requirePagePermission("privacy:manage");
-  const [audit, usage, analyses, deletionRequests] = await Promise.all([
+  const [audit, usage, analyses, orphanFiles, deletionRequests] = await Promise.all([
     prisma.auditLog.count(),
     prisma.aIUsage.count(),
     prisma.curricularAnalysis.count(),
+    findOrphanGradeFiles().then((keys) => keys.length).catch(() => null),
     prisma.analysisDeletionRequest.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
@@ -41,6 +44,7 @@ export default async function MaintenancePage() {
           extra={{ label: "Somente", options: [{ value: "ALL", label: "Todas" }, { value: "COMPLETED", label: "Concluídas" }, { value: "FAILED", label: "Com falha" }] }}
         />
       </div>
+      <OrphanFilesCard count={orphanFiles} action={removeOrphanGradeFilesAction} />
       <Card className="mt-6 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Solicitações de exclusão</CardTitle>

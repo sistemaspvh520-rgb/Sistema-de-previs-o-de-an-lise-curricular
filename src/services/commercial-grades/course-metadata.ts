@@ -40,7 +40,7 @@ export function inferDegree(courseName: string): string | null {
 
 function inferKnowledgeArea(courseName: string): string | null {
   const normalized = courseName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-  if (/FARMACIA|NUTRICAO|EDUCACAO FISICA|ENFERMAGEM|FISIOTERAPIA|BIOMEDICINA|ODONTOLOGIA|PSICOLOGIA/.test(normalized)) return "Saúde";
+  if (/FARMACIA|ESTETICA|COSMETICA|RADIOLOGIA|NUTRICAO|EDUCACAO FISICA|ENFERMAGEM|FISIOTERAPIA|BIOMEDICINA|ODONTOLOGIA|PSICOLOGIA/.test(normalized)) return "Saúde";
   if (/PEDAGOGIA|LETRAS|HISTORIA|MATEMATICA|EDUCACAO/.test(normalized)) return "Educação";
   if (/GESTAO|ADMINISTRACAO|CONTABEIS|MARKETING|RECURSOS HUMANOS/.test(normalized)) return "Gestão e negócios";
   if (/COMPUTACAO|SISTEMAS|TECNOLOGIA|ANALISE E DESENVOLVIMENTO/.test(normalized)) return "Tecnologia";
