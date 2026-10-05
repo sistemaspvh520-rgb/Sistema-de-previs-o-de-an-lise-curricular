@@ -10,7 +10,7 @@ import type { CurriculumExtraction } from "@/services/openai/schemas";
 import { getOpenAIClient } from "@/services/openai/client-factory";
 import { extractCurriculum } from "@/services/openai/extractor";
 import { auditCurriculum } from "@/services/openai/auditor";
-import { OpenAIIntegrationError, mapOpenAIError } from "@/services/openai/errors";
+import { OpenAIIntegrationError, formatIntegrationError, mapOpenAIError } from "@/services/openai/errors";
 import { recordUsage } from "@/services/openai/usage";
 import { getSystemSettings } from "@/repositories/settings-repository";
 import { getRuleSetById } from "@/repositories/rules-repository";
@@ -170,7 +170,7 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
           if (mapped.code === "AI_DISABLED") {
             throw new StepFailure("EXTRACTING", mapped.code, "A IA está desativada e a leitura local não conseguiu identificar a tabela deste PDF. Ative a IA em Configurações → OpenAI e tente novamente.", false);
           }
-          throw new StepFailure("EXTRACTING", mapped.code, mapped.detail ? `${mapped.message} (${mapped.detail})` : mapped.message, true);
+          throw new StepFailure("EXTRACTING", mapped.code, formatIntegrationError(mapped), true);
         }
       }
       try {
@@ -323,7 +323,7 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
         await prisma.aIExtraction.create({
           data: { analysisId, model: aiBundle.config.extractionModel, promptVersion: "n/a", privacyMode: settings.aiPrivacyMode, durationMs: Date.now() - started, status: "ERROR", errorCode: mapped.code },
         }).catch(() => undefined);
-        throw new StepFailure("EXTRACTING", mapped.code, mapped.detail ? `${mapped.message} (${mapped.detail})` : mapped.message, true);
+        throw new StepFailure("EXTRACTING", mapped.code, formatIntegrationError(mapped), true);
       }
     }
 
@@ -375,7 +375,7 @@ export async function runAnalysisPipeline(analysisId: string): Promise<void> {
       } catch (err) {
         const mapped = mapOpenAIError(err);
         logger.warn("pipeline.ai_audit_unavailable", { analysisId, code: mapped.code, status: mapped.status, detail: mapped.detail });
-        aiUnavailable = { message: mapped.detail ? `${mapped.message} (${mapped.detail})` : mapped.message, disabled: mapped.code === "AI_DISABLED" };
+        aiUnavailable = { message: formatIntegrationError(mapped), disabled: mapped.code === "AI_DISABLED" };
       }
 
       const subjectIds = new Set(computed.subjects.map((x) => x.id));

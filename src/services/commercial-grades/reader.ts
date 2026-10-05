@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import { parsePdf } from "@/services/pdf/parser";
 import { getOpenAIClient } from "@/services/openai/client-factory";
-import { mapOpenAIError } from "@/services/openai/errors";
+import { formatIntegrationError, mapOpenAIError } from "@/services/openai/errors";
 import { logger } from "@/lib/logger";
 import { normalizeCatalogMetadata, type CommercialTrack } from "@/services/commercial-grades/course-metadata";
 
@@ -92,7 +92,7 @@ export async function readCommercialGrade(bytes: Buffer, filename: string): Prom
       logger.warn("commercial_grade.ai_read_empty", { filename, status: response.status, reason: response.incomplete_details?.reason, maxOutputTokens });
     } catch (error) {
       const mapped = mapOpenAIError(error);
-      aiNote = mapped.message.replace(/\.$/, "");
+      aiNote = formatIntegrationError(mapped).replace(/\.$/, "");
       logger.warn("commercial_grade.ai_read_failed", { filename, code: mapped.code, status: mapped.status, detail: mapped.detail, maxOutputTokens });
       // Só vale repetir quando a falha foi na resposta (corte/formato); chave, cota, modelo ou IA desligada não mudam na segunda tentativa.
       if (mapped.code !== "INVALID_STRUCTURED_OUTPUT" && mapped.code !== "UNKNOWN") break;
