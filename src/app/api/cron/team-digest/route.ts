@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { getEnv } from "@/lib/env";
 import { sendWeeklyTeamDigests } from "@/services/student-portal/team-digest";
+import { sendWeeklyUsageDigests } from "@/services/usage/usage-digest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,8 +16,10 @@ function authorized(req: Request): boolean {
   return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
 }
 
-/** Resumo semanal da Central Acadêmica para cada tutor (Authorization: Bearer <CRON_SECRET>). */
+/** Resumos semanais: Central Acadêmica para cada tutor e uso da equipe para os administradores (Authorization: Bearer <CRON_SECRET>). */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  return NextResponse.json(await sendWeeklyTeamDigests());
+  const team = await sendWeeklyTeamDigests();
+  const usage = await sendWeeklyUsageDigests().catch((error) => ({ sent: 0, error: error instanceof Error ? error.name : "unknown" }));
+  return NextResponse.json({ ...team, usage });
 }

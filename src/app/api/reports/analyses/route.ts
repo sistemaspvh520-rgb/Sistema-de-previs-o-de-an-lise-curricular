@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/session";
+import { trackAction } from "@/services/usage/track";
 import { listAnalysesForReport } from "@/repositories/analysis-repository";
 import { ANALYSIS_STATUS_LABELS, RELIABILITY_LABELS } from "@/components/shared/status-badge";
 import { formatDateTime } from "@/lib/time";
@@ -21,6 +22,7 @@ function cell(value: string | number | null | undefined): string {
 export async function GET(req: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  trackAction(user, "report.export");
   const url = new URL(req.url);
   const polo = url.searchParams.get("polo");
   const from = url.searchParams.get("from");

@@ -278,3 +278,46 @@ export function teamDigestEmail(p: {
     ].join("\n"),
   };
 }
+
+/** Resumo semanal de uso da equipe para os administradores. */
+export function usageDigestEmail(p: {
+  name: string;
+  accounts: number;
+  activeWeek: number;
+  activeDelta: number;
+  activeTime: string;
+  modules: Array<{ label: string; people: number; time: string }>;
+  notUsing: string[];
+  url: string;
+  institution: string;
+}): EmailContent {
+  const first = firstName(p.name);
+  const delta = p.activeDelta === 0 ? "igual à semana anterior" : `${p.activeDelta > 0 ? "+" : ""}${p.activeDelta} em relação à semana anterior`;
+  const details: Array<[string, string]> = [
+    ["Pessoas que usaram", `${p.activeWeek} de ${p.accounts} (${delta})`],
+    ["Tempo ativo da equipe", p.activeTime],
+    ...p.modules.map((module): [string, string] => [module.label, `${module.people} ${module.people === 1 ? "pessoa" : "pessoas"} · ${module.time}`]),
+  ];
+  const note = p.notUsing.length ? `Sem uso na semana: ${p.notUsing.map(escape).join(", ")}.` : "Toda a equipe usou o sistema nesta semana.";
+  return {
+    subject: `Uso da equipe: ${p.activeWeek} de ${p.accounts} pessoas usaram o sistema na semana`,
+    html: layout({
+      preheader: "Quem usou a análise curricular, as grades e o sistema acadêmico nos últimos 7 dias.",
+      title: `${first}, o uso da equipe na semana`,
+      intro: "Resumo dos últimos 7 dias: quem usou cada parte do sistema e quem ficou parado. O detalhe por pessoa está no painel Uso da equipe.",
+      details,
+      button: { label: "Abrir o painel Uso da equipe", url: p.url },
+      note,
+      institution: p.institution,
+    }),
+    text: [
+      `${first}, o uso da equipe na semana`,
+      "",
+      ...details.map(([k, v]) => `${k}: ${v}`),
+      "",
+      p.notUsing.length ? `Sem uso na semana: ${p.notUsing.join(", ")}.` : "Toda a equipe usou o sistema nesta semana.",
+      "",
+      `Uso da equipe: ${p.url}`,
+    ].join("\n"),
+  };
+}

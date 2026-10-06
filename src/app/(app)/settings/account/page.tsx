@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/session";
+import { ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   Card,
@@ -94,6 +95,10 @@ export default async function AccountPage({
           </CardContent>
         </Card>
       </div>
+      <p className="mt-6 flex items-start gap-2 text-xs text-muted-foreground">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-cyan-700" aria-hidden="true" />
+        O sistema registra o uso (telas e tempo ativo) para a gestão da equipe. O conteúdo que você digita e os dados de alunos não entram nesse registro.
+      </p>
     </>
   );
 }

@@ -229,6 +229,9 @@ model User {
   academicVersions AcademicAnalysisVersion[]
   academicSources AcademicAnalysisSource[]
   academicRequests AcademicRequest[]
+  usageHours      UsageHourly[]
+  usageEvents     UsageEvent[]
+  usagePresence   UserPresence?
 }
 
 /// Token de uso único para definir (convite) ou redefinir a senha por link de e-mail. Só o hash é armazenado.
@@ -914,4 +917,69 @@ model AcademicRequest {
   @@index([status, createdAt(sort: Desc)])
   @@index([actorUserId])
   @@index([previousRequestId])
+}
+
+// ------------------------------------------------------------------
+// Uso da equipe (painel do gestor). Só equipe: alunos e "Acessar como" não entram.
+// Guarda apenas o padrão da rota (ex.: /analyses/[id]) — nunca IDs, buscas ou dados de alunos.
+// ------------------------------------------------------------------
+
+enum UsageModule {
+  CURRICULAR
+  GRADES
+  ACADEMIC
+  MANAGEMENT
+  SETTINGS
+  OTHER
+}
+
+enum UsageEventKind {
+  PAGE_VIEW
+  ACTION
+}
+
+/** Agregado por pessoa, hora (início da hora, UTC) e módulo: tempo ativo real e telas abertas. */
+model UsageHourly {
+  userId        String      @db.Uuid
+  hour          DateTime    @db.Timestamptz(6)
+  module        UsageModule
+  activeSeconds Int         @default(0)
+  pageViews     Int         @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, hour, module])
+  @@index([hour])
+}
+
+/** Linha do tempo: telas abertas e ações que a auditoria não registra (ex.: baixar PDF de grade). */
+model UsageEvent {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  module    UsageModule
+  kind      UsageEventKind
+  /** Padrão da rota (PAGE_VIEW) ou nome da ação (ex.: grade.download). */
+  name      String
+  entityId  String?
+  createdAt DateTime       @default(now()) @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([module, createdAt(sort: Desc)])
+  @@index([createdAt])
+}
+
+/** Onde cada pessoa esteve por último ("online agora" = visto nos últimos minutos). */
+model UserPresence {
+  userId     String      @id @db.Uuid
+  module     UsageModule
+  routeLabel String
+  seenAt     DateTime    @db.Timestamptz(6)
+  /** Último sinal de tempo ativo contado: várias abas abertas não somam tempo em dobro. */
+  beatAt     DateTime?   @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([seenAt])
 }

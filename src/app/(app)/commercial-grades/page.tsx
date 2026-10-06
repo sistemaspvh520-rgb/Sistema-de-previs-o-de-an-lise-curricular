@@ -279,6 +279,7 @@ function CommercialGradeCard({
           {whatsapp && (
             <CopyWhatsapp
               text={whatsapp}
+              gradeId={grade.id}
               courseName={grade.courseName}
               hasTcc={grade.hasTcc}
               totalCourseHours={grade.totalCourseHours}

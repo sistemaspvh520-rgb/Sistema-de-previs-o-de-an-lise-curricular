@@ -4,6 +4,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { countDueFollowUps, listDueFollowUps } from "@/services/follow-up/follow-up";
 import { getVapidPublicKey } from "@/services/push/web-push";
 import { formatRelativeTime } from "@/lib/time";
+import { ActivityTracker } from "@/components/layout/activity-tracker";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   };
   return (
     <div className="flex min-h-screen overflow-x-clip">
+      {!user.impersonator && <ActivityTracker />}
       <div className="hidden md:block md:sticky md:top-0 md:h-screen md:self-start md:bg-sidebar">
         <Sidebar role={user.role} />
       </div>

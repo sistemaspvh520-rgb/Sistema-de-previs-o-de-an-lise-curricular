@@ -3,6 +3,7 @@
 import { Copy, MessageCircle, PencilLine } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { trackClientAction } from "@/features/usage/track-client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -29,6 +30,8 @@ type Track = {
 
 type CopyWhatsappProps = {
   text: string;
+  /** Grade de origem, para o painel de uso da equipe. */
+  gradeId?: string;
   courseName?: string;
   hasTcc?: boolean;
   totalCourseHours?: number | null;
@@ -37,6 +40,7 @@ type CopyWhatsappProps = {
 
 export function CopyWhatsapp({
   text,
+  gradeId,
   courseName,
   hasTcc,
   totalCourseHours,
@@ -62,6 +66,7 @@ export function CopyWhatsapp({
     try {
       await navigator.clipboard.writeText(message);
       toast.success("Mensagem copiada para o WhatsApp.");
+      trackClientAction("grade.whatsapp_copy", gradeId);
     } catch {
       toast.error("Não foi possível copiar a mensagem.");
     }
