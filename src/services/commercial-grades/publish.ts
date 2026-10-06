@@ -10,7 +10,8 @@ import { cleanReadingText, readCommercialGrade, type CommercialGradeReading } fr
 export const COMMERCIAL_GRADE_MAX_MB = 4;
 export const COMMERCIAL_GRADE_PREFIX = "commercial-grades";
 
-export type PublishResult = { ok: true; id: string; message: string } | { ok: false; error: string; status: number };
+/** `warning`: há algo para o time conferir (divergência IA × PDF, dado faltando ou IA indisponível). */
+export type PublishResult = { ok: true; id: string; message: string; warning: boolean } | { ok: false; error: string; status: number };
 
 const refuse = (error: string, status = 422): PublishResult => ({ ok: false, error, status });
 
@@ -50,20 +51,26 @@ export async function publishCommercialGrade(input: { bytes: Buffer; filename: s
   }
   if (previous) await getStorage().delete(previous.storageKey).catch(() => undefined);
   try {
-    await recordAudit({ userId, action: previous ? "commercial_grade.update" : "commercial_grade.upload", entityType: "CommercialGrade", entityId: id, metadata: { courseName, originalName: filename, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, source: reading.source, aiNote: reading.aiNote ?? null } });
+    await recordAudit({ userId, action: previous ? "commercial_grade.update" : "commercial_grade.upload", entityType: "CommercialGrade", entityId: id, metadata: { courseName, originalName: filename, degree: reading.degree, knowledgeArea: reading.knowledgeArea, durationSemesters: reading.durationSemesters, hasTcc: reading.hasTcc, totalInternshipHours: reading.totalInternshipHours, source: reading.source, aiNote: reading.aiNote ?? null, checkedWithPdf: reading.checkedWithPdf ?? false, divergences: reading.divergences ?? [] } });
   } catch (error) {
     // A grade já está publicada: uma falha só na auditoria não deve acusar erro ao usuário.
     logger.error("commercial_grade.audit_failed", { id, error: String(error) });
   }
-  return { ok: true, id, message: publishMessage(reading, Boolean(previous)) };
+  const notice = publishMessage(reading, Boolean(previous));
+  return { ok: true, id, message: notice.message, warning: notice.warning };
 }
 
-/** A leitura do PDF é o caminho normal; aviso só quando faltou dado e, se a IA foi tentada, o motivo da falha. */
-export function publishMessage(reading: Pick<CommercialGradeReading, "source" | "aiNote" | "complete">, updated: boolean): string {
-  if (reading.source === "AI") return updated ? "Grade atualizada e completada pela IA; confira os dados antes do envio." : "Grade lida e completada pela IA e disponibilizada para o time comercial; confira os dados antes do envio.";
-  if (reading.complete !== false) return updated ? "Grade atualizada a partir do PDF; confira os dados antes do envio." : "Grade lida do PDF e disponibilizada para o time comercial; confira os dados antes do envio.";
+/** Mensagem ao publicar: diz quem leu a grade (IA conferida com o PDF, só o PDF) e o que o time precisa conferir. */
+export function publishMessage(reading: Pick<CommercialGradeReading, "source" | "aiNote" | "complete" | "checkedWithPdf" | "divergences">, updated: boolean): { message: string; warning: boolean } {
+  const done = updated ? "Grade atualizada" : "Grade disponibilizada";
+  if (reading.divergences?.length)
+    return { warning: true, message: `${done}, mas a IA e a leitura do PDF divergiram em: ${reading.divergences.join("; ")}. Mantivemos o que está no PDF; confira antes do envio.` };
+  if (reading.source === "AI")
+    return { warning: false, message: reading.checkedWithPdf ? `${done}: lida pela IA e conferida com o PDF.` : `${done}: lida pela IA; confira os dados antes do envio.` };
   const why = reading.aiNote ? ` (IA indisponível: ${reading.aiNote})` : "";
-  return `${updated ? "Grade atualizada" : "Grade disponibilizada"}, mas o PDF não trouxe todos os dados (curso, carga horária ou duração)${why}; revise antes do envio.`;
+  if (reading.complete !== false)
+    return { warning: Boolean(reading.aiNote), message: `${done}: lida do PDF${why}; confira os dados antes do envio.` };
+  return { warning: true, message: `${done}, mas o PDF não trouxe todos os dados (curso, carga horária ou duração)${why}; revise antes do envio.` };
 }
 
 function gradeData(reading: CommercialGradeReading, own: { courseName: string; contentHash: string; catalogKey: string; originalName: string; storageKey: string; sizeBytes: number; uploadedById: string }) {

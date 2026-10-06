@@ -139,7 +139,7 @@ export function readMatrixLayout(pages: ParsedPage[] | undefined): MatrixLayoutR
     .filter((row) => /^Est[áa]gio$/i.test(row.type ?? "") || /^EST[ÁA]GIO\b/i.test(row.fullName))
     .map((row) => ({ semester: row.semester, name: row.fullName || "Estágio supervisionado", workload: row.workload && row.workload > 0 ? row.workload : null }))
     .sort((a, b) => a.semester - b.semester);
-  const hasTcc = components.some((row) => /^TCC$/i.test(row.type ?? "") || /TRABALHO DE CONCLUS[ÃA]O|\bTCC\b/i.test(row.fullName));
+  const hasTcc = components.some((row) => /^TCC$/i.test(row.type ?? "") || /TRABALHO DE (?:CONCLUS[ÃA]O|CURSO)\b|\bTCC\b/i.test(row.fullName));
   const largestSemester = components.reduce((max, row) => Math.max(max, row.semester), 0);
   const declaredInternships = internships.reduce((sum, row) => sum + (row.workload ?? 0), 0);
 

@@ -8,6 +8,7 @@ import { redactPersonalData } from "@/services/pdf/redaction";
 import type { LocalExtraction } from "@/services/pdf/parser";
 import type { SubjectRow, CurriculumTotals, SimulationResult, DocumentClaimInput } from "@/domain/curricular-analysis/types";
 import { logger } from "@/lib/logger";
+import { withLowEffort } from "@/services/openai/economy";
 
 export interface AuditorInput {
   model: string;
@@ -61,6 +62,11 @@ function summarize(input: AuditorInput): string {
  * envia do PDF somente as páginas que sustentam essas linhas/afirmações e limita
  * a evidência textual a um tamanho seguro. Dados pessoais continuam mascarados.
  */
+/** Abaixo disso o PDF não tem texto legível (escaneado). */
+const MIN_TEXT_EVIDENCE_CHARS = 400;
+/** ~5 mil tokens: cobre as páginas de uma análise longa e ainda custa menos que o PDF anexado. */
+const MAX_TEXT_EVIDENCE_CHARS = 16_000;
+
 function compactDocumentEvidence(input: AuditorInput): string | null {
   if (!input.localExtraction) return null;
   const relevantPages = new Set([
@@ -70,7 +76,7 @@ function compactDocumentEvidence(input: AuditorInput): string | null {
   const pages = input.localExtraction.pages.filter((page) => relevantPages.has(page.page));
   const source = pages.length ? pages : input.localExtraction.pages.slice(0, 2);
   const evidence = source.map((page) => `=== PÁGINA ${page.page} ===\n${page.lines.map((line) => line.text).join("\n")}`).join("\n\n");
-  return redactPersonalData(evidence).slice(0, 9_000);
+  return redactPersonalData(evidence).slice(0, MAX_TEXT_EVIDENCE_CHARS);
 }
 
 /**
@@ -82,26 +88,32 @@ export async function auditCurriculum(client: OpenAI, input: AuditorInput): Prom
   const content: OpenAI.Responses.ResponseInputContent[] = [
     { type: "input_text", text: "Audite os dados abaixo comparando com o documento.\n\n" + summarize(input) },
   ];
-  if (input.privacyMode === "PDF_FILE") {
+  // PDF digital: as linhas de texto das páginas bastam e custam uma fração do PDF (que vai como imagem + texto).
+  // O PDF só é anexado quando não há texto legível (escaneado) e o modo de privacidade permite.
+  const evidence = compactDocumentEvidence(input);
+  if (evidence && evidence.length >= MIN_TEXT_EVIDENCE_CHARS) {
+    content.push({ type: "input_text", text: "## EVIDÊNCIAS RELEVANTES DO DOCUMENTO (dados pessoais mascarados)\n" + evidence });
+  } else if (input.privacyMode === "PDF_FILE") {
     content.push({
       type: "input_file",
       filename: input.filename,
       file_data: `data:application/pdf;base64,${input.documentBytes.toString("base64")}`,
     });
-  } else {
-    const evidence = compactDocumentEvidence(input);
-    if (evidence) content.push({ type: "input_text", text: "## EVIDÊNCIAS RELEVANTES DO DOCUMENTO (dados pessoais mascarados)\n" + evidence });
+  } else if (evidence) {
+    content.push({ type: "input_text", text: "## EVIDÊNCIAS RELEVANTES DO DOCUMENTO (dados pessoais mascarados)\n" + evidence });
   }
 
   try {
-    const response = await client.responses.parse({
+    const response = await withLowEffort(input.model, (effort) => client.responses.parse({
+      ...effort,
       model: input.model,
       instructions: AUDITOR_SYSTEM_PROMPT,
       input: [{ role: "user", content }],
       text: { format },
-      // A auditoria só retorna apontamentos curtos; não reservar 8k tokens para isso.
-      max_output_tokens: 1_500,
-    });
+      // Só o que for usado é cobrado; o limite folgado evita resposta cortada pelo raciocínio do modelo.
+      max_output_tokens: 4_000,
+      store: false,
+    }));
     const parsed = response.output_parsed;
     if (!parsed) throw new OpenAIIntegrationError("INVALID_STRUCTURED_OUTPUT", OPENAI_ERROR_MESSAGES.INVALID_STRUCTURED_OUTPUT);
     const data = curriculumAuditSchema.parse(parsed);

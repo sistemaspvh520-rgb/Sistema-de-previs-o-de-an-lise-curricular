@@ -33,7 +33,7 @@ export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
     const result = await sendCommercialGradePdf("/api/commercial-grades/upload", file);
     setSending(false);
     if (!result.ok) return void toast.error(result.error);
-    (/não trouxe todos os dados/.test(result.message) ? toast.warning : toast.success)(result.message, { duration: 12_000 });
+    (result.warning ? toast.warning : toast.success)(result.message, { duration: 12_000 });
     clear();
     router.refresh();
   }
@@ -45,7 +45,7 @@ export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
           <span className="rounded-lg bg-brand-navy p-2 text-white"><FileSearch className="size-5" /></span>
           <div>
             <p className="font-medium text-brand-navy">Leitura automática do PDF</p>
-            <p className="mt-1 text-sm text-muted-foreground">O sistema lê a matriz do SIAA e identifica curso, grau, área, duração, estágios obrigatórios (com as horas), TCC e carga horária, e prepara a mensagem comercial. Confira os dados antes de enviar.</p>
+            <p className="mt-1 text-sm text-muted-foreground">A IA lê a matriz (com a IA ligada nas configurações) e o sistema confere com as colunas do PDF: curso, grau, área, duração, estágios obrigatórios (com as horas), TCC e carga horária. Se discordarem, vale o PDF e o aviso mostra o que conferir.</p>
           </div>
         </div>
       </div>

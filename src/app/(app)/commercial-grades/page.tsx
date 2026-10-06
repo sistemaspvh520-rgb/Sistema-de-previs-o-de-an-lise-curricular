@@ -115,8 +115,8 @@ export default async function CommercialGradesPage({
               matriz curricular
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Envie somente o PDF. O sistema lê dados comerciais, grau, área,
-              duração, estágios e TCC direto do documento.
+              Envie somente o PDF. A IA lê grau, área, duração, estágios e TCC,
+              e o sistema confere com o documento.
             </p>
           </CardHeader>
           <CardContent>

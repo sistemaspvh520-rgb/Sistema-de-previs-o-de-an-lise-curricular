@@ -113,6 +113,23 @@ describe("envio de grade comercial pela API", () => {
     expect(await storedCount()).toBe(before); // o PDF antigo foi removido
   });
 
+  it("relê o PDF já guardado (Reler com IA) sem novo envio e mantém um só arquivo", async (ctx) => {
+    if (!dbOk) return ctx.skip();
+    const { POST } = await import("@/app/api/commercial-grades/[id]/reread/route");
+    const target = await prismaMod.prisma.commercialGrade.findFirstOrThrow({ where: { uploadedById: userId, originalName: "OUTRA GRADE V2.PDF" } });
+    await prismaMod.prisma.commercialGrade.update({ where: { id: target.id }, data: { totalCourseHours: 669, hasTcc: true } });
+    const before = await storedCount();
+    const response = await POST(new Request(`http://localhost/api/commercial-grades/${target.id}/reread`, { method: "POST" }), { params: Promise.resolve({ id: target.id }) });
+    expect(response.status).toBe(200);
+    expect((await response.json()).message).toMatch(/^Grade atualizada/);
+    const reread = await prismaMod.prisma.commercialGrade.findUniqueOrThrow({ where: { id: target.id } });
+    expect(reread.totalCourseHours).toBe(2000);
+    expect(reread.originalName).toBe("OUTRA GRADE V2.PDF");
+    expect(await storedCount()).toBe(before);
+    const missing = await POST(new Request("http://localhost/api/commercial-grades/x/reread", { method: "POST" }), { params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }) });
+    expect(missing.status).toBe(404);
+  });
+
   it("só administradores publicam grades", async (ctx) => {
     if (!dbOk) return ctx.skip();
     const { POST } = await import("@/app/api/commercial-grades/upload/route");

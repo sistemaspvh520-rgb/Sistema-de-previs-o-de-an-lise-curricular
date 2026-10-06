@@ -85,6 +85,7 @@ export async function extractCurriculum(client: OpenAI, input: ExtractorInput): 
       // Uma grade de até 20 períodos cabe com folga neste limite; evitar margem de
       // saída excessiva reduz o custo em documentos grandes.
       max_output_tokens: 12_000,
+      store: false,
     });
     const parsed = response.output_parsed;
     if (!parsed) {

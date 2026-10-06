@@ -31,6 +31,7 @@ vi.mock("@/services/pdf/parser", () => ({ parsePdf: () => parseImpl() }));
 const calls: number[] = [];
 const inputs: unknown[] = [];
 let aiBehavior: (maxOutputTokens: number) => Promise<unknown> = async () => { throw new OpenAIIntegrationError("AI_DISABLED", OPENAI_ERROR_MESSAGES.AI_DISABLED); };
+vi.mock("@/services/openai/usage", () => ({ recordUsage: async () => undefined }));
 vi.mock("@/services/openai/client-factory", () => ({
   getOpenAIClient: async () => ({
     config: { extractionModel: "modelo-teste" },
@@ -40,7 +41,7 @@ vi.mock("@/services/openai/client-factory", () => ({
 
 const pdfText = (text: string) => { parseImpl = async () => ({ textByPage: [text] }); };
 
-describe("leitura local da grade comercial (IA desligada)", () => {
+describe("leitura da grade comercial (PDF + IA)", () => {
   beforeEach(() => {
     parseImpl = async () => ({ textByPage: [] });
     calls.length = 0;
@@ -88,18 +89,43 @@ describe("leitura local da grade comercial (IA desligada)", () => {
     expect(reading.source).toBe("LOCAL");
     expect(reading.aiNote).toBeNull();
     expect(reading.complete).toBe(false);
-    expect(calls).toEqual([6_000]);
+    expect(calls).toEqual([4_000]);
   });
 
-  it("matriz do SIAA lida por inteiro no PDF: não chama a IA", async () => {
+  it("IA desligada: matriz do SIAA lida por inteiro no PDF", async () => {
     parseImpl = async () => ({ textByPage: ["x"], pages: siaaPages({ internship: "640" }) });
-    aiBehavior = async () => { throw new Error("a IA não deveria ser chamada"); };
     const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
     const reading = await readCommercialGrade(Buffer.from("x"), "NUTRIÇÃO.PDF");
-    expect(calls).toEqual([]);
     expect(reading).toMatchObject({ source: "LOCAL", aiNote: null, complete: true, courseName: "NUTRIÇÃO (BACHARELADO)", modality: "EAD", curriculumTerm: "2025.2", degree: "Bacharelado", knowledgeArea: "Saúde", durationSemesters: 8, totalInternshipHours: 640, totalCourseHours: 3200, hasTcc: true });
     expect(reading.whatsappSummary).toContain("- 8º sem.: ESTÁGIO CURRICULAR SUPERVISIONADO EM NUTRIÇÃO CLÍNICA (214h)");
     expect(reading.whatsappSummary).toContain("Ao todo, a matriz prevê 640 horas de estágio durante o curso.");
+  });
+
+  const nutritionAi = { courseName: "NUTRIÇÃO (BACHARELADO)", modality: "EAD", curriculumTerm: "2025.2", hasTcc: true, totalInternshipHours: 640, totalCourseHours: 3200, internships: [{ semester: 8, name: "Estágio Curricular Supervisionado em Nutrição Clínica", workload: 214 }], degree: "Bacharelado", knowledgeArea: "Saúde", durationSemesters: 8, tracks: [] };
+
+  it("IA ligada: lê a grade e, quando bate com as colunas do PDF, fica conferida", async () => {
+    parseImpl = async () => ({ textByPage: ["x"], pages: siaaPages({ internship: "640" }) });
+    aiBehavior = async () => ({ status: "completed", output_parsed: nutritionAi });
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "NUTRIÇÃO.PDF");
+    expect(calls).toEqual([4_000]);
+    expect(reading).toMatchObject({ source: "AI", checkedWithPdf: true, complete: true, totalInternshipHours: 640, totalCourseHours: 3200, durationSemesters: 8, hasTcc: true });
+    expect(reading.divergences).toBeUndefined();
+  });
+
+  it("IA ligada: se a IA divergir do PDF, vale o PDF e cada divergência é apontada", async () => {
+    parseImpl = async () => ({ textByPage: ["x"], pages: siaaPages({ internship: "640" }) });
+    aiBehavior = async () => ({ status: "completed", output_parsed: { ...nutritionAi, totalCourseHours: 669, hasTcc: false, internships: [], totalInternshipHours: 0 } });
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "NUTRIÇÃO.PDF");
+    expect(reading).toMatchObject({ source: "LOCAL", totalCourseHours: 3200, totalInternshipHours: 640, hasTcc: true });
+    expect(reading.divergences).toEqual([
+      "carga horária total (PDF: 3.200h; IA: 669h)",
+      "horas de estágio (PDF: 640h; IA: 0h)",
+      "semestres de estágio (PDF: 8º; IA: nenhum)",
+      "TCC (PDF: sim; IA: não)",
+    ]);
+    expect(reading.whatsappSummary).not.toMatch(/669/);
   });
 
   it("informa que não há estágio quando o resumo do PDF declara estágio zerado", async () => {
@@ -113,10 +139,10 @@ describe("leitura local da grade comercial (IA desligada)", () => {
   it("repete com mais espaço de saída quando a resposta da IA vem cortada e usa o resultado da IA", async () => {
     pdfText("Matriz Curricular - 20251 - CST EM ESTÉTICA E COSMÉTICA");
     const ai = { courseName: "CST em Estética e Cosmética", modality: "EAD", curriculumTerm: "2025.1", hasTcc: true, totalInternshipHours: 160, totalCourseHours: 1680, internships: [{ semester: 3, name: "Estágio em Estética I", workload: 80 }], degree: "Tecnólogo", knowledgeArea: "Saúde", durationSemesters: 4, tracks: [] };
-    aiBehavior = async (max) => (max === 6_000 ? { status: "incomplete", incomplete_details: { reason: "max_output_tokens" }, output_parsed: null } : { status: "completed", output_parsed: ai });
+    aiBehavior = async (max) => (max === 4_000 ? { status: "incomplete", incomplete_details: { reason: "max_output_tokens" }, output_parsed: null } : { status: "completed", output_parsed: ai });
     const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
     const reading = await readCommercialGrade(Buffer.from("x"), "a.pdf");
-    expect(calls).toEqual([6_000, 16_000]);
+    expect(calls).toEqual([4_000, 12_000]);
     expect(reading).toMatchObject({ source: "AI", totalCourseHours: 1680, totalInternshipHours: 160, curriculumTerm: "2025.1" });
     expect(reading.whatsappSummary).toContain("3º sem.: Estágio em Estética I (80h)");
     expect(reading.whatsappSummary).not.toMatch(/não possui estágio/);
@@ -127,7 +153,7 @@ describe("leitura local da grade comercial (IA desligada)", () => {
     aiBehavior = async () => { throw new TypeError("Body is unusable: Body has already been read"); };
     const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
     const reading = await readCommercialGrade(Buffer.from("x"), "a.pdf");
-    expect(calls).toEqual([6_000]);
+    expect(calls).toEqual([4_000]);
     expect(reading.aiNote).toContain("Body is unusable");
   });
 

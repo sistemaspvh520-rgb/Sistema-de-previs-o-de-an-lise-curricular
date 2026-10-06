@@ -44,6 +44,16 @@ describe("classificador de documento curricular", () => {
     expect(validateCurricularDocumentMetadata(text, { curso: "PEDAGOGIA (LICENCIATURA)", "semestre de entrada": "4º Semestre" }, initial).accepted).toBe(true);
   });
 
+  it("cabeçalho todo em branco (como o PDF do SIAA com campus/curso/semestre vazios) pede curso e semestre; aceita do 1º ao 20º", () => {
+    const text = "Solicitação de Transferência ou 2ª Graduação — Análise Curricular Campus / Unidade Curso Semestre de Entrada Resumo do Aproveitamento Disciplinas Dispensadas Disciplinas a Cursar Situação de Ingresso Data da Análise C.H.";
+    const initial = classifyCurricularAnalysisText(text);
+    const blank = { "semestre de entrada": "º Semestre" };
+    expect(validateCurricularDocumentMetadata(text, blank, initial).missing).toEqual(["course", "entryPeriod"]);
+    for (const entryPeriod of [1, 12, 20])
+      expect(validateCurricularDocumentMetadata(text, blank, initial, { courseName: "CST EM GESTÃO PÚBLICA", entryPeriod }).accepted).toBe(true);
+    expect(validateCurricularDocumentMetadata(text, blank, initial, { courseName: "CST EM GESTÃO PÚBLICA", entryPeriod: 21 }).missing).toEqual(["entryPeriod"]);
+  });
+
   it("não troca o motivo de documentos que já foram recusados", () => {
     const text = "Boleto bancário Campus / Unidade Semestre de Entrada";
     const initial = classifyCurricularAnalysisText(text);
