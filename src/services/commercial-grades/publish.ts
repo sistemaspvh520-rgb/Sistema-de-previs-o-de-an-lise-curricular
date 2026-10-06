@@ -11,31 +11,41 @@ export const COMMERCIAL_GRADE_MAX_MB = 4;
 export const COMMERCIAL_GRADE_PREFIX = "commercial-grades";
 
 /** `warning`: há algo para o time conferir (divergência IA × PDF, dado faltando ou IA indisponível). */
-export type PublishResult = { ok: true; id: string; message: string; warning: boolean } | { ok: false; error: string; status: number };
+export type PublishAction = "created" | "updated" | "unchanged";
+export type PublishResult = { ok: true; id: string; message: string; warning: boolean; action: PublishAction } | { ok: false; error: string; status: number };
 
 const refuse = (error: string, status = 422): PublishResult => ({ ok: false, error, status });
 
 /**
  * Lê o PDF e publica a grade no catálogo. Com `replaceId`, substitui a grade existente (mantém uma só por matriz).
+ * Com `upsert` (envio em lote), o mesmo PDF já publicado vira "sem mudança" e uma grade do mesmo curso e modalidade
+ * (mesmo com vigência diferente) é atualizada em vez de recusada.
  * Erros de negócio voltam como `{ ok: false }`; falhas inesperadas sobem para quem chamou registrar.
  */
-export async function publishCommercialGrade(input: { bytes: Buffer; filename: string; userId: string; replaceId?: string }): Promise<PublishResult> {
-  const { bytes, filename, userId, replaceId } = input;
-  const previous = replaceId ? await prisma.commercialGrade.findUnique({ where: { id: replaceId }, select: { id: true, storageKey: true } }) : null;
+export async function publishCommercialGrade(input: { bytes: Buffer; filename: string; userId: string; replaceId?: string; upsert?: boolean }): Promise<PublishResult> {
+  const { bytes, filename, userId, replaceId, upsert } = input;
+  let previous = replaceId ? await prisma.commercialGrade.findUnique({ where: { id: replaceId }, select: { id: true, storageKey: true } }) : null;
   if (replaceId && !previous) return refuse("Grade não encontrada.", 404);
 
   const contentHash = fingerprint(bytes);
-  const sameFile = await prisma.commercialGrade.findFirst({ where: { contentHash, ...(replaceId ? { NOT: { id: replaceId } } : {}) }, select: { courseName: true } });
+  const sameFile = await prisma.commercialGrade.findFirst({ where: { contentHash, ...(replaceId ? { NOT: { id: replaceId } } : {}) }, select: { id: true, courseName: true } });
+  if (sameFile && upsert && !replaceId) return { ok: true, id: sameFile.id, warning: false, action: "unchanged", message: `“${sameFile.courseName}” já estava atualizada (mesmo PDF).` };
   if (sameFile) return refuse(replaceId ? `Este PDF já pertence à grade “${sameFile.courseName}”.` : `Este mesmo PDF já está disponível como “${sameFile.courseName}”.`, 409);
 
   const reading = await readCommercialGrade(bytes, filename);
   const courseName = reading.courseName || cleanReadingText(filename.replace(/\.pdf$/i, ""), 180) || "Grade sem nome";
   const catalogKey = fingerprint(`${normalizeCatalogValue(courseName)}|${normalizeCatalogValue(reading.modality)}|${normalizeCatalogValue(reading.curriculumTerm)}`);
+  if (upsert && !previous) {
+    // Mesmo curso e modalidade: é a nova versão da matriz. Prefere a de mesma vigência; senão, a mais recente.
+    const candidates = await prisma.commercialGrade.findMany({ where: { courseName: { equals: courseName, mode: "insensitive" } }, select: { id: true, storageKey: true, modality: true, curriculumTerm: true, updatedAt: true }, orderBy: { updatedAt: "desc" } });
+    const sameModality = candidates.filter((item) => normalizeCatalogValue(item.modality) === normalizeCatalogValue(reading.modality));
+    previous = sameModality.find((item) => normalizeCatalogValue(item.curriculumTerm) === normalizeCatalogValue(reading.curriculumTerm)) ?? sameModality[0] ?? null;
+  }
   const sameMatrix = await prisma.commercialGrade.findFirst({
-    where: { ...(replaceId ? { NOT: { id: replaceId } } : {}), OR: [{ catalogKey }, { courseName, modality: reading.modality, curriculumTerm: reading.curriculumTerm }] },
+    where: { ...(previous ? { NOT: { id: previous.id } } : {}), OR: [{ catalogKey }, { courseName, modality: reading.modality, curriculumTerm: reading.curriculumTerm }] },
     select: { courseName: true, curriculumTerm: true },
   });
-  if (sameMatrix) return refuse(`Já existe uma matriz de “${sameMatrix.courseName}”${sameMatrix.curriculumTerm ? ` (${sameMatrix.curriculumTerm})` : ""}. Exclua a versão anterior antes de ${replaceId ? "atualizar" : "publicar outra"}.`, 409);
+  if (sameMatrix) return refuse(`Já existe uma matriz de “${sameMatrix.courseName}”${sameMatrix.curriculumTerm ? ` (${sameMatrix.curriculumTerm})` : ""}. Exclua a versão anterior antes de ${previous ? "atualizar" : "publicar outra"}.`, 409);
 
   const stored = await getStorage().save(bytes, { extension: "pdf", prefix: COMMERCIAL_GRADE_PREFIX });
   const data = gradeData(reading, { courseName, contentHash, catalogKey, originalName: filename, storageKey: stored.key, sizeBytes: stored.sizeBytes, uploadedById: userId });
@@ -57,7 +67,7 @@ export async function publishCommercialGrade(input: { bytes: Buffer; filename: s
     logger.error("commercial_grade.audit_failed", { id, error: String(error) });
   }
   const notice = publishMessage(reading, Boolean(previous));
-  return { ok: true, id, message: notice.message, warning: notice.warning };
+  return { ok: true, id, message: notice.message, warning: notice.warning, action: previous ? "updated" : "created" };
 }
 
 /** Mensagem ao publicar: diz quem leu a grade (IA conferida com o PDF, só o PDF) e o que o time precisa conferir. */

@@ -52,8 +52,9 @@ function gradePdf(label: string, courseHours = "1.680") {
   ]);
 }
 
-function upload(bytes: Buffer | string, name = "CST EM ESTÉTICA E COSMÉTICA.PDF", url = "http://localhost/api/commercial-grades/upload") {
+function upload(bytes: Buffer | string, name = "CST EM ESTÉTICA E COSMÉTICA.PDF", url = "http://localhost/api/commercial-grades/upload", mode?: "upsert") {
   const form = new FormData();
+  if (mode) form.set("mode", mode);
   form.set("file", new File([new Uint8Array(typeof bytes === "string" ? Buffer.from(bytes) : bytes)], name, { type: "application/pdf" }));
   return new Request(url, { method: "POST", body: form });
 }
@@ -128,6 +129,33 @@ describe("envio de grade comercial pela API", () => {
     expect(await storedCount()).toBe(before);
     const missing = await POST(new Request("http://localhost/api/commercial-grades/x/reread", { method: "POST" }), { params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }) });
     expect(missing.status).toBe(404);
+  });
+
+  it("envio em lote (upsert): cria, atualiza a grade do mesmo curso e ignora o mesmo PDF", async (ctx) => {
+    if (!dbOk) return ctx.skip();
+    const { POST } = await import("@/app/api/commercial-grades/upload/route");
+    const send = async (bytes: Buffer, name: string) => {
+      const response = await POST(upload(bytes, name, undefined, "upsert"));
+      return { status: response.status, body: await response.json() };
+    };
+    const created = await send(gradePdf("LOTE", "1.000"), "LOTE v1.PDF");
+    expect(created).toMatchObject({ status: 200, body: { action: "created" } });
+    const before = await storedCount();
+    const total = await prismaMod.prisma.commercialGrade.count({ where: { uploadedById: userId } });
+
+    // Mesmo curso, conteúdo novo: atualiza a grade existente (um só registro e um só arquivo no armazenamento).
+    const updated = await send(gradePdf("LOTE", "1.100"), "LOTE v2.PDF");
+    expect(updated).toMatchObject({ status: 200, body: { action: "updated", id: created.body.id } });
+    expect(await prismaMod.prisma.commercialGrade.count({ where: { uploadedById: userId } })).toBe(total);
+    expect(await storedCount()).toBe(before);
+    expect((await prismaMod.prisma.commercialGrade.findUniqueOrThrow({ where: { id: created.body.id } })).totalCourseHours).toBe(1100);
+
+    // O mesmo PDF de novo não é erro: fica "sem mudança".
+    const unchanged = await send(gradePdf("LOTE", "1.100"), "LOTE v2 de novo.PDF");
+    expect(unchanged).toMatchObject({ status: 200, body: { action: "unchanged", id: created.body.id } });
+
+    // Sem o modo em lote, o mesmo PDF continua sendo recusado (409).
+    expect((await POST(upload(gradePdf("LOTE", "1.100"), "LOTE v2 repetida.PDF"))).status).toBe(409);
   });
 
   it("só administradores publicam grades", async (ctx) => {
