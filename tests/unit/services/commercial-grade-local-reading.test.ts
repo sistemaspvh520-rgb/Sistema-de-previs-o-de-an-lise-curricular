@@ -103,6 +103,15 @@ describe("leitura da grade comercial (PDF + IA)", () => {
 
   const nutritionAi = { courseName: "NUTRIÇÃO (BACHARELADO)", modality: "EAD", curriculumTerm: "2025.2", hasTcc: true, totalInternshipHours: 640, totalCourseHours: 3200, internships: [{ semester: 8, name: "Estágio Curricular Supervisionado em Nutrição Clínica", workload: 214 }], degree: "Bacharelado", knowledgeArea: "Saúde", durationSemesters: 8, tracks: [] };
 
+  it("opção 'sem IA': lê só o PDF e não chama a OpenAI nem com a IA ligada", async () => {
+    parseImpl = async () => ({ textByPage: ["x"], pages: siaaPages({ internship: "640" }) });
+    aiBehavior = async () => ({ status: "completed", output_parsed: nutritionAi });
+    const { readCommercialGrade } = await import("@/services/commercial-grades/reader");
+    const reading = await readCommercialGrade(Buffer.from("x"), "NUTRIÇÃO.PDF", { useAi: false });
+    expect(calls).toEqual([]);
+    expect(reading).toMatchObject({ source: "LOCAL", aiNote: null, complete: true, totalCourseHours: 3200, totalInternshipHours: 640, durationSemesters: 8 });
+  });
+
   it("IA ligada: lê a grade e, quando bate com as colunas do PDF, fica conferida", async () => {
     parseImpl = async () => ({ textByPage: ["x"], pages: siaaPages({ internship: "640" }) });
     aiBehavior = async () => ({ status: "completed", output_parsed: nutritionAi });
