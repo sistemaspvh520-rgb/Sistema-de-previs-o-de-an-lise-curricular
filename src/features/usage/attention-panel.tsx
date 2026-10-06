@@ -20,7 +20,16 @@ export const TONE = {
   warning: { tile: "border-status-warning/30 bg-status-warning-bg/60", bar: "bg-status-warning", icon: "bg-status-warning text-white", text: "text-status-warning", chip: "bg-status-warning-bg text-status-warning ring-status-warning/20" },
 } satisfies Record<AttentionTone, Record<string, string>>;
 
-export function AttentionPanel({ counts, flagged, accounts, active, hrefFor }: { counts: Record<AttentionKind, number>; flagged: number; accounts: number; active?: AttentionKind; hrefFor: (kind?: AttentionKind) => string }) {
+/** Quantos nomes cada bloco mostra antes de resumir em "+N" (o bloco selecionado mostra todos). */
+const NAMES_PREVIEW = 4;
+
+/** "Maria da Silva Souza" → "Maria Souza": cabe no bloco sem perder a identificação. */
+const shortName = (name: string) => {
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 2 ? `${parts[0]} ${parts[parts.length - 1]}` : name;
+};
+
+export function AttentionPanel({ counts, names, flagged, accounts, active, hrefFor }: { counts: Record<AttentionKind, number>; names: Record<AttentionKind, string[]>; flagged: number; accounts: number; active?: AttentionKind; hrefFor: (kind?: AttentionKind) => string }) {
   if (!flagged) {
     return (
       <section id="atencao" aria-label="Pedem atenção" className="mt-6 flex items-center gap-4 rounded-2xl border border-status-success/30 bg-status-success-bg/60 p-5">
@@ -60,7 +69,7 @@ export function AttentionPanel({ counts, flagged, accounts, active, hrefFor }: {
               scroll={false}
               aria-current={selected ? "true" : undefined}
               className={cn(
-                "group relative overflow-hidden rounded-xl border p-3 pl-4 transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "group relative flex flex-col overflow-hidden rounded-xl border p-3 pl-4 transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 count ? style.tile : "border-slate-200 bg-slate-50/60",
                 selected && "ring-2 ring-slate-900/70",
                 active && !selected && "opacity-60 hover:opacity-100",
@@ -73,6 +82,17 @@ export function AttentionPanel({ counts, flagged, accounts, active, hrefFor }: {
               </div>
               <div className="mt-2 text-sm font-semibold leading-tight text-slate-900">{title}</div>
               <div className="text-[11px] text-muted-foreground">{count ? caption : "ninguém"}</div>
+              {count > 0 && (
+                <ul aria-label={`Quem: ${title}`} className="mt-2.5 space-y-0.5 border-t border-black/5 pt-2">
+                  {(selected ? names[kind] : names[kind].slice(0, NAMES_PREVIEW)).map((name) => (
+                    <li key={name} className="flex items-center gap-1.5 text-xs text-slate-800">
+                      <span aria-hidden="true" className={cn("size-1.5 shrink-0 rounded-full", style.bar)} />
+                      <span className="truncate" title={name}>{shortName(name)}</span>
+                    </li>
+                  ))}
+                  {!selected && names[kind].length > NAMES_PREVIEW && <li className={cn("pl-3 text-[11px] font-medium", style.text)}>+{names[kind].length - NAMES_PREVIEW} {names[kind].length - NAMES_PREVIEW === 1 ? "pessoa" : "pessoas"} · ver todas</li>}
+                </ul>
+              )}
             </Link>
           );
         })}

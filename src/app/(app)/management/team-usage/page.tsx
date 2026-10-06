@@ -68,6 +68,8 @@ export default async function TeamUsagePage({ searchParams }: PageProps<"/manage
   const adoption = report.accounts ? Math.round((report.active7d / report.accounts) * 100) : 0;
   const flags = attentionFlags(report);
   const counts = attentionCounts(flags);
+  // Nomes de cada bloco, na ordem da tabela (quem mais usa primeiro).
+  const attentionNames = Object.fromEntries(ATTENTION_KINDS.map(({ kind }) => [kind, report.people.filter((person) => flags[person.id]?.some((flag) => flag.kind === kind)).map((person) => person.name)])) as Record<AttentionKind, string[]>;
   const visiblePeople = attention ? report.people.filter((person) => flags[person.id]?.some((flag) => flag.kind === attention)) : report.people;
   const moduleHref = (module?: WorkModule) => {
     if (module === "GRADES") return here({ view: "grades" });
@@ -178,7 +180,7 @@ export default async function TeamUsagePage({ searchParams }: PageProps<"/manage
             <LightMetric label="Logins" value={String(report.logins)} detail={period.label} />
           </dl>
 
-          <AttentionPanel counts={counts} flagged={flaggedPeople(flags)} accounts={report.accounts} active={attention} hrefFor={attentionHref} />
+          <AttentionPanel counts={counts} names={attentionNames} flagged={flaggedPeople(flags)} accounts={report.accounts} active={attention} hrefFor={attentionHref} />
 
           <section aria-label="Uso por módulo" className="mt-6 grid gap-4 lg:grid-cols-3">
             {report.modules.map((summary) => (
