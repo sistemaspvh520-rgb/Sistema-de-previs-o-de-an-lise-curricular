@@ -42,7 +42,7 @@ export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
     <div className="space-y-4">
       <div className="rounded-xl border border-brand-cyan-200 bg-brand-cyan-50/50 p-4">
         <div className="flex gap-3">
-          <span className="rounded-lg bg-brand-navy p-2 text-white"><FileSearch className="size-5" /></span>
+          <span className="flex size-9 shrink-0 items-center justify-center self-start rounded-lg bg-brand-navy text-white"><FileSearch className="size-5" /></span>
           <div>
             <p className="font-medium text-brand-navy">Leitura automática do PDF</p>
             <p className="mt-1 text-sm text-muted-foreground">A IA lê a matriz (com a IA ligada nas configurações) e o sistema confere com as colunas do PDF: curso, grau, área, duração, estágios obrigatórios (com as horas), TCC e carga horária. Se discordarem, vale o PDF e o aviso mostra o que conferir.</p>
