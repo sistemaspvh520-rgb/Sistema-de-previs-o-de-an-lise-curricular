@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, FileSearch, Info, Loader2, Pencil, Plus, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, FileSearch, Info, Loader2, Pencil, Plus, RefreshCw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn, formatDateTime, ordinal, pluralize } from "@/lib/utils";
@@ -173,7 +173,7 @@ export function AuditTab({ vm, canEdit, onLocateSubject, onEditSubject }: { vm: 
       {/* Números declarados no documento */}
       {vm.claims.length > 0 && (
         <section className="rounded-xl border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4 text-brand-cyan-700" /> Números do documento × cálculo do sistema</div>
+          <div className="flex items-center gap-2 text-sm font-semibold"><RefreshCw className="size-4 text-brand-cyan-700" /> Números do documento × cálculo do sistema</div>
           {mismatchedClaims.length > 0 ? (
             <ul className="mt-2 space-y-1.5 text-sm">
               {mismatchedClaims.map((c) => <ClaimRow key={c.id} claim={c} />)}

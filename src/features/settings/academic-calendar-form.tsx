@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Bot, CalendarClock, Check, FileUp, Loader2, Save, Sparkles } from "lucide-react";
+import { Bot, CalendarClock, Check, FileUp, Loader2, Save, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export function AcademicCalendarForm({ initialTerms, currentYear }: { initialTer
 
   return <div className="space-y-6">
     <section className="rounded-xl border border-brand-cyan/25 bg-brand-cyan-50/25 p-4 sm:p-5" aria-labelledby="calendar-ai-title">
-      <div className="flex items-start gap-3"><div className="rounded-lg bg-white p-2 text-brand-navy"><Bot className="size-5" /></div><div className="min-w-0 flex-1"><h3 id="calendar-ai-title" className="font-semibold">Importar datas com IA</h3><p className="mt-1 text-sm text-muted-foreground">A IA procura apenas início e término dos semestres. Enviamos um pequeno trecho de texto extraído localmente — não o PDF completo — e você confere antes de salvar.</p></div><Badge variant="outline" className="shrink-0"><Sparkles className="mr-1 size-3" />até 500 tokens de saída</Badge></div>
+      <div className="flex items-start gap-3"><div className="rounded-lg bg-white p-2 text-brand-navy"><Bot className="size-5" /></div><div className="min-w-0 flex-1"><h3 id="calendar-ai-title" className="font-semibold">Importar datas com IA</h3><p className="mt-1 text-sm text-muted-foreground">A IA procura apenas início e término dos semestres. Enviamos um pequeno trecho de texto extraído localmente — não o PDF completo — e você confere antes de salvar.</p></div><Badge variant="outline" className="shrink-0"><RefreshCw className="mr-1 size-3" />até 500 tokens de saída</Badge></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)_auto] sm:items-end">
         <label className="space-y-1.5 text-sm font-medium">Ano do documento<Select value={targetYear} onValueChange={setTargetYear}><SelectTrigger aria-label="Ano do calendário a extrair"><SelectValue /></SelectTrigger><SelectContent>{years.map((year) => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}</SelectContent></Select></label>
         <label className="space-y-1.5 text-sm font-medium">Calendário em PDF<Input type="file" accept="application/pdf,.pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="h-auto min-h-10 file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm" />{file && <span className="block truncate text-xs font-normal text-muted-foreground">{file.name}</span>}</label>
