@@ -22,8 +22,8 @@ const refuse = (error: string, status = 422): PublishResult => ({ ok: false, err
  * (mesmo com vigência diferente) é atualizada em vez de recusada.
  * Erros de negócio voltam como `{ ok: false }`; falhas inesperadas sobem para quem chamou registrar.
  */
-export async function publishCommercialGrade(input: { bytes: Buffer; filename: string; userId: string; replaceId?: string; upsert?: boolean }): Promise<PublishResult> {
-  const { bytes, filename, userId, replaceId, upsert } = input;
+export async function publishCommercialGrade(input: { bytes: Buffer; filename: string; userId: string; replaceId?: string; upsert?: boolean; useAi?: boolean }): Promise<PublishResult> {
+  const { bytes, filename, userId, replaceId, upsert, useAi } = input;
   let previous = replaceId ? await prisma.commercialGrade.findUnique({ where: { id: replaceId }, select: { id: true, storageKey: true } }) : null;
   if (replaceId && !previous) return refuse("Grade não encontrada.", 404);
 
@@ -32,7 +32,7 @@ export async function publishCommercialGrade(input: { bytes: Buffer; filename: s
   if (sameFile && upsert && !replaceId) return { ok: true, id: sameFile.id, warning: false, action: "unchanged", message: `“${sameFile.courseName}” já estava atualizada (mesmo PDF).` };
   if (sameFile) return refuse(replaceId ? `Este PDF já pertence à grade “${sameFile.courseName}”.` : `Este mesmo PDF já está disponível como “${sameFile.courseName}”.`, 409);
 
-  const reading = await readCommercialGrade(bytes, filename);
+  const reading = await readCommercialGrade(bytes, filename, { useAi });
   const courseName = reading.courseName || cleanReadingText(filename.replace(/\.pdf$/i, ""), 180) || "Grade sem nome";
   const catalogKey = fingerprint(`${normalizeCatalogValue(courseName)}|${normalizeCatalogValue(reading.modality)}|${normalizeCatalogValue(reading.curriculumTerm)}`);
   if (upsert && !previous) {

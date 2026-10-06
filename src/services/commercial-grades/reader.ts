@@ -83,7 +83,7 @@ const REPEATED_HEADER = /^(C\.H\. Aula|Cod\. Disc\.|Descrição\s+Grp|Teoria$)/i
  * indisponível, vale a leitura do PDF.
  * Nunca lança por causa do conteúdo do PDF: o que não puder ser lido vira campo vazio, para o time comercial revisar.
  */
-export async function readCommercialGrade(bytes: Buffer, filename: string): Promise<CommercialGradeReading> {
+export async function readCommercialGrade(bytes: Buffer, filename: string, options: { useAi?: boolean } = {}): Promise<CommercialGradeReading> {
   let text = "";
   let pages: ParsedPage[] | undefined;
   try {
@@ -98,7 +98,8 @@ export async function readCommercialGrade(bytes: Buffer, filename: string): Prom
   const fallback = fromPdf && layout && layoutComplete(layout) ? fromPdf : fromPdf ? mergeReadings(fromPdf, localReading(text, filename)) : localReading(text, filename);
   const complete = Boolean(fallback.courseName && fallback.totalCourseHours !== null && fallback.durationSemesters !== null);
 
-  const ai = await readWithAi(bytes, filename, text);
+  // `useAi: false` (opção "sem IA" do envio): lê só as colunas do PDF, sem chamar a OpenAI nem gastar a API.
+  const ai = options.useAi === false ? { reading: null, note: null } : await readWithAi(bytes, filename, text);
   if (!ai.reading) return { ...sanitizeReading(fallback), aiNote: ai.note, complete };
   const divergences = fromPdf ? findDivergences(fromPdf, ai.reading) : [];
   if (divergences.length) {

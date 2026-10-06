@@ -35,6 +35,8 @@ export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [dragging, setDragging] = useState(false);
   const [sending, setSending] = useState(false);
+  // Ligado: a IA lê e confere cada grade (gasta a API). Desligado: só o PDF é lido, sem custo.
+  const [useAi, setUseAi] = useState(true);
   const pending = items.filter((item) => item.status === "pending" || item.status === "error");
 
   function add(candidates: FileList | File[] | null | undefined) {
@@ -69,7 +71,7 @@ export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
     // Um PDF por vez: a leitura pela IA de cada grade é independente e o servidor limita o tempo de cada envio.
     for (const item of pending) {
       patch(item.id, { status: "sending", message: undefined });
-      const result = await sendCommercialGradePdf("/api/commercial-grades/upload", item.file, { upsert: true });
+      const result = await sendCommercialGradePdf("/api/commercial-grades/upload", item.file, { upsert: true, useAi });
       if (!result.ok) {
         counts.error += 1;
         patch(item.id, { status: "error", message: result.error });
@@ -147,6 +149,13 @@ export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
         </section>
       )}
 
+      <label className={cn("flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors", useAi ? "bg-card" : "border-status-success/40 bg-status-success-bg/50", sending && "pointer-events-none opacity-70")}>
+        <input type="checkbox" className="mt-0.5 size-4 accent-[#003B71]" checked={!useAi} disabled={sending} onChange={(event) => setUseAi(!event.target.checked)} />
+        <span>
+          <span className="font-medium text-slate-900">Ler só pelo PDF, sem usar a IA</span>
+          <span className="block text-xs text-muted-foreground">Não consome a API da OpenAI. As matrizes do SIAA são lidas direto das colunas do PDF; use &ldquo;Reler com IA&rdquo; depois, se quiser a conferência da IA.</span>
+        </span>
+      </label>
       <div className="flex justify-end gap-2">
         {items.length > 0 && <Button type="button" variant="ghost" disabled={sending} onClick={clear}>Limpar lista</Button>}
         <Button type="button" onClick={submit} disabled={!pending.length || sending}>

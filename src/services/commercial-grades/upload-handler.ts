@@ -43,7 +43,7 @@ export async function handleCommercialGradeUpload(request: Request, replaceId?: 
     const bytes = Buffer.from(await file.arrayBuffer());
     await validatePdfBytes(bytes, { maxBytes });
     const filename = file.name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 200);
-    const result = await publishCommercialGrade({ bytes, filename, userId: auth.userId, replaceId, upsert: form.get("mode") === "upsert" });
+    const result = await publishCommercialGrade({ bytes, filename, userId: auth.userId, replaceId, upsert: form.get("mode") === "upsert", useAi: form.get("ai") !== "off" });
     if (!result.ok) return json({ error: result.error }, result.status);
     revalidatePath("/commercial-grades");
     return json({ id: result.id, message: result.message, warning: result.warning, action: result.action });
