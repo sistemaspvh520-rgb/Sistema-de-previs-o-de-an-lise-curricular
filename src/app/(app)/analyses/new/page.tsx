@@ -7,6 +7,21 @@ import { zonedDateParts } from "@/lib/time";
 import { suggestStartTerm } from "@/domain/curricular-analysis/simulation/terms";
 import { resolveDefaultAcademicTerm } from "@/domain/academic-calendar/calendar";
 import { getAcademicCalendar } from "@/repositories/academic-calendar-repository";
+import { prisma } from "@/lib/prisma";
+
+/** Nomes de curso já usados nas análises e nas grades comerciais: sugestões quando o SIAA deixa o curso em branco. */
+async function courseSuggestions(): Promise<string[]> {
+  const [analyses, grades] = await Promise.all([
+    prisma.curricularAnalysis.findMany({ where: { courseName: { not: null } }, distinct: ["courseName"], select: { courseName: true }, take: 400 }),
+    prisma.commercialGrade.findMany({ distinct: ["courseName"], select: { courseName: true }, take: 400 }),
+  ]);
+  const byKey = new Map<string, string>();
+  for (const name of [...analyses.map((a) => a.courseName), ...grades.map((g) => g.courseName)]) {
+    const value = name?.trim();
+    if (value && !byKey.has(value.toLocaleLowerCase("pt-BR"))) byKey.set(value.toLocaleLowerCase("pt-BR"), value);
+  }
+  return [...byKey.values()].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
 
 export const metadata: Metadata = { title: "Nova análise" };
 export const dynamic = "force-dynamic";
@@ -15,9 +30,10 @@ export default async function NewAnalysisPage() {
   await requirePagePermission("analysis:create");
   const currentDate = zonedDateParts();
   const today = `${currentDate.year}-${String(currentDate.month).padStart(2, "0")}-${String(currentDate.day).padStart(2, "0")}`;
-  const [settings, calendarTerms] = await Promise.all([
+  const [settings, calendarTerms, courses] = await Promise.all([
     getSystemSettings(),
     getAcademicCalendar(currentDate.year + 10),
+    courseSuggestions(),
   ]);
   const defaultStartTerm = resolveDefaultAcademicTerm(settings.defaultStartTerm, today, calendarTerms) ?? suggestStartTerm();
 
@@ -33,7 +49,7 @@ export default async function NewAnalysisPage() {
         </div>
       </section>
       <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-6 lg:p-8">
-        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={defaultStartTerm} currentYear={currentDate.year} polos={settings.polos} courseFormats={settings.courseFormats} />
+        <UploadDropzone maxMb={settings.maxUploadMb} defaultStartTerm={defaultStartTerm} currentYear={currentDate.year} polos={settings.polos} courseFormats={settings.courseFormats} courseSuggestions={courses} />
       </section>
     </div>
   );

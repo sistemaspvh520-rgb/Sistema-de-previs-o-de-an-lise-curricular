@@ -130,18 +130,25 @@ export class InvalidCurricularDocumentError extends Error {
 }
 
 /** Lê apenas as três primeiras páginas: suficiente para cabeçalho e início da grade, sem iniciar o pipeline. */
-export async function assertCurricularAnalysisDocument(
+export async function inspectCurricularAnalysisDocument(
   bytes: Buffer,
   manual: ManualHeader = {},
 ): Promise<DocumentClassification> {
   const parsed = await parsePdf(bytes, { maxPages: 3 });
   const text = parsed.textByPage.join("\n");
-  const classification = validateCurricularDocumentMetadata(
+  return validateCurricularDocumentMetadata(
     text,
     parsed.headerFields ?? {},
     classifyCurricularAnalysisText(text),
     manual,
   );
+}
+
+export async function assertCurricularAnalysisDocument(
+  bytes: Buffer,
+  manual: ManualHeader = {},
+): Promise<DocumentClassification> {
+  const classification = await inspectCurricularAnalysisDocument(bytes, manual);
   if (!classification.accepted)
     throw new InvalidCurricularDocumentError(classification);
   return classification;
