@@ -42,7 +42,7 @@ export interface LocalExtraction {
   headerFields?: Record<string, string>;
 }
 
-export const PARSER_VERSION = "pdfjs-table-1.2";
+export const PARSER_VERSION = "pdfjs-table-1.3";
 
 const Y_TOLERANCE = 3.5;
 
@@ -90,6 +90,18 @@ interface RawItem {
   width: number;
   height: number;
   hasEOL?: boolean;
+}
+
+/**
+ * Páginas giradas (as matrizes curriculares do SIAA vêm com /Rotate 90 e o texto também girado): no espaço do PDF cada
+ * "linha" seria uma coluna. Aqui o texto vai para a orientação em que a página é exibida, mantendo a origem embaixo.
+ */
+function toDisplaySpace(items: RawItem[], viewport: { transform: number[]; height: number }, util: PdfJs["Util"]): RawItem[] {
+  return items.map((item) => {
+    const [a, b, c, d, e, f] = util.transform(viewport.transform, item.transform);
+    // O viewport tem y para baixo; as linhas usam y para cima, como o espaço do PDF.
+    return { ...item, transform: [a, -b, -c, -d, e, viewport.height - f] };
+  });
 }
 
 function groupIntoLines(items: RawItem[]): TextLine[] {
@@ -170,7 +182,8 @@ export async function parsePdf(bytes: Buffer, opts?: { maxPages?: number }): Pro
       const page = await doc.getPage(p);
       const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
-      const lines = groupIntoLines(content.items as unknown as RawItem[]);
+      const items = content.items as unknown as RawItem[];
+      const lines = groupIntoLines(page.rotate % 180 !== 0 ? toDisplaySpace(items, viewport, pdfjs.Util) : items);
       if (p === 1 && /HIST[ÓO]RICO ESCOLAR/i.test(lines.map(l => l.text).join(" "))) {
         const operators = await page.getOperatorList();
         for (let i = 0; i < operators.fnArray.length; i++) {
@@ -227,9 +240,12 @@ function extractUnifiedEnrollmentHeader(pages: ParsedPage[]): Record<string, str
   const courseX = labels.parts.find((part) => /^curso$/i.test(part.text.trim()))?.x;
   const entryX = labels.parts.find((part) => /semestre\s+de\s+entrada/i.test(part.text))?.x;
   if (campusX === undefined || courseX === undefined || entryX === undefined) return out;
-  // Inclui a quebra de linha do nome do curso, mas não os próximos rótulos
-  // "DATA DA ANÁLISE" e "SITUAÇÃO DE INGRESSO".
-  const values = first.lines.filter((line) => line.y < labels.y - 2 && line.y > labels.y - 35);
+  // Inclui a quebra de linha do nome do curso, mas para antes da próxima linha de rótulos
+  // ("DATA DA ANÁLISE" / "SITUAÇÃO DE INGRESSO"): campo vazio no SIAA continua vazio aqui.
+  const isLabel = (text: string) => /^(data da analise|situacao de ingresso|resumo do aproveitamento)$/.test(text.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase());
+  const nextLabels = first.lines.find((line) => line.y < labels.y - 2 && line.parts.some((part) => isLabel(part.text)));
+  const floor = Math.max(labels.y - 35, nextLabels ? nextLabels.y + 2 : -Infinity);
+  const values = first.lines.filter((line) => line.y < labels.y - 2 && line.y > floor);
   const readColumn = (from: number, to: number) => values
     .flatMap((line) => line.parts.filter((part) => part.x >= from - 4 && part.x < to - 4).map((part) => ({ y: line.y, text: part.text.trim() })))
     .sort((a, b) => b.y - a.y)

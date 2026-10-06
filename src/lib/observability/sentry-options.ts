@@ -1,6 +1,16 @@
 import type { ErrorEvent } from "@sentry/nextjs";
 
 /**
+ * A integração automática "OpenAI" do Sentry observa `responses.create` com `.then()`, o que já lê o corpo
+ * da resposta; o `responses.parse()` do SDK lê o mesmo `Response` de novo e falha com
+ * "TypeError: Body is unusable: Body has already been read" (só em produção, onde o Sentry está ligado).
+ * Sem rastreamento de desempenho ela não tem utilidade, e ainda levaria entrada/saída da IA para spans.
+ */
+export function withoutOpenAIIntegration<T extends { name: string }>(integrations: T[]): T[] {
+  return integrations.filter((integration) => integration.name !== "OpenAI");
+}
+
+/**
  * Opções comuns do Sentry (navegador, servidor e edge). Sem `NEXT_PUBLIC_SENTRY_DSN` o SDK fica
  * desligado. Pensado para LGPD: nada de dados pessoais automáticos, e a URL perde a query string
  * (links de convite e de redefinição de senha levam tokens nela).
@@ -12,6 +22,7 @@ export const sentryOptions = {
   sendDefaultPii: false,
   // Só erros; desempenho fica com o Vercel Speed Insights.
   tracesSampleRate: 0,
+  integrations: withoutOpenAIIntegration,
   beforeSend: scrubEvent,
 };
 

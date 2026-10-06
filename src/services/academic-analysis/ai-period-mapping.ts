@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import type OpenAI from "openai";
+import { withLowEffort } from "@/services/openai/economy";
 
 const responseSchema = z.object({
   assignments: z.array(z.object({ ref: z.number().int().min(0), period: z.number().int().min(1).max(20) })).max(200),
@@ -26,7 +27,8 @@ export async function assignHistoryPeriodsWithAI(input: {
   rows: HistoryRowForMapping[];
   courseName: string | null;
 }): Promise<{ periods: number[] | null; usage: { inputTokens: number; outputTokens: number; totalTokens: number } }> {
-  const response = await input.client.responses.parse({
+  const response = await withLowEffort(input.model, (effort) => input.client.responses.parse({
+    ...effort,
     model: input.model,
     instructions: [
       "Você organiza disciplinas de um Histórico Escolar brasileiro em períodos curriculares (semestres do curso).",
@@ -41,9 +43,9 @@ export async function assignHistoryPeriodsWithAI(input: {
       disciplinas: input.rows.map((row, ref) => ({ ref, nome: row.name, semestreLetivo: row.academicTerm ?? null, situacao: row.status })),
     }),
     text: { format: zodTextFormat(responseSchema, "history_curricular_periods") },
-    max_output_tokens: 4000,
+    max_output_tokens: 6000,
     store: false,
-  });
+  }));
   const usage = {
     inputTokens: response.usage?.input_tokens ?? 0,
     outputTokens: response.usage?.output_tokens ?? 0,

@@ -2,13 +2,13 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, CheckCircle2, FileUp, Loader2, Upload } from "lucide-react";
+import { CheckCircle2, FileSearch, FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { sendCommercialGradePdf } from "@/features/commercial-grades/upload-client";
 
-export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number; aiEnabled: boolean }) {
+export function CommercialGradeUploadForm({ maxMb }: { maxMb: number }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -33,7 +33,7 @@ export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number;
     const result = await sendCommercialGradePdf("/api/commercial-grades/upload", file);
     setSending(false);
     if (!result.ok) return void toast.error(result.error);
-    (/leitura simples/.test(result.message) ? toast.warning : toast.success)(result.message, { duration: 12_000 });
+    (result.warning ? toast.warning : toast.success)(result.message, { duration: 12_000 });
     clear();
     router.refresh();
   }
@@ -42,18 +42,13 @@ export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number;
     <div className="space-y-4">
       <div className="rounded-xl border border-brand-cyan-200 bg-brand-cyan-50/50 p-4">
         <div className="flex gap-3">
-          <span className="rounded-lg bg-brand-navy p-2 text-white"><Bot className="size-5" /></span>
+          <span className="rounded-lg bg-brand-navy p-2 text-white"><FileSearch className="size-5" /></span>
           <div>
-            <p className="font-medium text-brand-navy">Leitura automática da grade</p>
-            <p className="mt-1 text-sm text-muted-foreground">A IA identifica curso, estágios obrigatórios, TCC, carga horária e prepara a mensagem comercial.</p>
+            <p className="font-medium text-brand-navy">Leitura automática do PDF</p>
+            <p className="mt-1 text-sm text-muted-foreground">A IA lê a matriz (com a IA ligada nas configurações) e o sistema confere com as colunas do PDF: curso, grau, área, duração, estágios obrigatórios (com as horas), TCC e carga horária. Se discordarem, vale o PDF e o aviso mostra o que conferir.</p>
           </div>
         </div>
       </div>
-      {!aiEnabled && (
-        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <strong>A IA está desligada.</strong> Sem ela, a grade é lida de forma simples e pode ficar sem estágios, vigência ou carga horária. Para a leitura completa, ative em Configurações → OpenAI e depois use “Atualizar grade” nas grades já enviadas.
-        </p>
-      )}
       <div
         role="button"
         tabIndex={0}
@@ -79,7 +74,7 @@ export function CommercialGradeUploadForm({ maxMb, aiEnabled }: { maxMb: number;
       <div className="flex justify-end gap-2">
         {file && <Button type="button" variant="ghost" disabled={sending} onClick={clear}>Remover arquivo</Button>}
         <Button type="button" onClick={submit} disabled={!file || sending}>
-          {sending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} {sending ? "Lendo grade com IA..." : "Ler e disponibilizar grade"}
+          {sending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} {sending ? "Lendo a grade..." : "Ler e disponibilizar grade"}
         </Button>
       </div>
     </div>

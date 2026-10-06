@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CircleCheck,
@@ -44,6 +44,10 @@ import {
   type StudentMatch,
 } from "@/features/analyses/lookup-actions";
 import { normalizeStudentName } from "@/domain/student-name";
+import type { HeaderField } from "@/services/pdf/document-classifier";
+
+/** Semestres de entrada oferecidos quando o PDF do SIAA vem sem o número do semestre. */
+const ENTRY_PERIOD_OPTIONS = Array.from({ length: 20 }, (_, index) => String(index + 1));
 
 function describeTerm(term: string): string {
   return term.endsWith(".1")
@@ -57,12 +61,15 @@ export function UploadDropzone({
   currentYear,
   polos,
   courseFormats,
+  courseSuggestions = [],
 }: {
   maxMb: number;
   defaultStartTerm: string;
   currentYear: number;
   polos: Polo[];
   courseFormats: CourseFormat[];
+  /** Cursos já usados no sistema, sugeridos quando o curso precisa ser informado. */
+  courseSuggestions?: string[];
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +83,44 @@ export function UploadDropzone({
   const [poloCode, setPoloCode] = useState("");
   const [courseFormat, setCourseFormat] = useState("");
   const formatReady = courseFormats.includes(courseFormat as CourseFormat);
+  // O SIAA às vezes publica o resultado com curso/semestre de entrada em branco: o cabeçalho é lido assim que o PDF
+  // é anexado e o analista informa aqui o que faltar (o envio também devolve PDF_HEADER_INCOMPLETE como reserva).
+  const [missingHeader, setMissingHeader] = useState<HeaderField[]>([]);
+  const [manualCourse, setManualCourse] = useState("");
+  const [manualEntryPeriod, setManualEntryPeriod] = useState("");
+  const [inspecting, setInspecting] = useState(false);
+  const [rejectedReason, setRejectedReason] = useState<string | null>(null);
+  const inspection = useRef(0);
+  const asksCourse = missingHeader.includes("course");
+  const asksEntryPeriod = missingHeader.includes("entryPeriod");
+  const manualReady =
+    (!asksCourse || manualCourse.trim().length >= 3) &&
+    (!asksEntryPeriod || ENTRY_PERIOD_OPTIONS.includes(manualEntryPeriod));
+  async function inspectHeader(next: File, id: number) {
+    const fd = new FormData();
+    fd.append("file", next);
+    try {
+      const res = await fetch("/api/analyses/upload/inspect", { method: "POST", body: fd });
+      const body = await res.json().catch(() => ({}));
+      if (inspection.current !== id) return;
+      if (Array.isArray(body.missing)) setMissingHeader(body.missing as HeaderField[]);
+      if (body.accepted === false && body.error) setRejectedReason(String(body.error));
+    } catch {
+      // Sem a leitura prévia o envio segue normalmente; o servidor ainda pede o que faltar.
+    } finally {
+      if (inspection.current === id) setInspecting(false);
+    }
+  }
+  function chooseFile(next: File | null) {
+    const id = ++inspection.current;
+    setFile(next);
+    setMissingHeader([]);
+    setManualCourse("");
+    setManualEntryPeriod("");
+    setRejectedReason(null);
+    setInspecting(Boolean(next));
+    if (next) void inspectHeader(next, id);
+  }
   // Consulta análises anteriores do aluno enquanto o nome é digitado; se existir, exige declarar reanálise.
   const [matches, setMatches] = useState<StudentMatch[]>([]);
   const [looking, setLooking] = useState(false);
@@ -121,26 +166,30 @@ export function UploadDropzone({
   const selectedPolo = polos.find((polo) => polo.code === poloCode);
   const poloReady = Boolean(selectedPolo);
   const entryReady =
-    termReady && nameReady && poloReady && formatReady && reanalysisReady;
+    termReady &&
+    nameReady &&
+    poloReady &&
+    formatReady &&
+    reanalysisReady &&
+    manualReady &&
+    !inspecting &&
+    !rejectedReason;
 
-  const pick = useCallback(
-    (f: File | undefined) => {
-      if (!f) return;
-      if (
-        f.type !== "application/pdf" &&
-        !f.name.toLowerCase().endsWith(".pdf")
-      ) {
-        toast.error("Selecione um arquivo PDF.");
-        return;
-      }
-      if (f.size > maxMb * 1024 * 1024) {
-        toast.error(`O arquivo excede ${maxMb} MB.`);
-        return;
-      }
-      setFile(f);
-    },
-    [maxMb],
-  );
+  function pick(f: File | undefined) {
+    if (!f) return;
+    if (
+      f.type !== "application/pdf" &&
+      !f.name.toLowerCase().endsWith(".pdf")
+    ) {
+      toast.error("Selecione um arquivo PDF.");
+      return;
+    }
+    if (f.size > maxMb * 1024 * 1024) {
+      toast.error(`O arquivo excede ${maxMb} MB.`);
+      return;
+    }
+    chooseFile(f);
+  }
 
   function submit() {
     if (!file) return;
@@ -152,6 +201,8 @@ export function UploadDropzone({
     fd.append("studentName", studentName.trim());
     fd.append("poloCode", poloCode);
     fd.append("courseFormat", courseFormat);
+    if (asksCourse) fd.append("courseName", manualCourse.trim());
+    if (asksEntryPeriod) fd.append("entryPeriod", manualEntryPeriod);
     if (hasPrevious && reanalysis === "yes" && reanalysisOf)
       fd.append("reanalysisOf", reanalysisOf);
     const xhr = new XMLHttpRequest();
@@ -167,6 +218,13 @@ export function UploadDropzone({
         if (xhr.status === 201 && body.id) {
           toast.success("Arquivo recebido. Processamento iniciado.");
           router.push(`/analyses/${body.id}`);
+        } else if (
+          xhr.status === 422 &&
+          body.code === "PDF_HEADER_INCOMPLETE" &&
+          Array.isArray(body.missing)
+        ) {
+          setMissingHeader(body.missing as HeaderField[]);
+          toast.warning(body.error, { duration: 12000 });
         } else if (xhr.status === 409 && body.existingId) {
           toast.error(body.error, {
             duration: 15000,
@@ -233,6 +291,16 @@ export function UploadDropzone({
               <div className="text-sm text-muted-foreground">
                 {(file.size / 1024 / 1024).toFixed(2)} MB
               </div>
+              {inspecting && (
+                <div className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Lendo o cabeçalho do PDF…
+                </div>
+              )}
+              {rejectedReason && (
+                <p role="alert" className="mt-2 max-w-xl text-sm font-medium text-status-danger">
+                  {rejectedReason}
+                </p>
+              )}
             </div>
             <Button
               type="button"
@@ -240,7 +308,7 @@ export function UploadDropzone({
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                setFile(null);
+                chooseFile(null);
               }}
             >
               <X className="size-4" /> Trocar arquivo
@@ -271,9 +339,9 @@ export function UploadDropzone({
           <strong>Documento obrigatório: PDF de resultado do SIAA.</strong>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
             O sistema exige curso, período de ingresso e disciplinas
-            identificáveis. PDFs incompletos ou desatualizados serão recusados;
-            anexe uma nova versão com os dados preenchidos. Outros tipos de
-            documento também não iniciam a análise.
+            identificáveis. Se o SIAA deixar o curso ou o semestre de entrada
+            em branco, o sistema pede esses dados antes de iniciar. Outros
+            tipos de documento não iniciam a análise.
           </p>
         </div>
       </div>
@@ -285,8 +353,10 @@ export function UploadDropzone({
               Antes de iniciar, identifique o atendimento
             </h2>
             <p className="text-sm text-muted-foreground">
-              Aluno, polo e formato identificam o atendimento. O período de
-              ingresso será lido diretamente do PDF.
+              Aluno, polo e formato identificam o atendimento.{" "}
+              {asksEntryPeriod
+                ? "O PDF veio sem o semestre de entrada: informe-o abaixo."
+                : "O período de ingresso será lido diretamente do PDF."}
             </p>
           </div>
           {entryReady && (
@@ -296,6 +366,83 @@ export function UploadDropzone({
           )}
         </div>
         <div className="grid gap-4 md:grid-cols-2 md:items-end">
+          {missingHeader.length > 0 && (
+            <div
+              role="alert"
+              className="space-y-4 rounded-lg border border-status-warning/40 bg-status-warning-bg p-4 md:col-span-2"
+            >
+              <div className="flex gap-2 text-sm">
+                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-status-warning" />
+                <div>
+                  <p className="font-medium text-status-warning">
+                    O PDF do SIAA veio sem{" "}
+                    {[asksCourse && "curso", asksEntryPeriod && "semestre de entrada"]
+                      .filter(Boolean)
+                      .join(" e ")}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Informe abaixo, conforme a ficha do candidato. O restante
+                    continua sendo lido do PDF.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {asksCourse && (
+                  <div className="space-y-2">
+                    <Label htmlFor="manualCourse">
+                      Curso <span className="text-status-danger">*</span>
+                    </Label>
+                    <Input
+                      id="manualCourse"
+                      value={manualCourse}
+                      onChange={(e) => setManualCourse(e.target.value)}
+                      placeholder="Ex.: CST EM GESTÃO PÚBLICA"
+                      autoComplete="off"
+                      list={courseSuggestions.length ? "courseSuggestions" : undefined}
+                      maxLength={160}
+                      className="bg-card"
+                    />
+                    {courseSuggestions.length > 0 && (
+                      <datalist id="courseSuggestions">
+                        {courseSuggestions.map((course) => (
+                          <option key={course} value={course} />
+                        ))}
+                      </datalist>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Digite ou escolha um curso já cadastrado.
+                    </p>
+                  </div>
+                )}
+                {asksEntryPeriod && (
+                  <div className="space-y-2">
+                    <Label htmlFor="manualEntryPeriod">
+                      Semestre de entrada{" "}
+                      <span className="text-status-danger">*</span>
+                    </Label>
+                    <Select
+                      value={manualEntryPeriod}
+                      onValueChange={setManualEntryPeriod}
+                    >
+                      <SelectTrigger
+                        id="manualEntryPeriod"
+                        className="w-full bg-card"
+                      >
+                        <SelectValue placeholder="Selecionar semestre" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ENTRY_PERIOD_OPTIONS.map((period) => (
+                          <SelectItem key={period} value={period}>
+                            {period}º semestre
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="studentName">
               Nome do aluno <span className="text-status-danger">*</span>
@@ -589,9 +736,21 @@ export function UploadDropzone({
                   : "—"}
               </dd>
             </div>
+            {asksCourse && (
+              <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2">
+                <dt className="text-muted-foreground">Curso</dt>
+                <dd className="break-words font-medium">
+                  {manualCourse.trim()} (informado)
+                </dd>
+              </div>
+            )}
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Período</dt>
-              <dd className="font-medium">Será lido do PDF</dd>
+              <dd className="font-medium">
+                {asksEntryPeriod
+                  ? `${manualEntryPeriod}º semestre (informado)`
+                  : "Será lido do PDF"}
+              </dd>
             </div>
             <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2">
               <dt className="text-muted-foreground">Previsão a partir de</dt>

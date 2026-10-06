@@ -34,8 +34,10 @@ export interface CreateAnalysisInput {
   userId: string;
   bytes: Buffer;
   originalName: string;
-  /** Lido do PDF durante o processamento; usado apenas em envios legados. */
+  /** Lido do PDF durante o processamento; informado no envio só quando o PDF do SIAA veio sem ele. */
   entryPeriod?: number | null;
+  /** Curso informado no envio quando o cabeçalho do PDF veio em branco. */
+  courseName?: string | null;
   entryTerm: string;
   /** Identificação do atendimento, informada pelo analista. */
   studentName: string;
@@ -125,6 +127,7 @@ export async function createAnalysisFromUpload(input: CreateAnalysisInput): Prom
         entryTerm,
         entryPeriod,
         entryPeriodSource: entryPeriod === null ? null : "USER",
+        courseName: input.courseName?.trim() || null,
         studentName,
         poloCode: polo.code,
         poloName: polo.name,
