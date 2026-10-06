@@ -300,7 +300,7 @@ function CommercialGradeCard({
           </div>
           {usage !== undefined && (
             <Link
-              href={`/management/team-usage/grades?grade=${grade.id}&period=90d`}
+              href={`/management/team-usage?view=grades&grade=${grade.id}&period=90d`}
               className={usage ? "flex items-center justify-between gap-2 rounded-lg bg-status-success-bg px-3 py-2 text-xs text-status-success hover:underline" : "flex items-center justify-between gap-2 rounded-lg bg-status-warning-bg px-3 py-2 text-xs text-status-warning hover:underline"}
             >
               {usage ? (

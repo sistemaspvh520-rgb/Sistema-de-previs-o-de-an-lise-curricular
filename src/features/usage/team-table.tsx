@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDown, ArrowUp, CircleCheck, CircleSlash, Clock3 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, BookOpen, CircleCheck, CircleSlash, Clock3, FileX2, GraduationCap, UserX, type LucideIcon } from "lucide-react";
 import type { UsageModule } from "@/generated/prisma/enums";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { formatDateTime } from "@/lib/time";
@@ -12,6 +12,7 @@ import type { PersonUsage } from "@/services/usage/team-usage";
 import { MODULE_COLORS } from "@/features/usage/palette";
 import { MiniBars, ModuleSplitBar } from "@/features/usage/visuals";
 import { initials } from "@/features/usage/format";
+import { FLAG_CHIP_CLASS, type AttentionFlag, type AttentionKind } from "@/features/usage/attention";
 import { cn } from "@/lib/utils";
 
 type SortKey = "activeSeconds" | "actions" | "activeDays" | "lastSeenAt" | "name";
@@ -26,6 +27,25 @@ const STATUS_STYLE: Record<PersonStatusKind, { className: string; icon: typeof C
   idle: { className: "bg-status-warning-bg text-status-warning", icon: AlertTriangle },
   never: { className: "bg-status-danger-bg text-status-danger", icon: CircleSlash },
 };
+
+const FLAG_ICON: Record<AttentionKind, LucideIcon> = { never: CircleSlash, idle: UserX, grades: BookOpen, analyses: FileX2, academic: GraduationCap };
+
+/** Etiquetas de problema da pessoa (a mesma informação que os blocos de "Pedem atenção" filtram). */
+function FlagChips({ flags }: { flags: AttentionFlag[] | undefined }) {
+  if (!flags?.length) return null;
+  return (
+    <span className="mt-1.5 flex flex-wrap gap-1">
+      {flags.map(({ kind, label, tone }) => {
+        const Icon = FLAG_ICON[kind];
+        return (
+          <span key={kind} className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset", FLAG_CHIP_CLASS[tone])}>
+            <Icon className="size-3" aria-hidden="true" /> {label}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 export function StatusChip({ kind, label }: { kind: PersonStatusKind; label: string }) {
   const style = STATUS_STYLE[kind];
@@ -51,7 +71,7 @@ function mainModule(seconds: Record<UsageModule, number>): string | null {
   return module && value > 0 ? MODULE_LABELS[module] : null;
 }
 
-export function TeamUsageTable({ people, trendDays, query, focusLabel }: { people: PersonUsage[]; trendDays: string[]; query: string; focusLabel?: string }) {
+export function TeamUsageTable({ people, trendDays, query, focusLabel, flags = {} }: { people: PersonUsage[]; trendDays: string[]; query: string; focusLabel?: string; flags?: Record<string, AttentionFlag[]> }) {
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "activeSeconds", desc: true });
   const sorted = useMemo(() => {
     const value = (person: PersonUsage): number | string => {
@@ -102,6 +122,7 @@ export function TeamUsageTable({ people, trendDays, query, focusLabel }: { peopl
                     <span className="min-w-0">
                       <span className="block max-w-48 truncate font-medium text-slate-900 group-hover:underline">{person.name}</span>
                       <span className="block max-w-48 truncate text-xs text-muted-foreground">{ROLE_LABELS[person.role]}{person.poloName ? ` · ${person.poloName}` : ""}</span>
+                      <FlagChips flags={flags[person.id]} />
                     </span>
                   </Link>
                 </td>
@@ -138,6 +159,7 @@ export function TeamUsageTable({ people, trendDays, query, focusLabel }: { peopl
                   <div className="truncate font-medium text-slate-900">{person.name}</div>
                   <div className="truncate text-xs text-muted-foreground">{ROLE_LABELS[person.role]}{person.poloName ? ` · ${person.poloName}` : ""}</div>
                   <div className="mt-2"><StatusChip kind={person.status.kind} label={person.status.label} /></div>
+                  <FlagChips flags={flags[person.id]} />
                 </div>
               </div>
               <dl className="mt-3 grid grid-cols-3 gap-2 text-center">

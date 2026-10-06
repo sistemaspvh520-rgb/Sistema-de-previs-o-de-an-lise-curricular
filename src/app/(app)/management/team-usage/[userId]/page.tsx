@@ -130,7 +130,7 @@ export default async function PersonUsagePage({ params, searchParams }: PageProp
             <CardTitle className="flex items-center gap-2 text-base"><BookOpen className="size-4 text-[#b07800]" /> Grades que usou</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">Abriu a mensagem, copiou para o WhatsApp ou baixou o PDF · {period.label.toLocaleLowerCase("pt-BR")}.</p>
           </div>
-          <Link href={`/management/team-usage/grades?user=${person.id}${period.key === "custom" ? `&period=custom&from=${period.fromDay}&to=${period.toDay}` : `&period=${period.key}`}`} className="text-sm font-medium text-brand-cyan-700 hover:underline">Ver no uso das grades</Link>
+          <Link href={`/management/team-usage?view=grades&user=${person.id}${period.key === "custom" ? `&period=custom&from=${period.fromDay}&to=${period.toDay}` : `&period=${period.key}`}`} className="text-sm font-medium text-brand-cyan-700 hover:underline">Ver no uso das grades</Link>
         </CardHeader>
         <CardContent>
           {gradeUse && gradeUse.total > 0 ? (

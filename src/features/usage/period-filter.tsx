@@ -12,35 +12,42 @@ const PERIODS = [
   { key: "today", label: "Hoje" },
   { key: "7d", label: "7 dias" },
   { key: "30d", label: "30 dias" },
+  { key: "month", label: "Este mês" },
   { key: "90d", label: "90 dias" },
   { key: "custom", label: "Personalizado" },
 ] as const;
 
 const ALL = "all";
 
-/** Filtros em uma linha acima de tudo: período primeiro, depois perfil, polo e módulo. Ficam na URL. */
-export function UsageFilters({
+/**
+ * Filtro de período único da Gestão (Resultados, Uso da equipe) e de Meus relatórios: período primeiro e, se a página
+ * oferecer, perfil, polo, módulo e filtros extras. Fica na URL; o período padrão da página não vai para a URL.
+ */
+export function PeriodFilter({
+  defaultPeriod = "7d",
   period,
   fromDay,
   toDay,
   role,
   polo,
   module,
-  roles,
-  polos,
-  modules,
+  roles = [],
+  polos = [],
+  modules = [],
   showModule = true,
   extra = [],
 }: {
+  /** Preset que a página usa quando a URL não traz período. */
+  defaultPeriod?: "today" | "7d" | "30d" | "month" | "90d";
   period: string;
   fromDay: string;
   toDay: string;
   role?: string;
   polo?: string;
   module?: string;
-  roles: Array<{ value: string; label: string }>;
-  polos: Array<{ value: string; label: string }>;
-  modules: Array<{ value: string; label: string }>;
+  roles?: Array<{ value: string; label: string }>;
+  polos?: Array<{ value: string; label: string }>;
+  modules?: Array<{ value: string; label: string }>;
   showModule?: boolean;
   /** Filtros adicionais da página (ex.: pessoa e grade em "Uso das grades"). Trocar um filtro volta à página 1. */
   extra?: Array<{ param: string; label: string; allLabel: string; value?: string; options: Array<{ value: string; label: string }>; width?: string }>;
@@ -75,7 +82,7 @@ export function UsageFilters({
               onClick={() => {
                 if (item.key === "custom") return setCustomOpen(true);
                 setCustomOpen(false);
-                update({ period: item.key === "7d" ? undefined : item.key, from: undefined, to: undefined, page: undefined });
+                update({ period: item.key === defaultPeriod ? undefined : item.key, from: undefined, to: undefined, page: undefined });
               }}
               className={cn(
                 "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -101,22 +108,22 @@ export function UsageFilters({
           <Button type="submit" size="sm" disabled={!from || !to || from > to}>Aplicar</Button>
         </form>
       )}
-      <div className={cn("flex flex-1 flex-wrap items-center gap-2", extra.length ? "border-t pt-3" : "lg:justify-end")}>
-        <Select value={role ?? ALL} onValueChange={(value) => update({ role: value, page: undefined })}>
+      <div className={cn("flex flex-1 flex-wrap items-center gap-2", extra.length ? "border-t pt-3" : "lg:justify-end", !roles.length && !polos.length && !modules.length && !extra.length && "hidden")}>
+        {roles.length > 0 && <Select value={role ?? ALL} onValueChange={(value) => update({ role: value, page: undefined })}>
           <SelectTrigger className="h-9 w-full sm:w-[11rem]" aria-label="Perfil"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos os perfis</SelectItem>
             {roles.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
           </SelectContent>
-        </Select>
-        <Select value={polo ?? ALL} onValueChange={(value) => update({ polo: value, page: undefined })}>
+        </Select>}
+        {polos.length > 0 && <Select value={polo ?? ALL} onValueChange={(value) => update({ polo: value, page: undefined })}>
           <SelectTrigger className="h-9 w-full sm:w-[13rem]" aria-label="Polo"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos os polos</SelectItem>
             {polos.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
           </SelectContent>
-        </Select>
-        {showModule && (
+        </Select>}
+        {showModule && modules.length > 0 && (
           <Select value={module ?? ALL} onValueChange={(value) => update({ module: value })}>
             <SelectTrigger className="h-9 w-full sm:w-[12rem]" aria-label="Módulo"><SelectValue /></SelectTrigger>
             <SelectContent>

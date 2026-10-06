@@ -1,4 +1,4 @@
-import { APP_TIME_ZONE } from "@/lib/time";
+import { APP_TIME_ZONE, startOfCurrentMonth } from "@/lib/time";
 
 /** Regras puras do painel "Uso da equipe" (sem banco), todas no fuso de Porto Velho. */
 
@@ -37,7 +37,7 @@ export function lastDayKeys(now: Date, count: number): string[] {
   return Array.from({ length: count }, (_, index) => zonedDayKey(new Date(now.getTime() - (count - 1 - index) * DAY_MS)));
 }
 
-export type UsagePeriodKey = "today" | "7d" | "30d" | "90d" | "custom";
+export type UsagePeriodKey = "today" | "7d" | "30d" | "month" | "90d" | "custom";
 export interface UsagePeriod {
   key: UsagePeriodKey;
   from: Date;
@@ -48,12 +48,16 @@ export interface UsagePeriod {
   toDay: string;
 }
 
-const PRESET_DAYS: Record<Exclude<UsagePeriodKey, "custom">, number> = { today: 1, "7d": 7, "30d": 30, "90d": 90 };
-const PRESET_LABELS: Record<Exclude<UsagePeriodKey, "custom">, string> = { today: "Hoje", "7d": "Últimos 7 dias", "30d": "Últimos 30 dias", "90d": "Últimos 90 dias" };
+type PresetKey = Exclude<UsagePeriodKey, "custom" | "month">;
+const PRESET_DAYS: Record<PresetKey, number> = { today: 1, "7d": 7, "30d": 30, "90d": 90 };
+const PRESET_LABELS: Record<UsagePeriodKey, string> = { today: "Hoje", "7d": "Últimos 7 dias", "30d": "Últimos 30 dias", month: "Este mês", "90d": "Últimos 90 dias", custom: "Personalizado" };
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Período dos filtros (padrão: últimos 7 dias). Datas inválidas ou invertidas voltam ao padrão. */
-export function resolveUsagePeriod(params: { period?: string; from?: string; to?: string }, now = new Date()): UsagePeriod {
+/**
+ * Período dos filtros (padrão configurável por página; 7 dias se omitido). Datas inválidas ou invertidas voltam ao
+ * padrão. Compartilhado por Resultados, Uso da equipe e Meus relatórios: o preset sempre vira `from`/`to`.
+ */
+export function resolveUsagePeriod(params: { period?: string; from?: string; to?: string }, now = new Date(), defaultKey: Exclude<UsagePeriodKey, "custom"> = "7d"): UsagePeriod {
   const today = zonedDayKey(now);
   if (params.period === "custom" && params.from && params.to && DAY_KEY.test(params.from) && DAY_KEY.test(params.to) && params.from <= params.to) {
     const to = params.to > today ? today : params.to;
@@ -61,7 +65,12 @@ export function resolveUsagePeriod(params: { period?: string; from?: string; to?
     const label = `${from.split("-").reverse().join("/")} a ${to.split("-").reverse().join("/")}`;
     return { key: "custom", from: startOfZonedDay(from), to: new Date(startOfZonedDay(to).getTime() + DAY_MS - 1), label, fromDay: from, toDay: to };
   }
-  const key = (params.period && params.period in PRESET_DAYS ? params.period : "7d") as Exclude<UsagePeriodKey, "custom">;
+  const asked = params.period === "month" || (params.period && params.period in PRESET_DAYS) ? (params.period as Exclude<UsagePeriodKey, "custom">) : undefined;
+  const key = asked ?? defaultKey;
+  if (key === "month") {
+    const from = startOfCurrentMonth(now);
+    return { key, from, to: now, label: PRESET_LABELS.month, fromDay: zonedDayKey(from), toDay: today };
+  }
   const fromDay = lastDayKeys(now, PRESET_DAYS[key])[0];
   return { key, from: startOfZonedDay(fromDay), to: now, label: PRESET_LABELS[key], fromDay, toDay: today };
 }
