@@ -3,7 +3,7 @@ import { StudentRequestsList } from "@/features/student-portal/requests-list";
 import { isProcessingFresh } from "@/services/student-portal/processing";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Eye, FilePenLine, UploadCloud, Sparkles, CalendarClock, MapPin } from "lucide-react";
+import { Eye, FilePenLine, UploadCloud, RefreshCw, CalendarClock, MapPin } from "lucide-react";
 import { findPolo } from "@/domain/polos";
 import { can, ROLE_LABELS } from "@/lib/rbac";
 import { StudentDeletionButton } from "@/features/student-portal/student-deletion";
@@ -144,7 +144,7 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
                 href={`/academic-analysis/${student.currentVersion.reviewId}`}
                 className="mt-3 flex items-center gap-2 rounded-xl bg-brand-gold/15 px-3 py-2 text-sm text-brand-gold ring-1 ring-brand-gold/30 transition-colors hover:bg-brand-gold/25"
               >
-                <Sparkles className="size-4 shrink-0" /> Períodos ainda não mapeados — abra a análise para o mapeamento automático.
+                <RefreshCw className="size-4 shrink-0" /> Períodos ainda não mapeados — abra a análise para o mapeamento automático.
               </Link>
             )}
 

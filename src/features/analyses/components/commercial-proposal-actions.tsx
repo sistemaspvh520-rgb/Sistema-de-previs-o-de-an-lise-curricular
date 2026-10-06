@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, Sparkles } from "lucide-react";
+import { MessageCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildCommercialProposal } from "@/domain/commercial/proposal";
 import type { AnalysisVM } from "@/features/analyses/view-model";
@@ -46,7 +46,7 @@ export function CommercialProposalActions({
     <div className="flex flex-wrap items-center gap-2">
       {proposal.isHighValue && (
         <span className="inline-flex items-center gap-1 rounded-full bg-brand-gold-50 px-2.5 py-1 text-xs font-semibold text-brand-navy">
-          <Sparkles className="size-3.5 text-brand-gold" /> Lead prioritário: {proposal.highValueReason}
+          <RefreshCw className="size-3.5 text-brand-gold" /> Lead prioritário: {proposal.highValueReason}
         </span>
       )}
       <Button asChild>
