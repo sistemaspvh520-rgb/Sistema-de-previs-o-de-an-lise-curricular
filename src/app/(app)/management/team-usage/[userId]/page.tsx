@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock3, LogIn, MonitorSmartphone, MousePointerClick, Zap } from "lucide-react";
+import { ArrowLeft, BookOpen, Clock3, LogIn, MonitorSmartphone, MousePointerClick, TriangleAlert, Zap } from "lucide-react";
 import { z } from "zod";
 import { requirePagePermission } from "@/lib/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { formatDateTime } from "@/lib/time";
 import { MODULE_LABELS } from "@/domain/usage/modules";
 import { formatDuration, resolveUsagePeriod } from "@/domain/usage/metrics";
 import { getPersonUsage } from "@/services/usage/team-usage";
+import { getGradeUsage } from "@/services/usage/grade-usage";
+import { PersonGradeTable, UseCounters } from "@/features/usage/grade-usage-views";
 import { ManagementTabs } from "@/features/usage/management-tabs";
 import { StatusChip } from "@/features/usage/team-table";
 import { initials } from "@/features/usage/format";
@@ -31,7 +33,11 @@ export default async function PersonUsagePage({ params, searchParams }: PageProp
   // Detalhe: mínimo de 30 dias, para a série diária fazer sentido mesmo vindo do filtro "Hoje" ou "7 dias".
   const chosen = resolveUsagePeriod({ period: one(query.period), from: one(query.from), to: one(query.to) }, now);
   const period = chosen.key === "today" || chosen.key === "7d" ? resolveUsagePeriod({ period: "30d" }, now) : chosen;
-  const detail = await getPersonUsage(userId, { from: period.from, to: period.to }, now);
+  const [detail, gradeReport] = await Promise.all([
+    getPersonUsage(userId, { from: period.from, to: period.to }, now),
+    getGradeUsage({ from: period.from, to: period.to, userId }),
+  ]);
+  const gradeUse = gradeReport.byPerson[0];
   if (!detail) notFound();
   const { person, daily, topScreens, sessions, timeline } = detail;
   const back = new URLSearchParams();
@@ -117,6 +123,26 @@ export default async function PersonUsagePage({ params, searchParams }: PageProp
           </CardContent>
         </Card>
       </section>
+
+      <Card className="mt-6 shadow-sm">
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base"><BookOpen className="size-4 text-[#b07800]" /> Grades que usou</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">Abriu a mensagem, copiou para o WhatsApp ou baixou o PDF · {period.label.toLocaleLowerCase("pt-BR")}.</p>
+          </div>
+          <Link href={`/management/team-usage/grades?user=${person.id}${period.key === "custom" ? `&period=custom&from=${period.fromDay}&to=${period.toDay}` : `&period=${period.key}`}`} className="text-sm font-medium text-brand-cyan-700 hover:underline">Ver no uso das grades</Link>
+        </CardHeader>
+        <CardContent>
+          {gradeUse && gradeUse.total > 0 ? (
+            <>
+              <UseCounters opens={gradeUse.opens} copies={gradeUse.copies} downloads={gradeUse.downloads} />
+              <div className="mt-3"><PersonGradeTable grades={gradeUse.grades} /></div>
+            </>
+          ) : (
+            <p className="flex items-center gap-2 rounded-lg bg-status-warning-bg px-3 py-2.5 text-sm font-medium text-status-warning"><TriangleAlert className="size-4" /> Não usou nenhuma grade no período.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-2">
         <Card className="shadow-sm">

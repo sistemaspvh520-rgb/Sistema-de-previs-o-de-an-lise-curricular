@@ -30,6 +30,7 @@ export function UsageFilters({
   polos,
   modules,
   showModule = true,
+  extra = [],
 }: {
   period: string;
   fromDay: string;
@@ -41,6 +42,8 @@ export function UsageFilters({
   polos: Array<{ value: string; label: string }>;
   modules: Array<{ value: string; label: string }>;
   showModule?: boolean;
+  /** Filtros adicionais da página (ex.: pessoa e grade em "Uso das grades"). Trocar um filtro volta à página 1. */
+  extra?: Array<{ param: string; label: string; allLabel: string; value?: string; options: Array<{ value: string; label: string }>; width?: string }>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -60,7 +63,7 @@ export function UsageFilters({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 shadow-sm lg:flex-row lg:flex-wrap lg:items-center">
+    <div className={cn("flex flex-col gap-3 rounded-xl border bg-card p-3 shadow-sm", !extra.length && "lg:flex-row lg:flex-wrap lg:items-center")}>
       <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Período">
         {PERIODS.map((item) => {
           const active = item.key === "custom" ? customOpen || period === "custom" : period === item.key && !customOpen;
@@ -72,7 +75,7 @@ export function UsageFilters({
               onClick={() => {
                 if (item.key === "custom") return setCustomOpen(true);
                 setCustomOpen(false);
-                update({ period: item.key === "7d" ? undefined : item.key, from: undefined, to: undefined });
+                update({ period: item.key === "7d" ? undefined : item.key, from: undefined, to: undefined, page: undefined });
               }}
               className={cn(
                 "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -89,7 +92,7 @@ export function UsageFilters({
           className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            if (from && to && from <= to) update({ period: "custom", from, to });
+            if (from && to && from <= to) update({ period: "custom", from, to, page: undefined });
           }}
         >
           <Input type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} aria-label="De" className="h-9 w-auto" />
@@ -98,15 +101,15 @@ export function UsageFilters({
           <Button type="submit" size="sm" disabled={!from || !to || from > to}>Aplicar</Button>
         </form>
       )}
-      <div className="flex flex-1 flex-wrap items-center gap-2 lg:justify-end">
-        <Select value={role ?? ALL} onValueChange={(value) => update({ role: value })}>
+      <div className={cn("flex flex-1 flex-wrap items-center gap-2", extra.length ? "border-t pt-3" : "lg:justify-end")}>
+        <Select value={role ?? ALL} onValueChange={(value) => update({ role: value, page: undefined })}>
           <SelectTrigger className="h-9 w-full sm:w-[11rem]" aria-label="Perfil"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos os perfis</SelectItem>
             {roles.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={polo ?? ALL} onValueChange={(value) => update({ polo: value })}>
+        <Select value={polo ?? ALL} onValueChange={(value) => update({ polo: value, page: undefined })}>
           <SelectTrigger className="h-9 w-full sm:w-[13rem]" aria-label="Polo"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Todos os polos</SelectItem>
@@ -122,6 +125,15 @@ export function UsageFilters({
             </SelectContent>
           </Select>
         )}
+        {extra.map((filter) => (
+          <Select key={filter.param} value={filter.value ?? ALL} onValueChange={(value) => update({ [filter.param]: value, page: undefined })}>
+            <SelectTrigger className={cn("h-9 w-full", filter.width ?? "sm:w-[14rem]")} aria-label={filter.label}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>{filter.allLabel}</SelectItem>
+              {filter.options.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ))}
         {pending && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Atualizando" />}
       </div>
     </div>

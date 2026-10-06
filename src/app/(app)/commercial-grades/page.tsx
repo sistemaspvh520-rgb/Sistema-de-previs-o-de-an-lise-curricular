@@ -19,6 +19,8 @@ import { CommercialGradeCatalogFilters } from "@/features/commercial-grades/cata
 import { CommercialGradeCatalogSearch } from "@/features/commercial-grades/catalog-search";
 import { ManageCommercialGradeButtons } from "@/features/commercial-grades/manage-grade-buttons";
 import { formatDateTime } from "@/lib/time";
+import Link from "next/link";
+import { getGradeUsageStamps } from "@/services/usage/grade-usage";
 import {
   normalizeCatalogMetadata,
   parseCourseTracks,
@@ -49,6 +51,8 @@ export default async function CommercialGradesPage({
     area: one(query.area),
     duration: one(query.duration),
   };
+  // Administradores veem, em cada card, quanto a equipe usou a grade (painel Uso das grades).
+  const usageStamps = user.role === "ADMIN" ? await getGradeUsageStamps() : null;
   const grades = await prisma.commercialGrade.findMany({
     orderBy: [{ courseName: "asc" }, { createdAt: "desc" }],
     include: { uploadedBy: { select: { name: true } } },
@@ -169,6 +173,7 @@ export default async function CommercialGradesPage({
               metadata={metadata}
               tracks={tracks}
               canManage={user.role === "ADMIN"}
+              usage={usageStamps ? (usageStamps.get(grade.id) ?? null) : undefined}
             />
           ))
         )}
@@ -182,11 +187,14 @@ function CommercialGradeCard({
   metadata,
   tracks,
   canManage,
+  usage,
 }: {
   grade: CommercialGrade & { uploadedBy: { name: string } };
   metadata: ReturnType<typeof normalizeCatalogMetadata>;
   tracks: ReturnType<typeof parseCourseTracks>;
   canManage: boolean;
+  /** Só para administradores: quantas vezes a equipe usou esta grade (undefined = não mostrar). */
+  usage?: { uses: number; people: number; copies: number; lastAt: Date; lastBy: string } | null;
 }) {
   const hasInternship = Boolean(grade.internshipInfo);
   const savedWhatsapp =
@@ -290,6 +298,23 @@ function CommercialGradeCard({
             Enviada por {grade.uploadedBy.name} ·{" "}
             {formatDateTime(grade.createdAt)}
           </div>
+          {usage !== undefined && (
+            <Link
+              href={`/management/team-usage/grades?grade=${grade.id}&period=90d`}
+              className={usage ? "flex items-center justify-between gap-2 rounded-lg bg-status-success-bg px-3 py-2 text-xs text-status-success hover:underline" : "flex items-center justify-between gap-2 rounded-lg bg-status-warning-bg px-3 py-2 text-xs text-status-warning hover:underline"}
+            >
+              {usage ? (
+                <span>
+                  <strong className="tabular-nums">{usage.uses}</strong> {usage.uses === 1 ? "uso" : "usos"} por <strong className="tabular-nums">{usage.people}</strong> {usage.people === 1 ? "pessoa" : "pessoas"}
+                  {usage.copies > 0 && <> · <strong className="tabular-nums">{usage.copies}</strong> {usage.copies === 1 ? "cópia" : "cópias"} p/ WhatsApp</>}
+                  <span className="block text-[11px] opacity-80">última: {usage.lastBy.split(" ")[0]}, {formatDateTime(usage.lastAt)}</span>
+                </span>
+              ) : (
+                <span>Ninguém usou esta grade ainda</span>
+              )}
+              <span aria-hidden="true">→</span>
+            </Link>
+          )}
           <a
             className="inline-flex h-9 items-center gap-2 rounded-md bg-brand-navy px-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
             href={`/api/commercial-grades/${grade.id}/download`}

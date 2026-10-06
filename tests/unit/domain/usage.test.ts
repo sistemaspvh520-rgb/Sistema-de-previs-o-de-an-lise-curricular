@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { moduleForPath, pageLabel, routePattern } from "@/domain/usage/modules";
-import { AUDITED_ACTIONS, TRACKED_ACTIONS, usageAction } from "@/domain/usage/actions";
+import { AUDITED_ACTIONS, GRADE_ACTIONS, GRADE_ACTION_SHORT, TRACKED_ACTIONS, isGradeAction, usageAction } from "@/domain/usage/actions";
 import { formatDuration, groupSessions, lastDayKeys, personStatus, resolveUsagePeriod, zonedDayKey, zonedWeekdayHour } from "@/domain/usage/metrics";
 
 const UUID = "3f2c1a9e-4b7d-4c1e-9a2b-1c2d3e4f5a6b";
@@ -46,6 +46,16 @@ describe("uso da equipe: catálogo de ações", () => {
     expect(usageAction("grade.download")?.module).toBe("GRADES");
     expect(usageAction("email.sent")).toBeNull();
     for (const name of Object.keys(TRACKED_ACTIONS)) expect(AUDITED_ACTIONS[name]).toBeUndefined();
+  });
+
+  it("uso de grade: abrir a mensagem, copiar para o WhatsApp e baixar o PDF (a busca não identifica grade)", () => {
+    expect([...GRADE_ACTIONS].sort()).toEqual(["grade.download", "grade.whatsapp_copy", "grade.whatsapp_open"]);
+    for (const name of GRADE_ACTIONS) {
+      expect(usageAction(name)?.module).toBe("GRADES");
+      expect(GRADE_ACTION_SHORT[name]).toBeTruthy();
+    }
+    expect(isGradeAction("grade.search")).toBe(false);
+    expect(isGradeAction("analysis.create")).toBe(false);
   });
 });
 

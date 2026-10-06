@@ -8,13 +8,13 @@ import { isTrackableUser, recordAction, recordHeartbeat, recordPageView } from "
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Ações que o próprio navegador informa (as demais são registradas no servidor). */
-const CLIENT_ACTIONS = ["grade.whatsapp_copy", "grade.search"] as const;
-
+/** Ações que o próprio navegador informa (as demais são registradas no servidor). Uso de grade exige o id da grade. */
 const bodySchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("page"), path: z.string().min(1).max(300) }),
   z.object({ type: z.literal("beat"), path: z.string().min(1).max(300) }),
-  z.object({ type: z.literal("action"), name: z.enum(CLIENT_ACTIONS), entityId: z.string().uuid().optional() }),
+  z
+    .object({ type: z.literal("action"), name: z.enum(["grade.whatsapp_open", "grade.whatsapp_copy", "grade.search"]), entityId: z.string().uuid().optional() })
+    .refine((body) => body.name === "grade.search" || Boolean(body.entityId), { message: "Informe a grade." }),
 ]);
 
 function sameOrigin(req: Request): boolean {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   try {
     if (body.type === "page") await recordPageView(user.id, body.path);
     else if (body.type === "beat") await recordHeartbeat(user.id, body.path);
-    else await recordAction(user.id, body.name, body.entityId);
+    else await recordAction(user.id, body.name, body.entityId ?? null);
   } catch (error) {
     logger.warn("usage.record_failed", { type: body.type, error: String(error) });
   }

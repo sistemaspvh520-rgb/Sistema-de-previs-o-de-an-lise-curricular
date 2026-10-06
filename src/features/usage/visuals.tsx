@@ -1,10 +1,11 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import type { UsageModule } from "@/generated/prisma/enums";
 import { MODULE_LABELS } from "@/domain/usage/modules";
 import { formatDuration } from "@/domain/usage/metrics";
 import { ChartTooltip, useChartTooltip } from "@/features/usage/chart-tooltip";
-import { HEAT_EMPTY, HEAT_RAMP, MODULE_COLORS, TREND_ACCENT, TREND_MUTED } from "@/features/usage/palette";
+import { MODULE_COLORS, TREND_ACCENT, TREND_MUTED } from "@/features/usage/palette";
 
 /** Os três módulos de trabalho e "Outros" (Gestão, Configurações), sempre nesta ordem. */
 const STACK: Array<{ key: "CURRICULAR" | "GRADES" | "ACADEMIC" | "OTHER"; label: string; color: string }> = [
@@ -94,63 +95,81 @@ export function ModuleSplitBar({ seconds, className }: { seconds: Record<UsageMo
   );
 }
 
-/** Minutos ativos por dia da semana × hora (Porto Velho). Escala de um só tom; célula vazia em cinza neutro. */
-export function UsageHeatmap({ grid }: { grid: number[][] }) {
+/**
+ * Ritmo da equipe: minutos ativos por horário (colunas) e por dia da semana (barras com o valor escrito).
+ * Uma só cor, grade discreta, só o pico rotulado no gráfico de horários; o resto aparece ao passar o mouse.
+ */
+export function UsageRhythm({ grid }: { grid: number[][] }) {
   const { tip, show, hide } = useChartTooltip();
-  const max = Math.max(...grid.flat(), 0);
-  const level = (value: number) => (value <= 0 || max <= 0 ? -1 : Math.min(HEAT_RAMP.length - 1, Math.floor((value / max) * HEAT_RAMP.length - 1e-9)));
-  const hours = Array.from({ length: 24 }, (_, hour) => hour);
-  let peak = { weekday: 0, hour: 0, minutes: 0 };
-  grid.forEach((row, weekday) => row.forEach((minutes, hour) => { if (minutes > peak.minutes) peak = { weekday, hour, minutes }; }));
+  const byHour = Array.from({ length: 24 }, (_, hour) => grid.reduce((sum, row) => sum + (row?.[hour] ?? 0), 0));
+  const byWeekday = WEEK_ORDER.map((weekday) => ({ weekday, minutes: (grid[weekday] ?? []).reduce((sum, value) => sum + value, 0) }));
+  const total = byHour.reduce((sum, value) => sum + value, 0);
+  if (!total) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-slate-50/60 px-6 py-10 text-center">
+        <span className="flex size-10 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm"><Clock className="size-5" /></span>
+        <p className="mt-3 text-sm font-medium text-slate-700">Ainda sem tempo ativo no período</p>
+        <p className="mt-1 max-w-sm text-xs text-muted-foreground">O gráfico aparece assim que a equipe usar o sistema. Escolha um período maior para ver mais dias.</p>
+      </div>
+    );
+  }
+  const used = byHour.flatMap((minutes, hour) => (minutes > 0 ? [hour] : []));
+  const first = Math.min(6, used[0]);
+  const last = Math.max(22, used[used.length - 1]);
+  const hours = Array.from({ length: last - first + 1 }, (_, index) => first + index);
+  const peakHour = hours.reduce((best, hour) => (byHour[hour] > byHour[best] ? hour : best), hours[0]);
+  const peakDay = byWeekday.reduce((best, item) => (item.minutes > best.minutes ? item : best), byWeekday[0]);
+  const maxHour = Math.max(...hours.map((hour) => byHour[hour]), 1);
+  const maxDay = Math.max(...byWeekday.map((item) => item.minutes), 1);
+
+  const width = 560;
+  const height = 170;
+  const pad = { top: 22, bottom: 22, left: 4, right: 4 };
+  const plotH = height - pad.top - pad.bottom;
+  const slot = (width - pad.left - pad.right) / hours.length;
+  const barW = Math.min(18, slot - 4);
+  const fmt = (minutes: number) => formatDuration(minutes * 60);
   return (
     <div>
-      <p className="mb-2 text-xs text-slate-600">
-        {peak.minutes ? <>Pico de uso: <span className="font-semibold text-slate-900">{WEEKDAY_NAMES[peak.weekday]}, {peak.hour}h</span> ({peak.minutes} min no período).</> : "Ainda sem tempo ativo registrado no período."}
+      <p className="text-sm text-slate-600">
+        Pico às <span className="font-semibold text-slate-900">{peakHour}h</span> e às <span className="font-semibold text-slate-900">{WEEKDAY_NAMES[peakDay.weekday].toLocaleLowerCase("pt-BR")}s</span> · {fmt(total)} de uso no período.
       </p>
-      <div className="overflow-x-auto pb-1">
-        <table className="border-separate border-spacing-[2px] text-[10px] text-muted-foreground" aria-label="Minutos ativos por dia da semana e hora (só as horas com uso são lidas)">
-          <thead>
-            <tr>
-              <th className="w-8" />
-              {hours.map((hour) => (
-                <th key={hour} scope="col" className="w-4 min-w-4 font-normal">
-                  {hour % 3 === 0 ? `${hour}h` : ""}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {WEEK_ORDER.map((weekday) => (
-              <tr key={weekday}>
-                <th scope="row" className="pr-1 text-left font-normal">{WEEKDAY_LABELS[weekday]}</th>
-                {hours.map((hour) => {
-                  const minutes = grid[weekday]?.[hour] ?? 0;
-                  const step = level(minutes);
-                  return (
-                    <td
-                      key={hour}
-                      className="size-4 min-w-4 rounded-[3px] transition-[outline] hover:outline hover:outline-2 hover:outline-slate-900/30"
-                      style={{ backgroundColor: step < 0 ? HEAT_EMPTY : HEAT_RAMP[step] }}
-                      onPointerMove={(event) => show(event, { title: `${WEEKDAY_NAMES[weekday]}, ${hour}h`, rows: [{ value: minutes ? `${minutes} min` : "sem uso", label: "ativos no período" }] })}
-                      onPointerLeave={hide}
-                    >
-                      {minutes > 0 && <span className="sr-only">{`${WEEKDAY_NAMES[weekday]} ${hour}h: ${minutes} min`}</span>}
-                    </td>
-                  );
-                })}
-              </tr>
+      <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <figure>
+          <figcaption className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Por horário</figcaption>
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label={`Minutos ativos por horário; pico às ${peakHour}h com ${fmt(byHour[peakHour])}`}>
+            <line x1={pad.left} x2={width - pad.right} y1={height - pad.bottom + 0.5} y2={height - pad.bottom + 0.5} stroke="#cbd5e1" />
+            <line x1={pad.left} x2={width - pad.right} y1={pad.top + 0.5} y2={pad.top + 0.5} stroke="#eef2f6" strokeDasharray="3 3" />
+            {hours.map((hour, index) => {
+              const minutes = byHour[hour];
+              const h = minutes > 0 ? Math.max(3, (minutes / maxHour) * plotH) : 0;
+              const x = pad.left + index * slot + (slot - barW) / 2;
+              const peak = hour === peakHour;
+              return (
+                <g key={hour} onPointerMove={(event) => show(event, { title: `${hour}h às ${hour + 1}h`, rows: [{ value: minutes ? fmt(minutes) : "sem uso", label: "ativos no período", color: TREND_ACCENT }] })} onPointerLeave={hide}>
+                  <rect x={pad.left + index * slot} y={pad.top} width={slot} height={plotH} fill="transparent" />
+                  {h > 0 && <rect x={x} y={height - pad.bottom - h} width={barW} height={h} rx={3} fill={TREND_ACCENT} opacity={peak ? 1 : 0.55} />}
+                  {peak && <text x={x + barW / 2} y={height - pad.bottom - h - 6} textAnchor="middle" className="fill-slate-900 text-[11px] font-semibold">{fmt(minutes)}</text>}
+                  {hour % 2 === 0 && <text x={pad.left + index * slot + slot / 2} y={height - 6} textAnchor="middle" className="fill-slate-500 text-[10px]">{hour}h</text>}
+                </g>
+              );
+            })}
+          </svg>
+        </figure>
+        <figure>
+          <figcaption className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Por dia da semana</figcaption>
+          <ul className="space-y-2">
+            {byWeekday.map(({ weekday, minutes }) => (
+              <li key={weekday} className="grid grid-cols-[2.5rem_minmax(0,1fr)_4.5rem] items-center gap-2 text-sm">
+                <span className="text-xs text-slate-600">{WEEKDAY_LABELS[weekday]}</span>
+                <span className="h-2.5 rounded-full bg-slate-100">
+                  {minutes > 0 && <span className="block h-full rounded-full" style={{ width: `${Math.max(3, (minutes / maxDay) * 100)}%`, backgroundColor: TREND_ACCENT, opacity: weekday === peakDay.weekday ? 1 : 0.55 }} />}
+                </span>
+                <span className={minutes ? "text-right text-xs font-semibold tabular-nums text-slate-900" : "text-right text-xs text-slate-400"}>{minutes ? fmt(minutes) : "—"}</span>
+              </li>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span>menos</span>
-        {HEAT_RAMP.map((color) => (
-          <span key={color} aria-hidden="true" className="size-3 rounded-[3px]" style={{ backgroundColor: color }} />
-        ))}
-        <span>mais</span>
-        <span aria-hidden="true" className="ml-3 size-3 rounded-[3px]" style={{ backgroundColor: HEAT_EMPTY }} />
-        <span>sem uso</span>
+          </ul>
+        </figure>
       </div>
       <ChartTooltip tip={tip} />
     </div>
