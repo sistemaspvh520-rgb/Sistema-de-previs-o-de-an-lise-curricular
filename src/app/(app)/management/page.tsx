@@ -20,6 +20,7 @@ import { DateRangeFilter } from "@/components/shared/date-range-filter";
 import { DashboardRing } from "@/components/dashboard/dashboard-ring";
 import { countStaleEnrollmentCases } from "@/services/follow-up/management-alerts";
 import { getCommercialInsights } from "@/repositories/commercial-repository";
+import { ManagementTabs } from "@/features/usage/management-tabs";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Gestão" };
@@ -142,6 +143,7 @@ export default async function ManagementPage({
         title="Gestão à vista"
         description="Acompanhe conversão, pendências e a atuação da equipe no período."
       />
+      <ManagementTabs active="/management" />
       <section className="relative overflow-hidden rounded-2xl border border-brand-cyan/30 bg-[radial-gradient(circle_at_18%_0%,rgba(6,147,227,0.45),transparent_42%),linear-gradient(135deg,#00284d,#071426)] text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
         <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-brand-cyan/15 blur-3xl" />
         <div className="relative flex flex-col gap-5 px-6 py-7 lg:flex-row lg:items-center lg:justify-between">
@@ -229,9 +231,14 @@ export default async function ManagementPage({
                 Produção e último acesso por responsável.
               </p>
             </div>
-            <span className="rounded-full bg-brand-navy px-2.5 py-1 text-xs font-semibold text-white">
-              {activeUsers} ativos
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="rounded-full bg-brand-navy px-2.5 py-1 text-xs font-semibold text-white">
+                {activeUsers} ativos
+              </span>
+              <Link href="/management/team-usage" className="inline-flex items-center gap-1 text-xs font-medium text-brand-cyan-700 hover:underline">
+                Ver uso completo <ArrowUpRight className="size-3.5" />
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2">
             {users.map((user) => {

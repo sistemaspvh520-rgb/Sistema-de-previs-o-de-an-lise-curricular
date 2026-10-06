@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { getEnv } from "@/lib/env";
 import { runRetention } from "@/services/retention/retention";
+import { purgeOldUsage } from "@/services/usage/track";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,5 +19,7 @@ function authorized(req: Request): boolean {
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   const result = await runRetention();
-  return NextResponse.json(result);
+  // Uso da equipe: linha do tempo por 180 dias, agregado por hora por 2 anos.
+  const usage = await purgeOldUsage();
+  return NextResponse.json({ ...result, usage });
 }

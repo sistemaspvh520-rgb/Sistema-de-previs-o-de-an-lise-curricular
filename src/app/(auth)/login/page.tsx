@@ -36,6 +36,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <p className="mt-6 text-center text-xs text-white/60">
           Sistema interno · Universidade Cruzeiro do Sul Virtual
         </p>
+        <p className="mt-1 text-center text-[11px] text-white/45">
+          O uso do sistema (telas e tempo ativo) é registrado para a gestão da equipe.
+        </p>
       </div>
     </main>
   );

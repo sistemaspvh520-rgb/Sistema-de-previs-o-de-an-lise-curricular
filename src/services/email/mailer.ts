@@ -39,7 +39,7 @@ function getTransporter(): nodemailer.Transporter {
 export interface SendMailInput {
   to: string;
   content: EmailContent;
-  kind: "ACADEMIC_UPDATE" | "INVITE" | "RESET" | "TEMPORARY_PASSWORD" | "FOLLOW_UP" | "TEAM_DIGEST";
+  kind: "ACADEMIC_UPDATE" | "INVITE" | "RESET" | "TEMPORARY_PASSWORD" | "FOLLOW_UP" | "TEAM_DIGEST" | "USAGE_DIGEST";
   actorUserId?: string | null;
   targetUserId?: string | null;
 }

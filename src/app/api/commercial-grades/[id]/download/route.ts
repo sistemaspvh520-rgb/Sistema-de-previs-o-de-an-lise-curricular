@@ -4,6 +4,7 @@ import { can } from "@/lib/rbac";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { getStorage } from "@/services/storage/storage";
+import { trackAction } from "@/services/usage/track";
 
 export const runtime = "nodejs"; export const dynamic = "force-dynamic";
 export async function GET(_request: Request, ctx: RouteContext<"/api/commercial-grades/[id]/download">) {
@@ -11,5 +12,5 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/commercial-
   const { id } = await ctx.params; if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   const grade = await prisma.commercialGrade.findUnique({ where: { id } }); if (!grade) return NextResponse.json({ error: "Grade não encontrada." }, { status: 404 });
   const storage = getStorage(); if (!(await storage.exists(grade.storageKey))) return NextResponse.json({ error: "Arquivo indisponível." }, { status: 410 });
-  const bytes = await storage.read(grade.storageKey); return new NextResponse(new Uint8Array(bytes), { headers: { "Content-Type": "application/pdf", "Content-Length": String(bytes.length), "Content-Disposition": `attachment; filename="${encodeURIComponent(grade.originalName)}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+  const bytes = await storage.read(grade.storageKey); trackAction(user, "grade.download", grade.id); return new NextResponse(new Uint8Array(bytes), { headers: { "Content-Type": "application/pdf", "Content-Length": String(bytes.length), "Content-Disposition": `attachment; filename="${encodeURIComponent(grade.originalName)}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
 }
