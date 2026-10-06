@@ -24,7 +24,8 @@ async function authorize(request: Request): Promise<{ userId: string } | { respo
   const user = await getSessionUser();
   if (!user) return { response: json({ error: "Faça login para continuar." }, 401) };
   if (!can(user.role, "privacy:manage")) return { response: json({ error: "Acesso negado." }, 403) };
-  const limit = rateLimit(`commercial-grade-upload:${user.id}`, { capacity: 10, refillPerMinute: 6 });
+  // Folga para envio em lote (dezenas de PDFs seguidos); só administradores chegam aqui.
+  const limit = rateLimit(`commercial-grade-upload:${user.id}`, { capacity: 80, refillPerMinute: 40 });
   if (!limit.allowed) return { response: json({ error: `Aguarde ${limit.retryAfterSeconds}s antes de enviar novamente.` }, 429) };
   return { userId: user.id };
 }
@@ -42,10 +43,10 @@ export async function handleCommercialGradeUpload(request: Request, replaceId?: 
     const bytes = Buffer.from(await file.arrayBuffer());
     await validatePdfBytes(bytes, { maxBytes });
     const filename = file.name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 200);
-    const result = await publishCommercialGrade({ bytes, filename, userId: auth.userId, replaceId });
+    const result = await publishCommercialGrade({ bytes, filename, userId: auth.userId, replaceId, upsert: form.get("mode") === "upsert" });
     if (!result.ok) return json({ error: result.error }, result.status);
     revalidatePath("/commercial-grades");
-    return json({ id: result.id, message: result.message, warning: result.warning });
+    return json({ id: result.id, message: result.message, warning: result.warning, action: result.action });
   } catch (error) {
     if (error instanceof PdfValidationError) return json({ error: error.message }, 422);
     const reference = error instanceof Error ? `${error.name}${"code" in error && typeof error.code === "string" ? ` ${error.code}` : ""}`.slice(0, 60) : "Error";

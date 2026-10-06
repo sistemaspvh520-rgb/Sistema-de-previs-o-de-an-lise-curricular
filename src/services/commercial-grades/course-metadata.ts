@@ -32,20 +32,31 @@ export function normalizeCatalogMetadata(input: Partial<CourseCatalogMetadata> &
 export function inferDegree(courseName: string): string | null {
   const normalized = courseName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
   if (normalized.includes("AREA BASICA")) return "Área básica de ingresso";
-  if (normalized.includes("LICENCIATURA")) return "Licenciatura";
-  if (normalized.includes("BACHARELADO")) return "Bacharelado";
+  // "(LICENCIATURA)" e "(LICENCIADOS EM ...)" são licenciatura; "(BACHARELADO)" e "(BACH P/ EGRESSO ...)", bacharelado.
+  if (normalized.includes("LICENCIATURA") || normalized.includes("LICENCIADOS")) return "Licenciatura";
+  // Matrizes de segundo curso para egressos de bacharelados ("(P EGRESSO ...)", "(PARA BACH ...)") também são bacharelado.
+  if (normalized.includes("BACHARELADO") || /\(BACH\b|PARA BACH|EGRESSO/.test(normalized)) return "Bacharelado";
   if (normalized.includes("CST") || normalized.includes("TECNOLOG")) return "Tecnólogo";
   return null;
 }
 
+/** Área ampla do curso pelo nome, na ordem das regras (a primeira que combinar vale). */
+const KNOWLEDGE_AREAS: Array<[RegExp, string]> = [
+  [/FARMACIA|ESTETICA|COSMETICA|RADIOLOGIA|NUTRICAO|EDUCACAO FISICA|ENFERMAGEM|FISIOTERAPIA|BIOMEDICINA|ODONTOLOGIA|PSICOLOGIA/, "Saúde"],
+  [/AGRONOMIA|VETERINARIA|ZOOTECNIA|AGRONEGOCIO/, "Ciências agrárias"],
+  [/ARQUITETURA|URBANISMO|ENGENHARIA/, "Engenharia e arquitetura"],
+  [/CIENCIAS BIOLOGICAS|BIOLOGIA|FISICA E QUIMICA/, "Ciências da natureza"],
+  [/ARTES VISUAIS|DESIGN|JORNALISMO|PUBLICIDADE|MUSICA/, "Artes e comunicação"],
+  [/DIREITO|CRIMINOLOGIA|CONCILIACAO|MEDIACAO|ARBITRAGEM|SEGURANCA PUBLICA/, "Direito e segurança"],
+  [/CIENCIA POLITICA|CIENCIAS SOCIAIS|FILOSOFIA|GEOGRAFIA|SOCIOLOGIA/, "Humanas e sociais"],
+  [/PEDAGOGIA|LETRAS|HISTORIA|MATEMATICA|EDUCACAO/, "Educação"],
+  [/COMPUTACAO|SISTEMAS|TECNOLOGIA|ANALISE E DESENVOLVIMENTO|DADOS|CIBERSEGURANCA|NUVEM|CODING|BACK-END|FRONT-END|FULL STACK|DESENVOLVIMENTO/, "Tecnologia"],
+  [/GESTAO|ADMINISTRACAO|CONTABEIS|ECONOMICAS|COMERCIO EXTERIOR|COACHING|MARKETING|RECURSOS HUMANOS|LOGISTICA|FINANCEIR/, "Gestão e negócios"],
+];
+
 function inferKnowledgeArea(courseName: string): string | null {
   const normalized = courseName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-  if (/FARMACIA|ESTETICA|COSMETICA|RADIOLOGIA|NUTRICAO|EDUCACAO FISICA|ENFERMAGEM|FISIOTERAPIA|BIOMEDICINA|ODONTOLOGIA|PSICOLOGIA/.test(normalized)) return "Saúde";
-  if (/PEDAGOGIA|LETRAS|HISTORIA|MATEMATICA|EDUCACAO/.test(normalized)) return "Educação";
-  if (/GESTAO|ADMINISTRACAO|CONTABEIS|MARKETING|RECURSOS HUMANOS/.test(normalized)) return "Gestão e negócios";
-  if (/COMPUTACAO|SISTEMAS|TECNOLOGIA|ANALISE E DESENVOLVIMENTO/.test(normalized)) return "Tecnologia";
-  if (/DIREITO/.test(normalized)) return "Direito";
-  return null;
+  return KNOWLEDGE_AREAS.find(([expression]) => expression.test(normalized))?.[1] ?? null;
 }
 
 export function normalizeDegree(value: string | null | undefined): string | null {
