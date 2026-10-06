@@ -11,7 +11,7 @@ import { MODULE_LABELS } from "@/domain/usage/modules";
 import { formatDuration, resolveUsagePeriod } from "@/domain/usage/metrics";
 import { getPersonUsage } from "@/services/usage/team-usage";
 import { getGradeUsage } from "@/services/usage/grade-usage";
-import { PersonGradeTable, UseCounters } from "@/features/usage/grade-usage-views";
+import { PersonGradeTable, UseLegend } from "@/features/usage/grade-usage-views";
 import { ManagementTabs } from "@/features/usage/management-tabs";
 import { StatusChip } from "@/features/usage/team-table";
 import { initials } from "@/features/usage/format";
@@ -133,11 +133,9 @@ export default async function PersonUsagePage({ params, searchParams }: PageProp
           <Link href={`/management/team-usage?view=grades&user=${person.id}${period.key === "custom" ? `&period=custom&from=${period.fromDay}&to=${period.toDay}` : `&period=${period.key}`}`} className="text-sm font-medium text-brand-cyan-700 hover:underline">Ver no uso das grades</Link>
         </CardHeader>
         <CardContent>
+          {gradeUse && gradeUse.total > 0 && <div className="mb-3"><UseLegend /></div>}
           {gradeUse && gradeUse.total > 0 ? (
-            <>
-              <UseCounters opens={gradeUse.opens} copies={gradeUse.copies} downloads={gradeUse.downloads} />
-              <div className="mt-3"><PersonGradeTable grades={gradeUse.grades} /></div>
-            </>
+            <PersonGradeTable grades={gradeUse.grades} />
           ) : (
             <p className="flex items-center gap-2 rounded-lg bg-status-warning-bg px-3 py-2.5 text-sm font-medium text-status-warning"><TriangleAlert className="size-4" /> Não usou nenhuma grade no período.</p>
           )}

@@ -15,23 +15,49 @@ const ACTION_ICON: Record<GradeActionName, typeof Copy> = {
   "grade.download": Download,
 };
 
-/** Contadores de uma grade/pessoa com ícone + número + rótulo (nunca só cor ou só ícone). */
+const USE_KINDS = [
+  { key: "copies", icon: Copy, one: "cópia", many: "cópias", full: "cópia p/ WhatsApp", fullMany: "cópias p/ WhatsApp", meaning: "copiou a mensagem para enviar no WhatsApp", strong: true },
+  { key: "opens", icon: MessageCircle, one: "aberta", many: "abertas", full: "mensagem aberta", fullMany: "mensagens abertas", meaning: "abriu a mensagem pronta, sem necessariamente copiar", strong: false },
+  { key: "downloads", icon: Download, one: "PDF", many: "PDFs", full: "PDF baixado", fullMany: "PDFs baixados", meaning: "baixou o PDF da matriz", strong: false },
+] as const;
+
+/** Contadores de uso: ícone + número + palavra (nunca só ícone). `compact` usa a palavra curta e esconde o que for zero. */
 export function UseCounters({ opens, copies, downloads, compact = false }: { opens: number; copies: number; downloads: number; compact?: boolean }) {
-  const items = [
-    { key: "copies", icon: Copy, value: copies, label: copies === 1 ? "cópia p/ WhatsApp" : "cópias p/ WhatsApp", strong: true },
-    { key: "opens", icon: MessageCircle, value: opens, label: opens === 1 ? "mensagem aberta" : "mensagens abertas", strong: false },
-    { key: "downloads", icon: Download, value: downloads, label: downloads === 1 ? "PDF baixado" : "PDFs baixados", strong: false },
-  ];
+  const values = { copies, opens, downloads };
   return (
     <ul className={cn("flex flex-wrap gap-1.5", compact && "gap-1")}>
-      {items.filter((item) => !compact || item.value > 0).map(({ key, icon: Icon, value, label, strong }) => (
-        <li key={key} className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]", value ? (strong ? "bg-status-success-bg text-status-success" : "bg-slate-100 text-slate-700") : "bg-slate-50 text-slate-400")}>
-          <Icon className="size-3" aria-hidden="true" />
-          <span className="font-semibold tabular-nums">{value}</span>
-          {!compact && <span>{label}</span>}
-          {compact && <span className="sr-only">{label}</span>}
-        </li>
-      ))}
+      {USE_KINDS.filter((kind) => !compact || values[kind.key] > 0).map((kind) => {
+        const value = values[kind.key];
+        const Icon = kind.icon;
+        return (
+          <li
+            key={kind.key}
+            title={`${value} ${value === 1 ? kind.full : kind.fullMany}: ${kind.meaning}`}
+            className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]", value ? (kind.strong ? "bg-status-success-bg text-status-success" : "bg-slate-100 text-slate-700") : "bg-slate-50 text-slate-400")}
+          >
+            <Icon className="size-3" aria-hidden="true" />
+            <span className="font-semibold tabular-nums">{value}</span>
+            <span>{compact ? (value === 1 ? kind.one : kind.many) : value === 1 ? kind.full : kind.fullMany}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Explica uma vez só o que cada ícone significa (cópia, mensagem aberta, PDF baixado). */
+export function UseLegend() {
+  return (
+    <ul aria-label="Legenda dos ícones" className="flex flex-wrap gap-x-5 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      {USE_KINDS.map((kind) => {
+        const Icon = kind.icon;
+        return (
+          <li key={kind.key} className="flex items-center gap-1.5">
+            <Icon className={cn("size-3.5", kind.strong ? "text-status-success" : "text-slate-500")} aria-hidden="true" />
+            <span><strong className="font-semibold text-slate-800">{kind.fullMany.replace(" p/ WhatsApp", "")}</strong> — {kind.meaning}</span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -92,12 +118,7 @@ export function ByPersonView({ people, personHref }: { people: PersonGradeUsage[
               </div>
             )}
           </div>
-          {person.total > 0 && (
-            <>
-              <div className="mt-3"><UseCounters opens={person.opens} copies={person.copies} downloads={person.downloads} /></div>
-              <div className="mt-3"><PersonGradeTable grades={person.grades} /></div>
-            </>
-          )}
+          {person.total > 0 && <div className="mt-3"><PersonGradeTable grades={person.grades} /></div>}
         </li>
       ))}
     </ul>
