@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { GradeUsageReport } from "@/services/usage/grade-usage";
-import { ByGradeView, ByPersonView, LogView } from "@/features/usage/grade-usage-views";
+import { ByGradeView, ByPersonView, LogView, UseLegend } from "@/features/usage/grade-usage-views";
 import { cn } from "@/lib/utils";
 
 const SUBVIEWS = [
@@ -67,6 +67,7 @@ export function GradesView({
           </Link>
         ))}
       </nav>
+      <div className="mt-4"><UseLegend /></div>
       <div className="mt-4">
         {sub === "pessoas" && (
           <>

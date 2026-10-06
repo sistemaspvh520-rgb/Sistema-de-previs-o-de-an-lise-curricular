@@ -111,6 +111,11 @@ describe("uso da equipe", () => {
     expect(analyst.moduleActions).toMatchObject({ CURRICULAR: 1, GRADES: 1 });
     expect(report.modules.find((module) => module.module === "ACADEMIC")).toMatchObject({ people: 1, activeSeconds: 60 });
     expect(report.online.map((person) => person.id)).toContain(ids.tutor);
+    // Ritmo: quem trabalhou em cada horário e dia da semana (o tutor tem 60 s registrados no teste anterior).
+    const tutorHours = report.rhythmPeople.hours.flatMap((list) => list.filter((person) => person.id === ids.tutor));
+    expect(tutorHours).toHaveLength(1);
+    expect(tutorHours[0]).toMatchObject({ seconds: 60, name: "Uso tutor" });
+    expect(report.rhythmPeople.weekdays.flat().filter((person) => person.id === ids.tutor)).toHaveLength(1);
     expect(report.attention.neverAccessed.map((person) => person.id)).toEqual([ids.never]);
     expect(report.attention.idle.map((person) => person.id)).toEqual([ids.idle]);
     expect(report.attention.analystsWithoutAnalyses.map((person) => person.id).sort()).toEqual([ids.idle, ids.never].sort());

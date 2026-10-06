@@ -208,7 +208,7 @@ export default async function TeamUsagePage({ searchParams }: PageProps<"/manage
                 <p className="text-xs text-muted-foreground">Tempo ativo por horário e por dia da semana (horário de Porto Velho) · {period.label.toLocaleLowerCase("pt-BR")}{focus ? ` · ${MODULE_LABELS[focus]}` : ""}.</p>
               </CardHeader>
               <CardContent>
-                <UsageRhythm grid={report.heatmap} />
+                <UsageRhythm grid={report.heatmap} people={report.rhythmPeople} />
               </CardContent>
             </Card>
           </section>

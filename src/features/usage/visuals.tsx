@@ -1,9 +1,15 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { Clock } from "lucide-react";
 import type { UsageModule } from "@/generated/prisma/enums";
 import { MODULE_LABELS } from "@/domain/usage/modules";
 import { formatDuration } from "@/domain/usage/metrics";
+import { ROLE_LABELS } from "@/lib/rbac";
+import type { RhythmPerson } from "@/services/usage/team-usage";
+import { initials } from "@/features/usage/format";
+import { cn } from "@/lib/utils";
 import { ChartTooltip, useChartTooltip } from "@/features/usage/chart-tooltip";
 import { MODULE_COLORS, TREND_ACCENT, TREND_MUTED } from "@/features/usage/palette";
 
@@ -96,14 +102,22 @@ export function ModuleSplitBar({ seconds, className }: { seconds: Record<UsageMo
 }
 
 /**
- * Ritmo da equipe: minutos ativos por horário (colunas) e por dia da semana (barras com o valor escrito).
- * Uma só cor, grade discreta, só o pico rotulado no gráfico de horários; o resto aparece ao passar o mouse.
+ * Ritmo da equipe: tempo ativo por horário e por dia da semana, e QUEM trabalhou. Clicar numa barra (ou numa linha da
+ * semana) mostra a lista de pessoas daquele horário/dia, da que mais trabalhou para a que menos; com muitas pessoas a
+ * lista rola. Uma só cor e só o pico rotulado; os detalhes aparecem ao passar o mouse ou ao selecionar.
  */
-export function UsageRhythm({ grid }: { grid: number[][] }) {
+export function UsageRhythm({ grid, people }: { grid: number[][]; people: { hours: RhythmPerson[][]; weekdays: RhythmPerson[][] } }) {
   const { tip, show, hide } = useChartTooltip();
   const byHour = Array.from({ length: 24 }, (_, hour) => grid.reduce((sum, row) => sum + (row?.[hour] ?? 0), 0));
   const byWeekday = WEEK_ORDER.map((weekday) => ({ weekday, minutes: (grid[weekday] ?? []).reduce((sum, value) => sum + value, 0) }));
   const total = byHour.reduce((sum, value) => sum + value, 0);
+  const used = byHour.flatMap((minutes, hour) => (minutes > 0 ? [hour] : []));
+  const first = used.length ? Math.min(6, used[0]) : 6;
+  const last = used.length ? Math.max(22, used[used.length - 1]) : 22;
+  const hours = Array.from({ length: last - first + 1 }, (_, index) => first + index);
+  const peakHour = hours.reduce((best, hour) => (byHour[hour] > byHour[best] ? hour : best), hours[0]);
+  const peakDay = byWeekday.reduce((best, item) => (item.minutes > best.minutes ? item : best), byWeekday[0]);
+  const [selected, setSelected] = useState<{ kind: "hour" | "day"; value: number } | null>(null);
   if (!total) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-slate-50/60 px-6 py-10 text-center">
@@ -113,12 +127,7 @@ export function UsageRhythm({ grid }: { grid: number[][] }) {
       </div>
     );
   }
-  const used = byHour.flatMap((minutes, hour) => (minutes > 0 ? [hour] : []));
-  const first = Math.min(6, used[0]);
-  const last = Math.max(22, used[used.length - 1]);
-  const hours = Array.from({ length: last - first + 1 }, (_, index) => first + index);
-  const peakHour = hours.reduce((best, hour) => (byHour[hour] > byHour[best] ? hour : best), hours[0]);
-  const peakDay = byWeekday.reduce((best, item) => (item.minutes > best.minutes ? item : best), byWeekday[0]);
+  const current = selected ?? { kind: "hour" as const, value: peakHour };
   const maxHour = Math.max(...hours.map((hour) => byHour[hour]), 1);
   const maxDay = Math.max(...byWeekday.map((item) => item.minutes), 1);
 
@@ -129,28 +138,45 @@ export function UsageRhythm({ grid }: { grid: number[][] }) {
   const slot = (width - pad.left - pad.right) / hours.length;
   const barW = Math.min(18, slot - 4);
   const fmt = (minutes: number) => formatDuration(minutes * 60);
+  const whoRows = (list: RhythmPerson[]) => list.slice(0, 3).map((person) => ({ value: formatDuration(person.seconds), label: person.name.split(" ")[0] }));
+  const select = (kind: "hour" | "day", value: number) => setSelected({ kind, value });
+  const listed = current.kind === "hour" ? (people.hours[current.value] ?? []) : (people.weekdays[current.value] ?? []);
+  const listedTotal = listed.reduce((sum, person) => sum + person.seconds, 0);
+  const title = current.kind === "hour" ? `às ${current.value}h` : `${WEEKDAY_NAMES[current.value].toLocaleLowerCase("pt-BR")}s`;
   return (
     <div>
       <p className="text-sm text-slate-600">
-        Pico às <span className="font-semibold text-slate-900">{peakHour}h</span> e às <span className="font-semibold text-slate-900">{WEEKDAY_NAMES[peakDay.weekday].toLocaleLowerCase("pt-BR")}s</span> · {fmt(total)} de uso no período.
+        Pico às <span className="font-semibold text-slate-900">{peakHour}h</span> e às <span className="font-semibold text-slate-900">{WEEKDAY_NAMES[peakDay.weekday].toLocaleLowerCase("pt-BR")}s</span> · {fmt(total)} de uso no período. <span className="text-muted-foreground">Toque num horário ou dia para ver quem trabalhou.</span>
       </p>
       <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <figure>
           <figcaption className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Por horário</figcaption>
-          <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label={`Minutos ativos por horário; pico às ${peakHour}h com ${fmt(byHour[peakHour])}`}>
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="group" aria-label={`Minutos ativos por horário; pico às ${peakHour}h com ${fmt(byHour[peakHour])}`}>
             <line x1={pad.left} x2={width - pad.right} y1={height - pad.bottom + 0.5} y2={height - pad.bottom + 0.5} stroke="#cbd5e1" />
             <line x1={pad.left} x2={width - pad.right} y1={pad.top + 0.5} y2={pad.top + 0.5} stroke="#eef2f6" strokeDasharray="3 3" />
             {hours.map((hour, index) => {
               const minutes = byHour[hour];
               const h = minutes > 0 ? Math.max(3, (minutes / maxHour) * plotH) : 0;
               const x = pad.left + index * slot + (slot - barW) / 2;
-              const peak = hour === peakHour;
+              const isSelected = current.kind === "hour" && current.value === hour;
+              const who = people.hours[hour] ?? [];
               return (
-                <g key={hour} onPointerMove={(event) => show(event, { title: `${hour}h às ${hour + 1}h`, rows: [{ value: minutes ? fmt(minutes) : "sem uso", label: "ativos no período", color: TREND_ACCENT }] })} onPointerLeave={hide}>
-                  <rect x={pad.left + index * slot} y={pad.top} width={slot} height={plotH} fill="transparent" />
-                  {h > 0 && <rect x={x} y={height - pad.bottom - h} width={barW} height={h} rx={3} fill={TREND_ACCENT} opacity={peak ? 1 : 0.55} />}
-                  {peak && <text x={x + barW / 2} y={height - pad.bottom - h - 6} textAnchor="middle" className="fill-slate-900 text-[11px] font-semibold">{fmt(minutes)}</text>}
-                  {hour % 2 === 0 && <text x={pad.left + index * slot + slot / 2} y={height - 6} textAnchor="middle" className="fill-slate-500 text-[10px]">{hour}h</text>}
+                <g
+                  key={hour}
+                  className="cursor-pointer outline-none"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${hour}h: ${minutes ? fmt(minutes) : "sem uso"}, ${who.length} ${who.length === 1 ? "pessoa" : "pessoas"}`}
+                  aria-pressed={isSelected}
+                  onClick={() => select("hour", hour)}
+                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select("hour", hour); } }}
+                  onPointerMove={(event) => show(event, { title: `${hour}h às ${hour + 1}h`, rows: minutes ? [{ value: fmt(minutes), label: `${who.length} ${who.length === 1 ? "pessoa" : "pessoas"}`, color: TREND_ACCENT }, ...whoRows(who)] : [{ value: "sem uso", label: "" }] })}
+                  onPointerLeave={hide}
+                >
+                  <rect x={pad.left + index * slot} y={pad.top} width={slot} height={plotH} fill={isSelected ? "#e8f2fa" : "transparent"} rx={4} />
+                  {h > 0 && <rect x={x} y={height - pad.bottom - h} width={barW} height={h} rx={3} fill={TREND_ACCENT} opacity={isSelected || (!selected && hour === peakHour) ? 1 : 0.55} />}
+                  {hour === peakHour && <text x={x + barW / 2} y={height - pad.bottom - h - 6} textAnchor="middle" className="fill-slate-900 text-[11px] font-semibold">{fmt(minutes)}</text>}
+                  {hour % 2 === 0 && <text x={pad.left + index * slot + slot / 2} y={height - 6} textAnchor="middle" className={isSelected ? "fill-slate-900 text-[10px] font-semibold" : "fill-slate-500 text-[10px]"}>{hour}h</text>}
                 </g>
               );
             })}
@@ -158,19 +184,62 @@ export function UsageRhythm({ grid }: { grid: number[][] }) {
         </figure>
         <figure>
           <figcaption className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Por dia da semana</figcaption>
-          <ul className="space-y-2">
-            {byWeekday.map(({ weekday, minutes }) => (
-              <li key={weekday} className="grid grid-cols-[2.5rem_minmax(0,1fr)_4.5rem] items-center gap-2 text-sm">
-                <span className="text-xs text-slate-600">{WEEKDAY_LABELS[weekday]}</span>
-                <span className="h-2.5 rounded-full bg-slate-100">
-                  {minutes > 0 && <span className="block h-full rounded-full" style={{ width: `${Math.max(3, (minutes / maxDay) * 100)}%`, backgroundColor: TREND_ACCENT, opacity: weekday === peakDay.weekday ? 1 : 0.55 }} />}
-                </span>
-                <span className={minutes ? "text-right text-xs font-semibold tabular-nums text-slate-900" : "text-right text-xs text-slate-400"}>{minutes ? fmt(minutes) : "—"}</span>
-              </li>
-            ))}
+          <ul className="space-y-1">
+            {byWeekday.map(({ weekday, minutes }) => {
+              const isSelected = current.kind === "day" && current.value === weekday;
+              const who = people.weekdays[weekday] ?? [];
+              return (
+                <li key={weekday}>
+                  <button
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => select("day", weekday)}
+                    onPointerMove={(event) => show(event, { title: WEEKDAY_NAMES[weekday], rows: minutes ? [{ value: fmt(minutes), label: `${who.length} ${who.length === 1 ? "pessoa" : "pessoas"}`, color: TREND_ACCENT }, ...whoRows(who)] : [{ value: "sem uso", label: "" }] })}
+                    onPointerLeave={hide}
+                    className={cn("grid w-full grid-cols-[2.5rem_minmax(0,1fr)_4.5rem] items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", isSelected && "bg-brand-navy-50")}
+                  >
+                    <span className={cn("text-xs", isSelected ? "font-semibold text-slate-900" : "text-slate-600")}>{WEEKDAY_LABELS[weekday]}</span>
+                    <span className="h-2.5 rounded-full bg-slate-100">
+                      {minutes > 0 && <span className="block h-full rounded-full" style={{ width: `${Math.max(3, (minutes / maxDay) * 100)}%`, backgroundColor: TREND_ACCENT, opacity: isSelected || (!selected && weekday === peakDay.weekday) ? 1 : 0.55 }} />}
+                    </span>
+                    <span className={minutes ? "text-right text-xs font-semibold tabular-nums text-slate-900" : "text-right text-xs text-slate-400"}>{minutes ? fmt(minutes) : "—"}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </figure>
       </div>
+
+      <section aria-live="polite" aria-label={`Quem trabalhou ${title}`} className="mt-6 rounded-xl border bg-slate-50/60">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-3">
+          <h3 className="text-sm font-semibold text-slate-900">Quem trabalhou {title}</h3>
+          <span className="text-xs text-muted-foreground">
+            {listed.length ? `${listed.length} ${listed.length === 1 ? "pessoa" : "pessoas"} · ${formatDuration(listedTotal)} no período` : "ninguém no período"}
+          </span>
+        </div>
+        {listed.length ? (
+          <ul className="max-h-72 divide-y overflow-y-auto">
+            {listed.map((person) => (
+              <li key={person.id}>
+                <Link href={`/management/team-usage/${person.id}`} className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,7rem)_4.5rem] items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <span className="flex size-8 items-center justify-center rounded-full bg-brand-navy text-[10px] font-semibold text-white">{initials(person.name)}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-slate-900">{person.name}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{ROLE_LABELS[person.role]}</span>
+                  </span>
+                  <span className="h-1.5 rounded-full bg-slate-200" aria-hidden="true">
+                    <span className="block h-full rounded-full" style={{ width: `${Math.max(4, (person.seconds / listed[0].seconds) * 100)}%`, backgroundColor: TREND_ACCENT }} />
+                  </span>
+                  <span className="text-right text-xs font-semibold tabular-nums text-slate-900">{formatDuration(person.seconds)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">Ninguém usou o sistema {title} neste período.</p>
+        )}
+      </section>
       <ChartTooltip tip={tip} />
     </div>
   );

@@ -65,6 +65,13 @@ export interface PersonUsage {
   managedStudents: number;
 }
 
+export interface RhythmPerson {
+  id: string;
+  name: string;
+  role: Role;
+  seconds: number;
+}
+
 export interface ModuleSummary {
   module: WorkModule;
   label: string;
@@ -91,6 +98,8 @@ export interface TeamUsageReport {
   people: PersonUsage[];
   /** Minutos ativos por dia da semana (0 = domingo) × hora (0–23). */
   heatmap: number[][];
+  /** Quem trabalhou em cada horário (0–23) e em cada dia da semana (0 = domingo), do maior para o menor tempo ativo. */
+  rhythmPeople: { hours: RhythmPerson[][]; weekdays: RhythmPerson[][] };
   attention: {
     neverAccessed: Array<{ id: string; name: string; role: Role }>;
     idle: Array<{ id: string; name: string; role: Role; days: number }>;
@@ -140,6 +149,8 @@ export async function getTeamUsage(filters: UsageFilters, now = new Date()): Pro
   });
 
   const heatmap = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
+  const hourPeople = Array.from({ length: 24 }, () => new Map<string, number>());
+  const weekdayPeople = Array.from({ length: 7 }, () => new Map<string, number>());
   const perUser = new Map(ids.map((id) => [id, {
     moduleSeconds: emptyByModule(),
     moduleActions: emptyByModule(),
@@ -164,6 +175,8 @@ export async function getTeamUsage(filters: UsageFilters, now = new Date()): Pro
     if (row.activeSeconds > 0 && (!focus || row.module === focus)) {
       const { weekday, hour } = zonedWeekdayHour(row.hour);
       heatmap[weekday][hour] += Math.round(row.activeSeconds / 60);
+      hourPeople[hour].set(row.userId, (hourPeople[hour].get(row.userId) ?? 0) + row.activeSeconds);
+      weekdayPeople[weekday].set(row.userId, (weekdayPeople[weekday].get(row.userId) ?? 0) + row.activeSeconds);
     }
   }
   const countAction = (userId: string | null, name: string, at: Date) => {
@@ -181,6 +194,12 @@ export async function getTeamUsage(filters: UsageFilters, now = new Date()): Pro
   };
   for (const row of audits) countAction(row.userId, row.action, row.createdAt);
   for (const row of tracked) countAction(row.userId, row.name, row.createdAt);
+
+  const userMeta = new Map(users.map((user) => [user.id, user]));
+  const rankRhythm = (map: Map<string, number>): RhythmPerson[] =>
+    [...map.entries()]
+      .flatMap(([id, seconds]) => (seconds > 0 && userMeta.has(id) ? [{ id, name: userMeta.get(id)!.name, role: userMeta.get(id)!.role, seconds }] : []))
+      .sort((a, b) => b.seconds - a.seconds || a.name.localeCompare(b.name, "pt-BR"));
 
   const onlineSince = new Date(now.getTime() - ONLINE_WINDOW_MS);
   const people: PersonUsage[] = users.map((user) => {
@@ -264,6 +283,7 @@ export async function getTeamUsage(filters: UsageFilters, now = new Date()): Pro
     modules,
     people,
     heatmap,
+    rhythmPeople: { hours: hourPeople.map(rankRhythm), weekdays: weekdayPeople.map(rankRhythm) },
     attention: {
       neverAccessed: people.filter((person) => person.status.kind === "never").map((person) => ({ id: person.id, name: person.name, role: person.role })),
       idle: people.filter((person) => person.status.kind === "idle").map((person) => ({ id: person.id, name: person.name, role: person.role, days: person.status.days ?? 0 })).sort((a, b) => b.days - a.days),
