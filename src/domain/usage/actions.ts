@@ -45,6 +45,7 @@ export const AUDITED_ACTIONS: Record<string, UsageActionDef> = {
 
 /** Ações gravadas pelo próprio rastreamento (não existem na auditoria). */
 export const TRACKED_ACTIONS = {
+  "grade.whatsapp_open": { module: "GRADES", label: "Abriu a mensagem de WhatsApp de uma grade", plural: "mensagens abertas" },
   "grade.download": { module: "GRADES", label: "Baixou o PDF de uma grade", plural: "PDFs baixados", key: true },
   "grade.whatsapp_copy": { module: "GRADES", label: "Copiou a mensagem de WhatsApp de uma grade", plural: "mensagens copiadas", key: true },
   "grade.search": { module: "GRADES", label: "Buscou no catálogo de grades", plural: "buscas" },
@@ -52,6 +53,21 @@ export const TRACKED_ACTIONS = {
 } as const satisfies Record<string, UsageActionDef>;
 
 export type TrackedActionName = keyof typeof TRACKED_ACTIONS;
+
+/** Ações sobre uma grade específica (guardam o id e o nome do curso): é o "uso de grade" do painel. */
+export const GRADE_ACTIONS = ["grade.whatsapp_open", "grade.whatsapp_copy", "grade.download"] as const satisfies readonly TrackedActionName[];
+export type GradeActionName = (typeof GRADE_ACTIONS)[number];
+
+export function isGradeAction(name: string): name is GradeActionName {
+  return (GRADE_ACTIONS as readonly string[]).includes(name);
+}
+
+/** Rótulo curto de cada uso de grade, para tabelas e linha do tempo. */
+export const GRADE_ACTION_SHORT: Record<GradeActionName, string> = {
+  "grade.whatsapp_open": "Abriu a mensagem",
+  "grade.whatsapp_copy": "Copiou para o WhatsApp",
+  "grade.download": "Baixou o PDF",
+};
 
 export function isTrackedAction(name: string): name is TrackedActionName {
   return Object.prototype.hasOwnProperty.call(TRACKED_ACTIONS, name);

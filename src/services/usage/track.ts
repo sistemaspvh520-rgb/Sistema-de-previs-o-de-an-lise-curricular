@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import type { SessionUser } from "@/lib/session";
 import { moduleForPath, routePattern } from "@/domain/usage/modules";
-import { TRACKED_ACTIONS, type TrackedActionName } from "@/domain/usage/actions";
+import { TRACKED_ACTIONS, isGradeAction, type TrackedActionName } from "@/domain/usage/actions";
 
 /** Cada sinal de atividade vale no máximo este tempo; o navegador envia um por minuto. */
 export const HEARTBEAT_SECONDS = 60;
@@ -84,8 +84,16 @@ export async function recordHeartbeat(userId: string, path: string, at = new Dat
 }
 
 /** Ação que a auditoria não registra (ex.: baixar o PDF de uma grade). */
-export async function recordAction(userId: string, name: TrackedActionName, entityId?: string | null, at = new Date()): Promise<void> {
-  await prisma.usageEvent.create({ data: { userId, module: TRACKED_ACTIONS[name].module, kind: "ACTION", name, entityId: entityId ?? null, createdAt: at } });
+export async function recordAction(userId: string, name: TrackedActionName, entityId?: string | null, at = new Date()): Promise<boolean> {
+  let entityLabel: string | null = null;
+  if (isGradeAction(name)) {
+    // Uso de grade exige a grade: o nome do curso é lido aqui (nunca vem do navegador) e fica no histórico.
+    const grade = entityId ? await prisma.commercialGrade.findUnique({ where: { id: entityId }, select: { courseName: true } }) : null;
+    if (!grade) return false;
+    entityLabel = grade.courseName;
+  }
+  await prisma.usageEvent.create({ data: { userId, module: TRACKED_ACTIONS[name].module, kind: "ACTION", name, entityId: entityId ?? null, entityLabel, createdAt: at } });
+  return true;
 }
 
 /** Para chamar de dentro de outras rotas: nunca lança nem atrasa a resposta por causa do rastreamento. */

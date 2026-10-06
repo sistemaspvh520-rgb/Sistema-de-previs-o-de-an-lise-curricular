@@ -3,7 +3,7 @@
 import { Copy, MessageCircle, PencilLine } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { trackClientAction } from "@/features/usage/track-client";
+import { trackGradeUse } from "@/features/usage/track-client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -66,13 +66,13 @@ export function CopyWhatsapp({
     try {
       await navigator.clipboard.writeText(message);
       toast.success("Mensagem copiada para o WhatsApp.");
-      trackClientAction("grade.whatsapp_copy", gradeId);
+      trackGradeUse("grade.whatsapp_copy", gradeId);
     } catch {
       toast.error("Não foi possível copiar a mensagem.");
     }
   }
   return (
-    <Dialog>
+    <Dialog onOpenChange={(open) => { if (open) trackGradeUse("grade.whatsapp_open", gradeId); }}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           <MessageCircle className="size-3.5" /> Mensagem pronta para WhatsApp

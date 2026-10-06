@@ -111,7 +111,7 @@ export function TeamUsageTable({ people, trendDays, query, focusLabel }: { peopl
                     {person.online ? (person.currentScreen ? `em ${person.currentScreen}` : "agora") : person.lastSeenAt ? `visto ${shortDateTime.format(new Date(person.lastSeenAt))}` : "nunca acessou"}
                   </div>
                 </td>
-                <td className="px-2.5 py-3 font-semibold tabular-nums text-slate-900">{formatDuration(person.activeSeconds)}</td>
+                <td className="whitespace-nowrap px-2.5 py-3 font-semibold tabular-nums text-slate-900">{formatDuration(person.activeSeconds)}</td>
                 <td className="px-2.5 py-3 tabular-nums text-slate-700">{person.activeDays}</td>
                 <td className="px-2.5 py-3">
                   <ModuleSplitBar seconds={person.moduleSeconds} />

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, CircleSlash, Download, GraduationCap, Hourglass, ShieldCheck, UserX } from "lucide-react";
+import { ArrowUpRight, Download, Hourglass, ShieldCheck } from "lucide-react";
 import { requirePagePermission } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,11 @@ import { ManagementTabs } from "@/features/usage/management-tabs";
 import { UsageFilters } from "@/features/usage/usage-filters";
 import { TeamUsageTable } from "@/features/usage/team-table";
 import { initials } from "@/features/usage/format";
-import { MiniBars, UsageHeatmap } from "@/features/usage/visuals";
+import { MiniBars, UsageRhythm } from "@/features/usage/visuals";
 import { MODULE_COLORS } from "@/features/usage/palette";
+import { AttentionPanel, type AttentionKind } from "@/features/usage/attention-panel";
+
+const ATTENTION_KINDS: AttentionKind[] = ["never", "idle", "grades", "analyses", "academic"];
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Uso da equipe" };
@@ -46,7 +49,14 @@ export default async function TeamUsagePage({ searchParams }: PageProps<"/manage
     return `/management/team-usage${text ? `?${text}` : ""}#equipe`;
   };
   const adoption = report.accounts ? Math.round((report.active7d / report.accounts) * 100) : 0;
-  const attentionCount = report.attention.neverAccessed.length + report.attention.idle.length + report.attention.tutorsWithoutAcademic.length + report.attention.analystsWithoutAnalyses.length;
+  const attention = ATTENTION_KINDS.includes(one(params.attn) as AttentionKind) ? (one(params.attn) as AttentionKind) : undefined;
+  const attentionHref = (kind?: AttentionKind) => {
+    const next = new URLSearchParams(query);
+    if (kind) next.set("attn", kind);
+    const text = next.toString();
+    return `/management/team-usage${text ? `?${text}` : ""}#atencao`;
+  };
+  const personHref = (id: string) => `/management/team-usage/${id}${queryString ? `?${queryString}` : ""}`;
 
   return (
     <>
@@ -112,11 +122,18 @@ export default async function TeamUsagePage({ searchParams }: PageProps<"/manage
         </div>
       </section>
 
+      <AttentionPanel report={report} active={attention} hrefFor={attentionHref} personHref={personHref} />
+
       <section aria-label="Uso por módulo" className="mt-6 grid gap-4 lg:grid-cols-3">
         {report.modules.map((summary) => (
           <ModuleCard key={summary.module} summary={summary} active={focus === summary.module} dimmed={Boolean(focus && focus !== summary.module)} href={moduleHref(summary.module)} trendDays={trendDays} />
         ))}
       </section>
+      <p className="mt-3 text-right text-sm">
+        <Link href={`/management/team-usage/grades${queryString ? `?${queryString}` : ""}`} className="inline-flex items-center gap-1 font-medium text-brand-cyan-700 hover:underline">
+          Ver quais grades cada pessoa usou <ArrowUpRight className="size-4" />
+        </Link>
+      </p>
 
       <section id="equipe" className="mt-6 scroll-mt-6">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -132,26 +149,14 @@ export default async function TeamUsagePage({ searchParams }: PageProps<"/manage
         <TeamUsageTable people={report.people} trendDays={trendDays} query={queryString} focusLabel={focus ? MODULE_LABELS[focus] : undefined} />
       </section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <section className="mt-6">
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base"><Hourglass className="size-4 text-brand-cyan-700" /> Quando a equipe trabalha</CardTitle>
-            <p className="text-xs text-muted-foreground">Minutos ativos por dia da semana e hora (Porto Velho) · {period.label.toLocaleLowerCase("pt-BR")}{focus ? ` · ${MODULE_LABELS[focus]}` : ""}.</p>
+            <p className="text-xs text-muted-foreground">Tempo ativo por horário e por dia da semana (horário de Porto Velho) · {period.label.toLocaleLowerCase("pt-BR")}{focus ? ` · ${MODULE_LABELS[focus]}` : ""}.</p>
           </CardHeader>
           <CardContent>
-            <UsageHeatmap grid={report.heatmap} />
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="size-4 text-status-warning" /> Pedem atenção {attentionCount > 0 && <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-xs text-status-warning">{attentionCount}</span>}</CardTitle>
-            <p className="text-xs text-muted-foreground">Contas paradas e quem não está usando a parte que é sua.</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <AttentionGroup icon={CircleSlash} title="Nunca acessaram" empty="Todos já acessaram." items={report.attention.neverAccessed.map((item) => ({ id: item.id, name: item.name, detail: ROLE_LABELS[item.role] }))} query={queryString} />
-            <AttentionGroup icon={UserX} title="Sem uso há 14 dias ou mais" empty="Ninguém parado há tanto tempo." items={report.attention.idle.map((item) => ({ id: item.id, name: item.name, detail: `${ROLE_LABELS[item.role]} · ${item.days} dias` }))} query={queryString} />
-            <AttentionGroup icon={GraduationCap} title="Tutores com alunos e sem uso acadêmico na semana" empty="Todos os tutores com alunos usaram o sistema acadêmico." items={report.attention.tutorsWithoutAcademic.map((item) => ({ id: item.id, name: item.name, detail: `${item.students} ${item.students === 1 ? "aluno" : "alunos"} na carteira` }))} query={queryString} />
-            <AttentionGroup icon={AlertTriangle} title="Analistas sem análises no período" empty="Todos os analistas criaram análises." items={report.attention.analystsWithoutAnalyses.map((item) => ({ id: item.id, name: item.name, detail: "nenhuma análise criada" }))} query={queryString} />
+            <UsageRhythm grid={report.heatmap} />
           </CardContent>
         </Card>
       </section>
@@ -228,28 +233,5 @@ function ModuleCard({ summary, active, dimmed, href, trendDays }: { summary: Mod
         <MiniBars values={summary.trend} days={trendDays} color={color} label={`Uso de ${summary.label}`} width={96} height={30} />
       </div>
     </Link>
-  );
-}
-
-function AttentionGroup({ icon: Icon, title, empty, items, query }: { icon: typeof AlertTriangle; title: string; empty: string; items: Array<{ id: string; name: string; detail: string }>; query: string }) {
-  return (
-    <div>
-      <h3 className="flex items-center gap-2 text-sm font-medium text-slate-800"><Icon className="size-4 text-muted-foreground" /> {title}{items.length > 0 && <span className="text-muted-foreground">· {items.length}</span>}</h3>
-      {items.length ? (
-        <ul className="mt-1.5 divide-y rounded-lg border">
-          {items.slice(0, 6).map((item) => (
-            <li key={item.id}>
-              <Link href={`/management/team-usage/${item.id}${query ? `?${query}` : ""}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
-                <span className="truncate font-medium text-slate-800">{item.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{item.detail}</span>
-              </Link>
-            </li>
-          ))}
-          {items.length > 6 && <li className="px-3 py-2 text-xs text-muted-foreground">e mais {items.length - 6}</li>}
-        </ul>
-      ) : (
-        <p className="mt-1 text-xs text-muted-foreground">{empty}</p>
-      )}
-    </div>
   );
 }

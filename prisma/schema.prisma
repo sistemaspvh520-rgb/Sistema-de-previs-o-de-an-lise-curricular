@@ -961,6 +961,8 @@ model UsageEvent {
   /** Padrão da rota (PAGE_VIEW) ou nome da ação (ex.: grade.download). */
   name      String
   entityId  String?
+  /** Nome do registro no momento do uso (ex.: curso da grade), lido no servidor: o histórico sobrevive à exclusão. */
+  entityLabel String?
   createdAt DateTime       @default(now()) @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

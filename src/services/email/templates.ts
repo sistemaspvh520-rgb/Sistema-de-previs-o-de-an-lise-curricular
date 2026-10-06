@@ -288,6 +288,7 @@ export function usageDigestEmail(p: {
   activeTime: string;
   modules: Array<{ label: string; people: number; time: string }>;
   notUsing: string[];
+  grades: { people: number; accounts: number; copies: number; notUsing: string[] };
   url: string;
   institution: string;
 }): EmailContent {
@@ -297,8 +298,13 @@ export function usageDigestEmail(p: {
     ["Pessoas que usaram", `${p.activeWeek} de ${p.accounts} (${delta})`],
     ["Tempo ativo da equipe", p.activeTime],
     ...p.modules.map((module): [string, string] => [module.label, `${module.people} ${module.people === 1 ? "pessoa" : "pessoas"} · ${module.time}`]),
+    ["Usaram as grades", `${p.grades.people} de ${p.grades.accounts} · ${p.grades.copies} ${p.grades.copies === 1 ? "mensagem copiada" : "mensagens copiadas"} para WhatsApp`],
   ];
-  const note = p.notUsing.length ? `Sem uso na semana: ${p.notUsing.map(escape).join(", ")}.` : "Toda a equipe usou o sistema nesta semana.";
+  const notes = [
+    p.notUsing.length ? `Sem uso na semana: ${p.notUsing.map(escape).join(", ")}.` : "Toda a equipe usou o sistema nesta semana.",
+    p.grades.notUsing.length ? `Sem uso das grades: ${p.grades.notUsing.map(escape).join(", ")}.` : "Toda a equipe usou as grades.",
+  ];
+  const note = notes.join(" ");
   return {
     subject: `Uso da equipe: ${p.activeWeek} de ${p.accounts} pessoas usaram o sistema na semana`,
     html: layout({
@@ -316,6 +322,7 @@ export function usageDigestEmail(p: {
       ...details.map(([k, v]) => `${k}: ${v}`),
       "",
       p.notUsing.length ? `Sem uso na semana: ${p.notUsing.join(", ")}.` : "Toda a equipe usou o sistema nesta semana.",
+      p.grades.notUsing.length ? `Sem uso das grades: ${p.grades.notUsing.join(", ")}.` : "Toda a equipe usou as grades.",
       "",
       `Uso da equipe: ${p.url}`,
     ].join("\n"),

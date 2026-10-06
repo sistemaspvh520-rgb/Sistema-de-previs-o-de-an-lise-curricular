@@ -3,7 +3,7 @@ import type { Role, UsageModule } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { STAFF_ROLES } from "@/lib/rbac";
 import { findPolo } from "@/domain/polos";
-import { AUDITED_ACTION_NAMES, usageAction } from "@/domain/usage/actions";
+import { AUDITED_ACTION_NAMES, GRADE_ACTIONS, usageAction } from "@/domain/usage/actions";
 import { MODULE_LABELS, WORK_MODULES, pageLabel, type WorkModule } from "@/domain/usage/modules";
 import {
   ONLINE_WINDOW_MS,
@@ -96,6 +96,8 @@ export interface TeamUsageReport {
     idle: Array<{ id: string; name: string; role: Role; days: number }>;
     tutorsWithoutAcademic: Array<{ id: string; name: string; students: number }>;
     analystsWithoutAnalyses: Array<{ id: string; name: string }>;
+    /** Toda a equipe (admins inclusive) sem abrir, copiar ou baixar nenhuma grade no período. */
+    withoutGrades: Array<{ id: string; name: string; role: Role }>;
   };
 }
 
@@ -267,6 +269,7 @@ export async function getTeamUsage(filters: UsageFilters, now = new Date()): Pro
       idle: people.filter((person) => person.status.kind === "idle").map((person) => ({ id: person.id, name: person.name, role: person.role, days: person.status.days ?? 0 })).sort((a, b) => b.days - a.days),
       tutorsWithoutAcademic: people.filter((person) => person.role === "TUTOR" && person.managedStudents > 0 && !academicActive.has(person.id)).map((person) => ({ id: person.id, name: person.name, students: person.managedStudents })),
       analystsWithoutAnalyses: people.filter((person) => person.role === "ANALYST" && !(perUser.get(person.id)!.actions.get("analysis.create"))).map((person) => ({ id: person.id, name: person.name })),
+      withoutGrades: people.filter((person) => !GRADE_ACTIONS.some((name) => perUser.get(person.id)!.actions.get(name))).map((person) => ({ id: person.id, name: person.name, role: person.role })),
     },
   };
 }
