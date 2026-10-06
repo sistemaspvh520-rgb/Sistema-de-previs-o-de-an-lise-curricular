@@ -12,11 +12,12 @@ import { TutorScoreboard } from "@/features/team/tutor-scoreboard";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateTime } from "@/lib/time";
 import { startOfCurrentMonth } from "@/lib/time";
+import { resolveUsagePeriod } from "@/domain/usage/metrics";
+import { getTeamPulse } from "@/services/usage/team-usage";
 import { countAnalysesByPolo } from "@/repositories/analysis-repository";
 import { PoloReportCard } from "@/features/analyses/components/polo-report";
-import { DateRangeFilter } from "@/components/shared/date-range-filter";
+import { PeriodFilter } from "@/features/usage/period-filter";
 import { DashboardRing } from "@/components/dashboard/dashboard-ring";
 import { countStaleEnrollmentCases } from "@/services/follow-up/management-alerts";
 import { getCommercialInsights } from "@/repositories/commercial-repository";
@@ -31,30 +32,14 @@ export default async function ManagementPage({
 }: PageProps<"/management">) {
   await requirePagePermission("audit:read");
   const params = await searchParams;
-  const monthStart = startOfCurrentMonth();
-  const fromParam = typeof params.from === "string" ? params.from : undefined;
-  const toParam = typeof params.to === "string" ? params.to : undefined;
-  const from =
-    fromParam && !Number.isNaN(Date.parse(fromParam))
-      ? new Date(`${fromParam}T00:00:00-04:00`)
-      : undefined;
-  const to =
-    toParam && !Number.isNaN(Date.parse(toParam))
-      ? new Date(`${toParam}T23:59:59.999-04:00`)
-      : undefined;
-  const createdAt: Prisma.DateTimeFilter | undefined =
-    from || to
-      ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) }
-      : undefined;
-  const periodWhere: Prisma.CurricularAnalysisWhereInput = createdAt
-    ? { createdAt }
-    : { createdAt: { gte: monthStart } };
+  const now = new Date();
+  const monthStart = startOfCurrentMonth(now);
+  // Mesmo filtro de período das demais telas de gestão; o padrão é "Este mês".
+  const period = resolveUsagePeriod({ period: typeof params.period === "string" ? params.period : undefined, from: typeof params.from === "string" ? params.from : undefined, to: typeof params.to === "string" ? params.to : undefined }, now, "month");
+  const periodWhere: Prisma.CurricularAnalysisWhereInput = { createdAt: { gte: period.from, lte: period.to } };
 
   const [
-    activeUsers,
-    users,
-    periodByUserRows,
-    completedByUserRows,
+    pulse,
     byPolo,
     total,
     completed,
@@ -65,36 +50,7 @@ export default async function ManagementPage({
     commercialInsights,
     teamInsights,
   ] = await Promise.all([
-    prisma.user.count({ where: { isActive: true } }),
-    prisma.user.findMany({
-      where: { isActive: true },
-      orderBy: [
-        { lastActiveAt: { sort: "desc", nulls: "last" } },
-        { name: "asc" },
-      ],
-      take: 12,
-      select: {
-        id: true,
-        name: true,
-        role: true,
-        lastActiveAt: true,
-        analyses: {
-          select: { courseName: true, studentName: true, createdAt: true },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    }),
-    prisma.curricularAnalysis.groupBy({
-      by: ["createdById"],
-      where: periodWhere,
-      _count: { _all: true },
-    }),
-    prisma.curricularAnalysis.groupBy({
-      by: ["createdById"],
-      where: { ...periodWhere, status: "COMPLETED" },
-      _count: { _all: true },
-    }),
+    getTeamPulse(now),
     countAnalysesByPolo({ monthStart }),
     prisma.curricularAnalysis.count({ where: periodWhere }),
     prisma.curricularAnalysis.count({
@@ -120,28 +76,19 @@ export default async function ManagementPage({
         enrollmentReanalysisAt: { not: null },
       },
     }),
-    getCommercialInsights({
-      from: from ?? (to ? undefined : monthStart),
-      to,
-    }),
+    getCommercialInsights({ from: period.from, to: period.to }),
     getTeamInsights({}),
   ]);
-  const periodByUser = new Map(
-    periodByUserRows.map((item) => [item.createdById, item._count._all]),
-  );
-  const completedByUser = new Map(
-    completedByUserRows.map((item) => [item.createdById, item._count._all]),
-  );
   /** Conversão comercial: das análises efetivamente concluídas, quantas viraram matrícula. */
   const conversion = completed ? Math.round((enrolled / completed) * 100) : 0;
-  const exportQuery = `${fromParam ? `?from=${encodeURIComponent(fromParam)}` : ""}${toParam ? `${fromParam ? "&" : "?"}to=${encodeURIComponent(toParam)}` : ""}`;
+  const exportQuery = `?from=${period.fromDay}&to=${period.toDay}`;
 
   return (
     <>
       <PageHeader
         eyebrow="Gestão"
-        title="Gestão à vista"
-        description="Acompanhe conversão, pendências e a atuação da equipe no período."
+        title="Resultados"
+        description="Conversão, pendências e operação comercial no período. O uso do sistema pela equipe fica em Uso da equipe."
       />
       <ManagementTabs active="/management" />
       <section className="relative overflow-hidden rounded-2xl border border-brand-cyan/30 bg-[radial-gradient(circle_at_18%_0%,rgba(6,147,227,0.45),transparent_42%),linear-gradient(135deg,#00284d,#071426)] text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -175,7 +122,7 @@ export default async function ManagementPage({
         </div>
       </section>
       <div className="mt-4">
-        <DateRangeFilter />
+        <PeriodFilter defaultPeriod="month" period={period.key} fromDay={period.fromDay} toDay={period.toDay} />
       </div>
 
       <section
@@ -220,67 +167,19 @@ export default async function ManagementPage({
         />
       </section>
 
-      <section id="atividade-equipe" className="mt-6">
-        <Card className="overflow-hidden border-brand-cyan/25 bg-brand-cyan-50/35 shadow-md">
-          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="size-4 text-brand-navy" /> Equipe
-              </CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Produção e último acesso por responsável.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="rounded-full bg-brand-navy px-2.5 py-1 text-xs font-semibold text-white">
-                {activeUsers} ativos
-              </span>
-              <Link href="/management/team-usage" className="inline-flex items-center gap-1 text-xs font-medium text-brand-cyan-700 hover:underline">
-                Ver uso completo <ArrowUpRight className="size-3.5" />
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-2 sm:grid-cols-2">
-            {users.map((user) => {
-              const latest = user.analyses[0];
-              return (
-                <Link
-                  key={user.id}
-                  href={`/analyses?user=${user.id}`}
-                  className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:border-brand-cyan-500 hover:bg-brand-cyan-50/40"
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-semibold text-white">
-                    {initials(user.name)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
-                      {user.name}
-                    </div>
-                    <div className="mt-0.5 flex gap-2 text-xs text-muted-foreground">
-                      <span>{periodByUser.get(user.id) ?? 0} no período</span>
-                      <span className="text-status-success">
-                        {completedByUser.get(user.id) ?? 0} prontas
-                      </span>
-                    </div>
-                    <div className="mt-1 truncate text-[11px] text-muted-foreground">
-                      Último acesso:{" "}
-                      {user.lastActiveAt
-                        ? formatDateTime(user.lastActiveAt)
-                        : "nunca acessou"}
-                    </div>
-                    <div className="truncate text-[11px] text-muted-foreground">
-                      {latest
-                        ? `Última análise: ${latest.studentName ?? latest.courseName ?? "—"}`
-                        : "Sem análises"}
-                    </div>
-                  </div>
-                  <ArrowUpRight className="size-4 text-muted-foreground" />
-                </Link>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </section>
+      <Link
+        href="/management/team-usage"
+        className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-cyan/25 bg-brand-cyan-50/35 px-4 py-3 shadow-sm transition-colors hover:border-brand-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="flex items-center gap-3 text-sm">
+          <span className="flex size-9 items-center justify-center rounded-full bg-brand-navy text-white"><Users className="size-4" /></span>
+          <span>
+            <strong className="tabular-nums">{pulse.online}</strong> online agora · <strong className={pulse.idle + pulse.never ? "tabular-nums text-status-danger" : "tabular-nums"}>{pulse.idle + pulse.never}</strong> {pulse.idle + pulse.never === 1 ? "pessoa parada" : "pessoas paradas"} (14+ dias ou nunca acessaram)
+            <span className="block text-xs text-muted-foreground">de {pulse.accounts} contas da equipe</span>
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-1 text-sm font-medium text-brand-cyan-700">Ver uso da equipe <ArrowUpRight className="size-4" /></span>
+      </Link>
       <div className="mt-6">
         <TutorScoreboard tutors={teamInsights.tutors} />
       </div>
@@ -388,17 +287,5 @@ function ManagementMetric({
         </CardContent>
       </Card>
     </Link>
-  );
-}
-
-function initials(name: string) {
-  return (
-    name
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase() || "—"
   );
 }

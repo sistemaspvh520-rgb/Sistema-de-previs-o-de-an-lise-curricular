@@ -12,7 +12,8 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnalysisStatusBadge } from "@/components/shared/status-badge";
-import { DateRangeFilter } from "@/components/shared/date-range-filter";
+import { PeriodFilter } from "@/features/usage/period-filter";
+import { resolveUsagePeriod } from "@/domain/usage/metrics";
 import { formatDateTime } from "@/lib/utils";
 import { startOfCurrentMonth } from "@/lib/time";
 import { countAnalysesByPolo } from "@/repositories/analysis-repository";
@@ -24,34 +25,16 @@ import type { Prisma } from "@/generated/prisma/client";
 export const metadata: Metadata = { title: "Meus relatórios" };
 export const dynamic = "force-dynamic";
 
-function dateRange(params: {
-  from?: string | string[];
-  to?: string | string[];
-}): Prisma.DateTimeFilter | undefined {
-  const fromParam = typeof params.from === "string" ? params.from : undefined;
-  const toParam = typeof params.to === "string" ? params.to : undefined;
-  const from =
-    fromParam && !Number.isNaN(Date.parse(fromParam))
-      ? new Date(`${fromParam}T00:00:00-04:00`)
-      : undefined;
-  const to =
-    toParam && !Number.isNaN(Date.parse(toParam))
-      ? new Date(`${toParam}T23:59:59.999-04:00`)
-      : undefined;
-  return from || to
-    ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) }
-    : undefined;
-}
-
 export default async function ReportsPage({
   searchParams,
 }: PageProps<"/reports">) {
   const user = await requireUser();
   const params = await searchParams;
-  const createdAt = dateRange(params);
+  // Mesmo filtro de período das telas de gestão; o padrão é "Este mês".
+  const period = resolveUsagePeriod({ period: typeof params.period === "string" ? params.period : undefined, from: typeof params.from === "string" ? params.from : undefined, to: typeof params.to === "string" ? params.to : undefined }, new Date(), "month");
   const base: Prisma.CurricularAnalysisWhereInput = {
     createdById: user.id,
-    ...(createdAt ? { createdAt } : {}),
+    createdAt: { gte: period.from, lte: period.to },
   };
   const monthStart = startOfCurrentMonth();
   const [
@@ -201,7 +184,7 @@ export default async function ReportsPage({
         </div>
       </section>
       <div className="mt-3">
-        <DateRangeFilter />
+        <PeriodFilter defaultPeriod="month" period={period.key} fromDay={period.fromDay} toDay={period.toDay} />
       </div>
       <section
         className="mt-3 rounded-2xl border border-brand-navy bg-brand-navy p-3 shadow-xl sm:p-4"
@@ -413,7 +396,7 @@ export default async function ReportsPage({
         title="Minhas análises por polo"
         description="Clique no polo para abrir a lista ou exporte o relatório em CSV."
         rows={byPolo}
-        exportQuery={`${typeof params.from === "string" ? `?from=${encodeURIComponent(params.from)}` : ""}${typeof params.to === "string" ? `${typeof params.from === "string" ? "&" : "?"}to=${encodeURIComponent(params.to)}` : ""}`}
+        exportQuery={`?from=${period.fromDay}&to=${period.toDay}`}
       />
     </>
   );

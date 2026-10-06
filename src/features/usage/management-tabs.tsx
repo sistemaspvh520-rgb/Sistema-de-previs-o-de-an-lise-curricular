@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { Activity, BookOpen, LayoutDashboard } from "lucide-react";
+import { Activity, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { href: "/management", label: "Gestão à vista", icon: LayoutDashboard },
+  { href: "/management", label: "Resultados", icon: LayoutDashboard },
   { href: "/management/team-usage", label: "Uso da equipe", icon: Activity },
-  { href: "/management/team-usage/grades", label: "Uso das grades", icon: BookOpen },
 ] as const;
 
 /** Abas da área de Gestão. */

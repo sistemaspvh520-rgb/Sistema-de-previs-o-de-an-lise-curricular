@@ -364,3 +364,23 @@ export async function getPersonUsage(userId: string, filters: Pick<UsageFilters,
 
   return { person, daily, topScreens, sessions, timeline: timeline.slice(0, 60) };
 }
+
+/** Pulso da equipe para a Gestão: quantos estão online agora e quantos estão parados (14+ dias ou nunca acessaram). */
+export async function getTeamPulse(now = new Date()): Promise<{ accounts: number; online: number; idle: number; never: number }> {
+  const users = await prisma.user.findMany({
+    where: { isActive: true, role: { in: [...STAFF_ROLES] } },
+    select: { lastActiveAt: true, lastLoginAt: true, usagePresence: { select: { seenAt: true } } },
+  });
+  const onlineSince = new Date(now.getTime() - ONLINE_WINDOW_MS);
+  let online = 0;
+  let idle = 0;
+  let never = 0;
+  for (const user of users) {
+    const isOnline = Boolean(user.usagePresence && user.usagePresence.seenAt >= onlineSince);
+    const status = personStatus(latest(user.usagePresence?.seenAt, user.lastActiveAt, user.lastLoginAt), isOnline, now);
+    if (status.kind === "online") online += 1;
+    else if (status.kind === "idle") idle += 1;
+    else if (status.kind === "never") never += 1;
+  }
+  return { accounts: users.length, online, idle, never };
+}

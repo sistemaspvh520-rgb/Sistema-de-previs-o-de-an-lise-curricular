@@ -88,6 +88,18 @@ describe("uso da equipe: métricas", () => {
     expect(resolveUsagePeriod({ period: "hack" }, now).key).toBe("7d");
   });
 
+  it("período: 'Este mês' vai do dia 1 até agora e cada página pode escolher o padrão", () => {
+    const month = resolveUsagePeriod({ period: "month" }, now);
+    expect(month).toMatchObject({ key: "month", label: "Este mês", fromDay: "2026-10-01", toDay: "2026-10-06" });
+    expect(month.from.toISOString()).toBe("2026-10-01T04:00:00.000Z");
+    expect(month.to).toEqual(now);
+    // Resultados e Meus relatórios usam "Este mês" como padrão; Uso da equipe, 7 dias.
+    expect(resolveUsagePeriod({}, now, "month").key).toBe("month");
+    expect(resolveUsagePeriod({ period: "30d" }, now, "month").key).toBe("30d");
+    expect(resolveUsagePeriod({ period: "hack" }, now, "month").key).toBe("month");
+    expect(resolveUsagePeriod({}, now).key).toBe("7d");
+  });
+
   it("sessões: pausas de mais de 30 minutos começam outra sessão (mais recente primeiro)", () => {
     const at = (time: string) => ({ at: new Date(`2026-10-06T${time}:00Z`) });
     const sessions = groupSessions([at("12:00"), at("12:20"), at("12:45"), at("14:00"), at("14:10")]);
